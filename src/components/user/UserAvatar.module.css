@@ -1,0 +1,7 @@
+.small, .large {
+  flex: 0 0 auto; display: grid; place-items: center; overflow: hidden;
+  color: #fff; background: var(--color-primary); border-radius: 50%; font-weight: 650;
+}
+.small { width: 30px; height: 30px; font-size: 12px; }
+.large { width: 80px; height: 80px; font-size: 28px; }
+.small img, .large img { width: 100%; height: 100%; object-fit: cover; }

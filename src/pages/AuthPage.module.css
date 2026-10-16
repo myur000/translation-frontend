@@ -1,0 +1,148 @@
+.header {
+  position: relative;
+  margin-bottom: 28px;
+}
+
+.backButton {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.backButton:hover {
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+}
+
+.backButton:active {
+  transform: translateY(1px);
+}
+
+.backButton svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.header h1 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 30px;
+  letter-spacing: -0.035em;
+}
+
+.header p {
+  margin: 8px 0 0;
+  color: var(--color-text-muted);
+}
+
+.form {
+  display: grid;
+  gap: 18px;
+}
+
+.formOptions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -4px;
+}
+
+.textLink,
+.footer a,
+.success a {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.textLink:hover,
+.footer a:hover,
+.success a:hover {
+  text-decoration: underline;
+}
+
+.submitButton {
+  height: 42px;
+  margin-top: 2px;
+  color: #ffffff;
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-weight: 650;
+}
+
+.submitButton:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.submitButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.formError {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.footer {
+  margin: 24px 0 0;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.success {
+  padding: 24px;
+  background: var(--color-success-surface);
+  border: 1px solid var(--color-success-border);
+  border-radius: var(--radius-md);
+}
+
+.successIcon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 16px;
+  color: var(--color-success-text);
+  background: var(--color-success-icon);
+  border-radius: 50%;
+  font-weight: 800;
+}
+
+.success h1 {
+  margin: 0 0 10px;
+  font-size: 25px;
+  letter-spacing: -0.025em;
+}
+
+.success p {
+  margin: 0 0 18px;
+  color: var(--color-success-text);
+}

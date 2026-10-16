@@ -1,0 +1,29 @@
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.controls button {
+  min-width: 24px;
+  height: 28px;
+  padding: 0 3px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+}
+
+.controls .value {
+  min-width: 42px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.controls button:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+}
+
+.controls button:disabled { opacity: 0.35; }

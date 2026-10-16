@@ -1,0 +1,15 @@
+.dialog {
+  width: min(420px, calc(100vw - 32px)); padding: 24px;
+  color: var(--color-text); background: var(--color-surface);
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius-md);
+}
+.dialog::backdrop { background: rgb(0 0 0 / 40%); }
+.dialog h2 { margin: 0 0 12px; font-size: 18px; }
+.dialog p { font-size: 13px; color: var(--color-text-muted); }
+.actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.actions button { padding: 9px 14px; border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); }
+.actions .confirm { color: var(--color-danger-text); border-color: var(--color-danger-border); background: var(--color-danger-surface); }
+.actions button:disabled { opacity: .55; cursor: default; }
+.dialog .error { color: var(--color-danger-text); }
+.actions button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }

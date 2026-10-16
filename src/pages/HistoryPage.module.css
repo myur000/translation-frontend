@@ -1,0 +1,123 @@
+.page {
+  height: 100%;
+  overflow: auto;
+  padding: 36px;
+}
+
+.page > header {
+  max-width: 720px;
+  margin-bottom: 28px;
+}
+
+.page > header p {
+  margin: 0 0 8px;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page > header h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+.page > header span,
+.state {
+  color: var(--color-text-muted);
+}
+
+.list {
+  max-width: 900px;
+  display: grid;
+  gap: 10px;
+}
+
+.item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  color: inherit;
+  text-align: left;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.item:hover {
+  border-color: var(--color-primary-border);
+  background: var(--color-surface-subtle);
+}
+
+.fileType {
+  width: 42px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  color: var(--color-primary);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.details {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.details strong,
+.details code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.details small,
+.details code,
+.status {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.details code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.status {
+  white-space: nowrap;
+}
+
+.state {
+  max-width: 620px;
+  display: grid;
+  gap: 10px;
+  padding: 28px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.state strong {
+  color: var(--color-text);
+}
+
+.state button {
+  width: fit-content;
+  padding: 8px 14px;
+  color: #ffffff;
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 680px) {
+  .page { padding: 24px 16px; }
+  .item { grid-template-columns: 42px minmax(0, 1fr); }
+  .status { grid-column: 2; }
+}

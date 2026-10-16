@@ -1,0 +1,68 @@
+.field {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.inputContainer {
+  position: relative;
+}
+
+.inputContainer input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  outline: none;
+  font-weight: 400;
+}
+
+.inputContainer input[type='password'],
+.inputContainer input[type='text'] {
+  padding-right: 82px;
+}
+
+.inputContainer input:hover {
+  border-color: #98a2b3;
+}
+
+.inputContainer input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 10%);
+}
+
+.inputContainer input[aria-invalid='true'] {
+  border-color: #dc2626;
+}
+
+.revealButton {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  min-width: 66px;
+  height: 32px;
+  padding: 0 8px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  transform: translateY(-50%);
+}
+
+.revealButton:hover {
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+}
+
+.field small {
+  color: #b42318;
+  font-size: 11px;
+  font-weight: 400;
+}

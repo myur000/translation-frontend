@@ -1,0 +1,356 @@
+.sidebar {
+  position: relative;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+
+.brand {
+  height: var(--toolbar-height);
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  font-size: 16px;
+  font-weight: 650;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.brandName {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brandMark {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  background: var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.collapseButton {
+  width: 26px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 20px;
+}
+
+.collapseButton:hover {
+  color: var(--color-text);
+  background: var(--color-bg);
+  border-color: var(--color-border);
+}
+
+.primaryAction {
+  padding: 16px 14px 12px;
+}
+
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.uploadStatus {
+  min-height: 16px;
+  margin: 6px 2px 0;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.uploadButton {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  color: #ffffff;
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+
+.uploadButton:hover {
+  background: var(--color-primary-hover);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.count {
+  min-width: 22px;
+  padding: 1px 6px;
+  text-align: center;
+  background: var(--color-bg);
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+.documentList {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px;
+}
+
+.documentItem {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+}
+
+.documentItem:hover {
+  background: var(--color-surface-subtle);
+}
+
+.active {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-border);
+}
+
+.fileIcon {
+  width: 34px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--color-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.documentInfo {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.documentName {
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.documentMeta {
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.footer {
+  flex: 0 0 auto;
+  padding: 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.footerLink {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  font-weight: 550;
+}
+
+.footerLink:hover,
+.footerLinkActive {
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.resizeHandle {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.resizeHandle::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2px;
+  background: transparent;
+  content: '';
+}
+
+.resizeHandle:hover::after,
+.resizeHandle:focus-visible::after,
+.resizeHandleActive::after {
+  background: var(--color-primary);
+}
+
+.resizeHandle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.collapsed {
+  overflow: visible;
+}
+
+.collapsed .brand {
+  justify-content: center;
+  gap: 4px;
+  padding: 0 6px;
+}
+
+.collapsed .brandName,
+.collapsed .uploadLabel,
+.collapsed .sectionHeader,
+.collapsed .documentInfo,
+.collapsed .footerLabel,
+.collapsed .uploadStatus {
+  display: none;
+}
+
+.collapsed .primaryAction {
+  padding: 16px;
+}
+
+.collapsed .uploadButton {
+  width: 40px;
+  min-height: 40px;
+  margin: 0 auto;
+  padding: 0;
+}
+
+.collapsed .documentItem {
+  justify-content: center;
+  padding: 8px;
+}
+
+.collapsed .footerLink {
+  justify-content: center;
+  padding: 9px;
+}
+
+@media (max-width: 840px) {
+  .sidebar {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .collapseButton,
+  .resizeHandle {
+    display: none;
+  }
+
+  .documentList {
+    display: flex;
+    flex: 0 0 auto;
+    max-height: 84px;
+    overflow-x: auto;
+  }
+
+  .documentItem {
+    min-width: 210px;
+  }
+
+  .footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    gap: 4px;
+    padding: 8px 14px;
+  }
+
+  .collapsed .brand {
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 0 18px;
+  }
+
+  .collapsed .brandName,
+  .collapsed .uploadLabel,
+  .collapsed .footerLabel {
+    display: inline;
+  }
+
+  .collapsed .sectionHeader,
+  .collapsed .documentInfo {
+    display: flex;
+  }
+
+  .collapsed .uploadStatus {
+    display: block;
+  }
+
+  .collapsed .primaryAction {
+    padding: 16px 14px 12px;
+  }
+
+  .collapsed .uploadButton {
+    width: 100%;
+    margin: 0;
+    padding: 9px 12px;
+  }
+
+  .collapsed .documentItem {
+    justify-content: flex-start;
+    padding: 10px;
+  }
+
+  .collapsed .footerLink {
+    justify-content: flex-start;
+    padding: 9px 10px;
+  }
+}

@@ -1,0 +1,167 @@
+.toolbar {
+  min-height: var(--toolbar-height);
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(240px, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.fileBlock {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fileName {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileMeta {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.controls,
+.actions,
+.pageNavigation {
+  display: flex;
+  align-items: center;
+}
+
+.controls {
+  gap: 8px;
+}
+
+.languageField {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.languageField select {
+  height: 30px;
+  padding: 0 28px 0 10px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.direction {
+  color: var(--color-text-soft);
+}
+
+.translateButton,
+.secondaryButton,
+.pageNavigation button {
+  height: 30px;
+  border-radius: var(--radius-sm);
+}
+
+.translateButton {
+  padding: 0 14px;
+  color: #ffffff;
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  font-weight: 600;
+}
+
+.translateButton:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.translateButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.actions {
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.pageNavigation {
+  gap: 2px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.pageNavigation button {
+  width: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.pageNavigation button:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-bg);
+  border-color: var(--color-border);
+}
+
+.secondaryButton {
+  padding: 0 12px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  font-weight: 550;
+}
+
+.secondaryButton:hover:not(:disabled) {
+  background: var(--color-surface-subtle);
+}
+
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.secondaryButton[aria-busy="true"] {
+  cursor: wait;
+}
+
+.activeAction {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-border);
+}
+
+.pageNavigation button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+@media (max-width: 1180px) {
+  .toolbar {
+    grid-template-columns: minmax(180px, 1fr) auto;
+  }
+
+  .actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .controls {
+    flex-wrap: wrap;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+  }
+}

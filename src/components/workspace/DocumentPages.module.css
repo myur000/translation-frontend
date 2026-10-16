@@ -1,0 +1,16 @@
+.paper { position: relative; margin: 0 auto; color: #1f2937; background: #fff; box-shadow: var(--shadow-page); zoom: var(--book-zoom, 1); }
+.paper + .paper { margin-top: 24px; }
+.canvas { display: block; width: 100%; height: 100%; }
+.placeholder { position: absolute; top: 16px; right: 20px; color: #98a2b3; font-size: 12px; }
+.pageError { position: absolute; inset: 0; display: grid; place-content: center; margin: 0; padding: 24px; background: #fff; color: #b42318; }
+.docx { min-height: 720px; padding: 40px; overflow-wrap: anywhere; line-height: 1.65; }
+.docx :is(h1, h2, h3, h4) { color: #111827; line-height: 1.2; }
+.docx img { max-width: 100%; height: auto; }
+.docx table { width: 100%; border-collapse: collapse; }
+.docx :is(td, th) { padding: 8px; border: 1px solid #d0d5dd; vertical-align: top; }
+.formatNote { margin: 0 0 24px; padding-bottom: 12px; border-bottom: 1px solid #e4e7ec; color: #667085; font-size: 11px; }
+.textLayer { position: absolute; inset: 0; overflow: clip; line-height: 1; text-size-adjust: none; --min-font-size: 1; --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size)); }
+.textLayer :is(span, br) { position: absolute; color: transparent; white-space: pre; cursor: text; transform-origin: 0 0; user-select: text; }
+.textLayer span { --font-height: 0; --scale-x: 1; --rotate: 0deg; font-size: calc(var(--text-scale-factor) * var(--font-height)); transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(calc(1 / var(--min-font-size))); }
+.textLayer :global(.markedContent) { display: contents; }
+.textLayer ::selection { background: rgb(37 99 235 / 25%); }

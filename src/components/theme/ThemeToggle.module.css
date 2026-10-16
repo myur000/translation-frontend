@@ -1,0 +1,31 @@
+.button {
+  position: absolute;
+  z-index: 2;
+  top: 28px;
+  right: clamp(28px, 5vw, 72px);
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+}
+
+.button:hover { color: var(--color-primary); }
+.button:active { transform: translateY(1px); }
+.button svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+@media (max-width: 520px) {
+  .button { top: 17px; right: 20px; }
+}
