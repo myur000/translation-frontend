@@ -3,10 +3,13 @@ import { Link, useOutletContext } from 'react-router'
 import { ApiClientError } from '../api/client.ts'
 import { NotesPanel } from '../components/notes/NotesPanel.tsx'
 import type { DocumentAction } from '../components/toolbar/DocumentActionsMenu.tsx'
-import { ConfirmDialog } from '../components/ui/ConfirmDialog.tsx'
 import { createIdempotencyKey } from '../api/idempotency.ts'
 import { RetranslateDialog } from '../components/workspace/RetranslateDialog.tsx'
-import { TranslationFeedback } from '../components/workspace/TranslationFeedback.tsx'
+import { FeedbackPrompt } from '../components/workspace/FeedbackPrompt.tsx'
+import {
+  wasFeedbackPromptDismissed,
+  type FeedbackPromptMode,
+} from '../documents/feedbackPromptStorage.ts'
 import { useGlossaryTermCount } from '../documents/useGlossaryTermCount.ts'
 import { ReaderBar } from '../components/toolbar/ReaderBar.tsx'
 import { TopToolbar } from '../components/toolbar/TopToolbar.tsx'
@@ -17,6 +20,7 @@ import {
   NOTES_MIN_WIDTH,
   useResizableNotesPanel,
 } from '../hooks/useResizableNotesPanel.ts'
+import { useElementHeight } from '../hooks/useElementHeight.ts'
 import { useSynchronizedScroll } from '../hooks/useSynchronizedScroll.ts'
 import { useBookZoom } from '../hooks/useBookZoom.ts'
 import { useTranslationDownload } from '../hooks/useTranslationDownload.ts'
@@ -58,10 +62,9 @@ interface DocumentWorkspaceProps {
   onAttachOriginal: AppLayoutContextValue['attachOriginal']
   onResumeTranslationWaiting: AppLayoutContextValue['resumeTranslationWaiting']
   onRetranslate: AppLayoutContextValue['retranslateDocument']
-  onDelete: AppLayoutContextValue['deleteDocument']
 }
 
-type WorkspaceDialog = 'retranslate' | 'delete' | null
+type WorkspaceDialog = 'retranslate' | null
 
 function DocumentWorkspace({
   document,
@@ -75,7 +78,6 @@ function DocumentWorkspace({
   onAttachOriginal,
   onResumeTranslationWaiting,
   onRetranslate,
-  onDelete,
 }: DocumentWorkspaceProps) {
   const { t } = useTranslation()
   const { getLabel: getLanguageLabel } = useLanguageCatalog()
@@ -88,8 +90,19 @@ function DocumentWorkspace({
   const [notice, setNotice] = useState('')
   const [isTranslating, setTranslating] = useState(false)
   const [dialog, setDialog] = useState<WorkspaceDialog>(null)
-  const [isDeleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [feedbackPrompt, setFeedbackPrompt] = useState<FeedbackPromptMode | null>(null)
+  // Offer a rating when this document finishes while it is open. Adjusting
+  // state during render (not in an effect) avoids an extra paint.
+  const [topChromeRef, topChromeHeight] = useElementHeight<HTMLDivElement>()
+  const [bottomChromeRef, bottomChromeHeight] = useElementHeight<HTMLDivElement>()
+  const [observedStatus, setObservedStatus] = useState(document.status)
+  if (observedStatus !== document.status) {
+    setObservedStatus(document.status)
+    if (observedStatus === 'processing' && document.status === 'ready' && document.jobId &&
+        !wasFeedbackPromptDismissed(document.jobId)) {
+      setFeedbackPrompt('auto')
+    }
+  }
   const [useGlossary, setUseGlossary] = useState(false)
   // Only a local file can be uploaded with a glossary from the toolbar.
   const canUploadFile = Boolean(document.sourceFile) &&
@@ -260,20 +273,6 @@ function DocumentWorkspace({
     return error.details?.message || t('workspace.uploadFailed')
   }
 
-  const handleDelete = async () => {
-    setDeleting(true)
-    setDeleteError(null)
-    try {
-      await onDelete(document.id)
-      // The workspace unmounts with the deleted document.
-    } catch (error) {
-      setDeleteError(error instanceof ApiClientError && error.status === 409
-        ? t('delete.processing')
-        : t('delete.failed'))
-      setDeleting(false)
-    }
-  }
-
   const details: string[] = []
   if (!document.jobId && document.estimate) {
     details.push(t('estimate.cost', { units: document.estimate.billedUnits }))
@@ -294,33 +293,20 @@ function DocumentWorkspace({
 
   const isUploaded = Boolean(document.jobId)
   const isProcessing = document.status === 'processing'
-  const documentActions: DocumentAction[] = [
-    {
-      id: 'retranslate',
-      label: t('documentActions.retranslate'),
-      disabledReason: !isUploaded
-        ? t('documentActions.notUploaded')
-        : isProcessing ? t('documentActions.processing') : undefined,
-      onSelect: () => setDialog('retranslate'),
-    },
-    isUploaded
-      ? {
-          id: 'delete',
-          label: t('documentActions.delete'),
-          danger: true,
+  // Deleting lives in the sidebar, next to the document it removes.
+  const documentActions: DocumentAction[] = isUploaded
+    ? [
+        {
+          id: 'retranslate',
+          label: t('documentActions.retranslate'),
           disabledReason: isProcessing ? t('documentActions.processing') : undefined,
-          onSelect: () => {
-            setDeleteError(null)
-            setDialog('delete')
-          },
-        }
-      : {
-          id: 'remove-draft',
-          label: t('documentActions.removeDraft'),
-          danger: true,
-          onSelect: () => void onDelete(document.id),
+          onSelect: () => setDialog('retranslate'),
         },
-  ]
+        ...(document.status === 'ready'
+          ? [{ id: 'rate', label: t('documentActions.rate'), onSelect: () => setFeedbackPrompt('manual') }]
+          : []),
+      ]
+    : []
 
   const handleDownload = () => {
     setNotice('')
@@ -360,49 +346,55 @@ function DocumentWorkspace({
   return (
     <div
       className={`${styles.workspace} ${isImmersiveMode ? styles.immersiveWorkspace : ''}`}
+      style={{
+        '--chrome-top': `${topChromeHeight}px`,
+        '--chrome-bottom': `${bottomChromeHeight}px`,
+      } as CSSProperties}
       onContextMenu={handleContextMenu}
     >
+      {/* The bars float over the reading columns; text scrolls beneath them. */}
       {!isImmersiveMode ? (
-        <TopToolbar
-        document={document}
-        sourceLanguage={sourceLanguage}
-        targetLanguage={targetLanguage}
-        pageCount={pageCount}
-        isTranslating={isTranslating}
-        isDownloading={translationDownload.isDownloading}
-        canDownload={translationDownload.canDownload}
-        canTranslate={
-          Boolean(document.waitingIssue) ||
-          !document.jobId ||
-          document.status === 'failed'
-        }
-        documentActions={documentActions}
-        details={details}
-        glossaryTermCount={canUploadFile ? glossaryTermCount : null}
-        useGlossary={useGlossary}
-        onUseGlossaryChange={setUseGlossary}
-        onSourceLanguageChange={handleSourceLanguageChange}
-        onTargetLanguageChange={handleTargetLanguageChange}
-        onSwapLanguages={handleSwapLanguages}
-        onTranslate={() => void handleTranslate()}
-        onDownload={handleDownload}
-      />
-      ) : null}
-
-      {!isImmersiveMode && (visibleNotice || quotaWarning || document.status === 'failed') ? (
-        <div
-          className={`${styles.notice} ${quotaWarning && !visibleNotice ? styles.noticeWarning : ''}`}
-          role={isNoticeError || (document.status === 'failed' && !visibleNotice) ? 'alert' : 'status'}
-        >
-          {visibleNotice || quotaWarning || document.errorMessage || t('workspace.translationFailed')}
-          {visibleNotice ? (
-            <button
-              type="button"
-              onClick={() => { setNotice(''); translationDownload.clearNotice() }}
-              aria-label={t('workspace.closeNotice')}
+        <div ref={topChromeRef} className={styles.topChrome}>
+          <TopToolbar
+            document={document}
+            sourceLanguage={sourceLanguage}
+            targetLanguage={targetLanguage}
+            pageCount={pageCount}
+            isTranslating={isTranslating}
+            isDownloading={translationDownload.isDownloading}
+            canDownload={translationDownload.canDownload}
+            canTranslate={
+              Boolean(document.waitingIssue) ||
+              !document.jobId ||
+              document.status === 'failed'
+            }
+            documentActions={documentActions}
+            details={details}
+            glossaryTermCount={canUploadFile ? glossaryTermCount : null}
+            useGlossary={useGlossary}
+            onUseGlossaryChange={setUseGlossary}
+            onSourceLanguageChange={handleSourceLanguageChange}
+            onTargetLanguageChange={handleTargetLanguageChange}
+            onSwapLanguages={handleSwapLanguages}
+            onTranslate={() => void handleTranslate()}
+            onDownload={handleDownload}
+          />
+          {visibleNotice || quotaWarning || document.status === 'failed' ? (
+            <div
+              className={`${styles.notice} ${quotaWarning && !visibleNotice ? styles.noticeWarning : ''}`}
+              role={isNoticeError || (document.status === 'failed' && !visibleNotice) ? 'alert' : 'status'}
             >
-              ×
-            </button>
+              {visibleNotice || quotaWarning || document.errorMessage || t('workspace.translationFailed')}
+              {visibleNotice ? (
+                <button
+                  type="button"
+                  onClick={() => { setNotice(''); translationDownload.clearNotice() }}
+                  aria-label={t('workspace.closeNotice')}
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </div>
       ) : null}
@@ -440,9 +432,6 @@ function DocumentWorkspace({
             view={translationView}
             language={getLanguageLabel(targetLanguage)}
             languageCode={targetLanguage}
-            headerExtra={document.status === 'ready' && document.jobId
-              ? <TranslationFeedback key={document.jobId} jobId={document.jobId} />
-              : null}
             page={displayedPage}
             navigationRevision={navigationRevision}
             onVisiblePage={setCurrentPage}
@@ -485,18 +474,20 @@ function DocumentWorkspace({
       </div>
 
       {!isImmersiveMode ? (
-        <ReaderBar
-          currentPage={displayedPage}
-          pageCount={pageCount}
-          notesOpen={notesVisible}
-          isScrollSyncEnabled={isScrollSyncEnabled}
-          isDualPanelFullscreen={isDualPanelFullscreen}
-          onPreviousPage={() => navigatePage(-1)}
-          onNextPage={() => navigatePage(1)}
-          onToggleNotes={handleToggleNotes}
-          onToggleScrollSync={handleToggleScrollSync}
-          onToggleDualPanelFullscreen={handleDualPanelFullscreenToggle}
-        />
+        <div ref={bottomChromeRef} className={styles.bottomChrome}>
+          <ReaderBar
+            currentPage={displayedPage}
+            pageCount={pageCount}
+            notesOpen={notesVisible}
+            isScrollSyncEnabled={isScrollSyncEnabled}
+            isDualPanelFullscreen={isDualPanelFullscreen}
+            onPreviousPage={() => navigatePage(-1)}
+            onNextPage={() => navigatePage(1)}
+            onToggleNotes={handleToggleNotes}
+            onToggleScrollSync={handleToggleScrollSync}
+            onToggleDualPanelFullscreen={handleDualPanelFullscreenToggle}
+          />
+        </div>
       ) : null}
 
       {dialog === 'retranslate' ? (
@@ -506,15 +497,13 @@ function DocumentWorkspace({
           onClose={() => setDialog(null)}
         />
       ) : null}
-      {dialog === 'delete' ? (
-        <ConfirmDialog
-          title={t('delete.title', { name: document.name })}
-          description={t('delete.description')}
-          confirmLabel={t('delete.confirm')}
-          busy={isDeleting}
-          error={deleteError}
-          onConfirm={() => void handleDelete()}
-          onClose={() => setDialog(null)}
+      {feedbackPrompt && document.jobId && !isImmersiveMode ? (
+        <FeedbackPrompt
+          key={document.jobId}
+          jobId={document.jobId}
+          documentName={document.name}
+          mode={feedbackPrompt}
+          onClose={() => setFeedbackPrompt(null)}
         />
       ) : null}
     </div>
@@ -535,7 +524,6 @@ export function WorkspacePage() {
     attachOriginal,
     resumeTranslationWaiting,
     retranslateDocument,
-    deleteDocument,
   } = useOutletContext<AppLayoutContextValue>()
   const { t } = useTranslation()
   const [isScrollSyncEnabled, setIsScrollSyncEnabled] = useState(false)
@@ -601,7 +589,6 @@ export function WorkspacePage() {
       onAttachOriginal={attachOriginal}
       onResumeTranslationWaiting={resumeTranslationWaiting}
       onRetranslate={retranslateDocument}
-      onDelete={deleteDocument}
     />
   )
 }

@@ -518,6 +518,7 @@ function AppLayoutContent() {
             activeDocumentId={isWorkspaceRoute ? activeDocument?.id : undefined}
             onSelectDocument={handleSelectDocument}
             onUploadDocument={handlePrepareDocument}
+            onDeleteDocument={deleteDocument}
             width={sidebar.expandedWidth}
             isCollapsed={sidebar.isCollapsed}
             isResizing={sidebar.isResizing}

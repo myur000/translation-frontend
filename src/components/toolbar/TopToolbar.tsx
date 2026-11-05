@@ -113,7 +113,7 @@ export function TopToolbar(props: TopToolbarProps) {
           </button>
         ) : null}
 
-        <DocumentActionsMenu actions={props.documentActions} />
+        {props.documentActions.length ? <DocumentActionsMenu actions={props.documentActions} /> : null}
       </div>
     </header>
   )

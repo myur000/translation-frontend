@@ -1,0 +1,187 @@
+.card {
+  position: absolute;
+  z-index: 20;
+  right: 20px;
+  bottom: calc(var(--chrome-bottom, 0px) + 16px);
+  width: min(320px, calc(100% - 40px));
+  padding: 16px 18px 14px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  animation: prompt-in 200ms ease-out;
+}
+
+@keyframes prompt-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.card h2 {
+  margin: 0 28px 2px 0;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.document {
+  margin: 0 28px 10px 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-soft);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+
+.close:hover {
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.close svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.6;
+}
+
+.stars {
+  display: flex;
+  gap: 2px;
+  margin-left: -4px;
+}
+
+.star {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--color-border-strong);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+
+.star svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+  transition: transform 120ms ease;
+}
+
+.star.filled {
+  color: var(--color-warning);
+}
+
+.star:hover:not(:disabled) svg {
+  transform: scale(1.12);
+}
+
+.star:disabled {
+  cursor: wait;
+}
+
+.later {
+  margin-top: 6px;
+  padding: 4px 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  font-size: 12px;
+}
+
+.later:hover {
+  color: var(--color-text);
+}
+
+.commentForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.commentForm label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.commentForm textarea {
+  width: 100%;
+  padding: 8px 10px;
+  resize: vertical;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 13px;
+}
+
+.commentForm textarea:focus {
+  border-color: var(--color-primary);
+  outline: 3px solid var(--color-focus-ring);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.actions button {
+  padding: 6px 12px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.actions .primary {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.thanks {
+  margin: 4px 28px 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.error {
+  margin: 8px 0 0;
+  color: var(--color-danger-text);
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+
+  .star svg {
+    transition: none;
+  }
+}

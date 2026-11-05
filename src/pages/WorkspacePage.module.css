@@ -40,30 +40,63 @@
 }
 
 .workspace {
+  position: relative;
   height: 100%;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  background: var(--color-canvas);
+}
+
+/* Bars float over the reading columns; the pages scroll underneath. */
+.topChrome,
+.bottomChrome {
+  position: absolute;
+  z-index: 10;
+  right: 0;
+  left: 0;
+  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  backdrop-filter: saturate(1.4) blur(14px);
+}
+
+.topChrome {
+  top: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.bottomChrome {
+  bottom: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Without blur support a translucent bar would make text under it unreadable. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .topChrome,
+  .bottomChrome {
+    background: var(--color-surface);
+  }
 }
 
 .notice {
-  min-height: 38px;
+  min-height: 36px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 8px 14px;
+  padding: 6px 18px;
   color: var(--color-primary);
-  background: var(--color-primary-soft);
-  border-bottom: 1px solid var(--color-primary-border);
+  background: color-mix(in srgb, var(--color-primary-soft) 85%, transparent);
+  border-top: 1px solid var(--color-primary-border);
   font-size: 12px;
 }
 
 .noticeWarning {
   color: var(--color-warning-text);
-  background: var(--color-warning-surface);
-  border-bottom-color: var(--color-warning-border);
+  background: color-mix(in srgb, var(--color-warning-surface) 90%, transparent);
+  border-top-color: var(--color-warning-border);
 }
 
 .notice button {
@@ -90,9 +123,12 @@
     minmax(260px, 1fr)
     minmax(260px, 1fr)
     var(--notes-current-width);
-  gap: 12px;
-  padding: 12px;
   overflow: hidden;
+}
+
+/* The columns are one continuous surface split by a hairline. */
+.workArea > section + section {
+  border-left: 1px solid var(--color-border);
 }
 
 .withoutNotes {
@@ -103,26 +139,7 @@
   background: var(--color-bg);
 }
 
-.immersiveWorkArea {
-  gap: 1px;
-  padding: 0;
-  background: var(--color-border);
-}
 
-.immersiveWorkArea > section,
-.immersiveWorkArea .notesArea > aside {
-  border-top: 0;
-  border-bottom: 0;
-  border-radius: 0;
-}
-
-.immersiveWorkArea > section:first-child {
-  border-left: 0;
-}
-
-.immersiveWorkArea > section:last-of-type {
-  border-right: 0;
-}
 
 .singlePanel {
   grid-template-columns: minmax(0, 1fr);
@@ -136,6 +153,9 @@
   position: relative;
   min-width: 0;
   min-height: 0;
+  /* Notes stay fully visible between the bars. */
+  margin: var(--chrome-top, 0px) 0 var(--chrome-bottom, 0px);
+  border-left: 1px solid var(--color-border);
 }
 
 .notesArea > aside {
@@ -223,8 +243,17 @@
 .immersiveWorkArea .notesArea { grid-column: auto; }
 
 @media (max-width: 680px) {
+  /* Stacked columns grow with their content, so the bars return to the flow. */
   .workspace {
+    --chrome-top: 0px !important;
+    --chrome-bottom: 0px !important;
     height: auto;
+    overflow: visible;
+  }
+
+  .topChrome,
+  .bottomChrome {
+    position: static;
   }
 
   .workArea {

@@ -25,6 +25,19 @@
   background: var(--color-surface-subtle);
 }
 
+.quiet {
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border-color: transparent;
+  border-radius: var(--radius-sm);
+}
+
+.quiet:hover,
+.quiet[aria-expanded='true'] {
+  background: rgb(143 177 201 / 16%);
+}
+
 .menu {
   position: absolute;
   z-index: 40;

@@ -1,56 +1,65 @@
 .panel {
+  position: relative;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  background: var(--color-canvas);
 }
 
-.panelHeader {
-  min-height: 46px;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 14px;
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.panelHeader > div {
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.panelActions {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-}
-
-.panelLabel {
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.language,
-.scale {
-  color: var(--color-text-muted);
-  font-size: 11px;
-}
-
+/* The column runs under the floating bars; the padding keeps the first and
+   last page reachable above and below them. */
 .viewport {
   min-height: 0;
   flex: 1;
   overflow: auto;
-  padding: 24px;
+  padding: calc(var(--chrome-top, 0px) + 44px) 24px calc(var(--chrome-bottom, 0px) + 64px);
   background: var(--color-canvas);
+  /* A thin bar in the palette: a full-height system bar reads as a divider. */
+  scrollbar-color: var(--color-border-strong) transparent;
+  scrollbar-width: thin;
+  scroll-padding-top: calc(var(--chrome-top, 0px) + 12px);
+  scroll-padding-bottom: calc(var(--chrome-bottom, 0px) + 12px);
+}
+
+.columnLabel,
+.columnTools {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.columnLabel {
+  top: calc(var(--chrome-top, 0px) + 10px);
+  left: 14px;
+  max-width: calc(100% - 28px);
+  overflow: hidden;
+  padding: 3px 10px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.columnLabel strong {
+  color: var(--color-text);
+  font-weight: 650;
+}
+
+.columnTools {
+  right: 14px;
+  bottom: calc(var(--chrome-bottom, 0px) + 12px);
+  gap: 2px;
+  padding: 2px 4px;
+  box-shadow: 0 4px 14px rgb(9 20 35 / 8%);
 }
 
 .pages {
@@ -162,7 +171,7 @@
 
 @media (max-width: 620px) {
   .viewport {
-    padding: 12px;
+    padding: 44px 12px 64px;
   }
 
   .page {
@@ -171,3 +180,10 @@
   }
 }
 
+
+/* Inside the floating pill the expand button drops its own frame. */
+.columnTools > button {
+  background: transparent;
+  border-color: transparent;
+  border-radius: 999px;
+}

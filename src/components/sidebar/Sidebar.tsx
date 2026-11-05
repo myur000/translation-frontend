@@ -6,6 +6,9 @@ import {
   type PointerEventHandler,
 } from 'react'
 import { NavLink } from 'react-router'
+import { ApiClientError } from '../../api/client.ts'
+import { DocumentActionsMenu, type DocumentAction } from '../toolbar/DocumentActionsMenu.tsx'
+import { ConfirmDialog } from '../ui/ConfirmDialog.tsx'
 import {
   SIDEBAR_MAX_WIDTH,
   SIDEBAR_MIN_WIDTH,
@@ -23,6 +26,8 @@ interface SidebarProps {
   activeDocumentId?: string
   onSelectDocument: (documentId: string) => void
   onUploadDocument: (file: File) => string
+  /** Deletes the job on the backend (drafts only locally). */
+  onDeleteDocument: (documentId: string) => Promise<void>
   width: number
   isCollapsed: boolean
   isResizing: boolean
@@ -39,6 +44,7 @@ export function Sidebar({
   activeDocumentId,
   onSelectDocument,
   onUploadDocument,
+  onDeleteDocument,
   width,
   isCollapsed,
   isResizing,
@@ -52,6 +58,43 @@ export function Sidebar({
   const { t } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploadMessage, setUploadMessage] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<DocumentItem | null>(null)
+  const [isDeleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await onDeleteDocument(pendingDelete.id)
+      setPendingDelete(null)
+    } catch (error) {
+      setDeleteError(error instanceof ApiClientError && error.status === 409
+        ? t('delete.processing')
+        : t('delete.failed'))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const actionsFor = (document: DocumentItem): DocumentAction[] => document.jobId
+    ? [{
+        id: 'delete',
+        label: t('documentActions.delete'),
+        danger: true,
+        disabledReason: document.status === 'processing' ? t('documentActions.processing') : undefined,
+        onSelect: () => {
+          setDeleteError(null)
+          setPendingDelete(document)
+        },
+      }]
+    : [{
+        id: 'remove-draft',
+        label: t('documentActions.removeDraft'),
+        danger: true,
+        onSelect: () => void onDeleteDocument(document.id),
+      }]
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const [file] = event.currentTarget.files ?? []
@@ -111,9 +154,9 @@ export function Sidebar({
         {documents.map((document) => {
           const isActive = document.id === activeDocumentId
           return (
+            <div key={document.id} className={styles.documentRow}>
             <button
               type="button"
-              key={document.id}
               className={`${styles.documentItem} ${isActive ? styles.active : ''}`}
               aria-pressed={isActive}
               onClick={() => onSelectDocument(document.id)}
@@ -136,9 +179,31 @@ export function Sidebar({
                 </span>
               </span>
             </button>
+            {!isCollapsed ? (
+              <DocumentActionsMenu
+                className={styles.rowActions}
+                variant="quiet"
+                portal
+                label={t('sidebar.documentActions', { name: document.name })}
+                actions={actionsFor(document)}
+              />
+            ) : null}
+            </div>
           )
         })}
       </nav>
+
+      {pendingDelete ? (
+        <ConfirmDialog
+          title={t('delete.title', { name: pendingDelete.name })}
+          description={t('delete.description')}
+          confirmLabel={t('delete.confirm')}
+          busy={isDeleting}
+          error={deleteError}
+          onConfirm={() => void confirmDelete()}
+          onClose={() => setPendingDelete(null)}
+        />
+      ) : null}
 
       <div className={styles.footer}>
         <NavLink
