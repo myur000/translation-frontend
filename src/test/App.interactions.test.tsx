@@ -1479,8 +1479,9 @@ describe('cost, glossary and rating', () => {
 
     expect(await screen.findByText(/списано 2 стр\. · глоссарий: 4/)).toBeTruthy()
     const [, init] = callsTo(fetchMock, '/api/documents/upload', 'POST')[0]
-    expect((init?.body as FormData).get('use_glossary')).toBe('true')
-    expect((init?.body as FormData).get('source_lang')).toBe('eng_Latn')
+    const body = init?.body as FormData
+    expect(body.get('use_glossary')).toBe('true')
+    expect(body.get('source_lang')).toBe('eng_Latn')
   })
 
   it('rates a finished translation and adds a comment', async () => {
@@ -1525,6 +1526,62 @@ describe('cost, glossary and rating', () => {
     await user.click(within(rating).getByRole('radio', { name: '2 из 5' }))
 
     await waitFor(() => expect(saved).toEqual({ rating: 2, comment: 'Хорошо' }))
+  })
+})
+
+describe('document status events', () => {
+  const job = '00000000-0000-0000-0000-000000000101'
+  const processingHistory = () => jsonResponse({
+    items: [{ ...historyItems[0], status: 'PROCESSING', progress: 10, file_name: 'Книга.pdf' }],
+    page: 0, size: 100, total_elements: 1, total_pages: 1, first: true, last: true,
+  })
+  const statusResponse = (status: string, progress: number) => () => jsonResponse({
+    job_id: job, status, progress, error_code: null, error_message: null,
+    file_name: 'Книга.pdf', glossary_term_count: null,
+  })
+
+  /** An open text/event-stream the test writes to. */
+  function eventStream() {
+    const encoder = new TextEncoder()
+    let controller!: ReadableStreamDefaultController<Uint8Array>
+    const body = new ReadableStream<Uint8Array>({ start(value) { controller = value } })
+    return {
+      response: () => new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }),
+      send: (event: string, data: unknown) =>
+        act(async () => { controller.enqueue(encoder.encode(`event:${event}\ndata:${JSON.stringify(data)}\n\n`)) }),
+    }
+  }
+
+  it('applies status events from the stream', async () => {
+    const stream = eventStream()
+    // The server state the status endpoint reports; events announce its changes.
+    let server: [string, number] = ['PROCESSING', 10]
+    renderDocumentRoute(`/documents/${job}`, {
+      '/api/documents/history?page=0&size=100': processingHistory,
+      '/api/documents/events': stream.response,
+      [`/api/documents/${job}/status`]: () => statusResponse(...server)(),
+    })
+    expect(await screen.findByText(/Переводится · 10%/)).toBeTruthy()
+
+    await stream.send('ready', { expires_at: '2026-11-05T01:00:00Z' })
+    server = ['PROCESSING', 60]
+    await stream.send('job', { job_id: job, status: 'PROCESSING', progress: 60 })
+    expect(await screen.findByText(/Переводится · 60%/)).toBeTruthy()
+
+    server = ['DONE', 100]
+    await stream.send('job', { job_id: job, status: 'DONE', progress: 100 })
+    expect(await screen.findByText(/Готов · 100%/)).toBeTruthy()
+  })
+
+  it('falls back to polling when the server has no event stream', async () => {
+    const { fetchMock } = renderDocumentRoute(`/documents/${job}`, {
+      '/api/documents/history?page=0&size=100': processingHistory,
+      '/api/documents/events': () => jsonResponse(apiErrorBody(404, 'Not found'), 404),
+      [`/api/documents/${job}/status`]: statusResponse('DONE', 100),
+    })
+
+    expect(await screen.findByText(/Готов · 100%/)).toBeTruthy()
+    expect(callsTo(fetchMock, '/api/documents/events', 'GET')).toHaveLength(1)
   })
 })
 

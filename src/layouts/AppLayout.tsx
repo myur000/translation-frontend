@@ -9,7 +9,12 @@ import {
   retranslateDocument as retranslateDocumentRequest,
   uploadDocument as uploadDocumentRequest,
 } from '../api/documents.ts'
-import type { DocumentUploadResponse } from '../api/contracts/documents.ts'
+import type {
+  DocumentJobEvent,
+  DocumentStatusResponse,
+  DocumentUploadResponse,
+} from '../api/contracts/documents.ts'
+import { getTranslationStatus } from '../api/translations.ts'
 import { ApiClientError } from '../api/client.ts'
 import { useAuth } from '../auth/useAuth.ts'
 import { EmailVerificationBanner } from '../components/auth/EmailVerificationBanner.tsx'
@@ -24,6 +29,7 @@ import {
   useRouteDocument,
   type RouteDocumentState,
 } from '../documents/useRouteDocument.ts'
+import { useDocumentEvents } from '../hooks/useDocumentEvents.ts'
 import { useResizableSidebar } from '../hooks/useResizableSidebar.ts'
 import {
   useTranslationStatusPolling,
@@ -76,6 +82,9 @@ export interface AppLayoutContextValue {
 export type ExpandedPanel = 'original' | 'translation' | null
 
 const MAX_DOCUMENT_SIZE = 20 * 1024 * 1024
+/** With a live event stream, polling is only a safety net for missed events. */
+const POLLING_WITH_EVENTS_MS = 30_000
+const POLLING_WITHOUT_EVENTS_MS = 2_500
 const SUPPORTED_EXTENSIONS = new Set(['pdf', 'doc', 'docx'])
 
 export function AppLayout() {
@@ -250,11 +259,45 @@ function AppLayoutContent() {
         ? { ...document, waitingIssue: undefined } : document))
   }, [])
 
+  const documentsRef = useRef(documents)
+  useEffect(() => {
+    documentsRef.current = documents
+  })
+  const [statusRefreshKey, setStatusRefreshKey] = useState(0)
+  const accessToken = session?.accessToken ?? null
+
+  const handleJobEvent = useCallback((event: DocumentJobEvent) => {
+    const document = documentsRef.current.find((item) => item.jobId === event.job_id)
+    if (!document) return
+    const apply = (response: DocumentStatusResponse) =>
+      handleStatusUpdates([{ documentId: document.id, response }])
+    const partial: DocumentStatusResponse = {
+      ...event, error_code: null, error_message: null, file_name: null, glossary_term_count: null,
+    }
+    // The event carries no error text; read the full status once the job ends.
+    if ((event.status === 'DONE' || event.status === 'FAILED') && accessToken) {
+      getTranslationStatus(event.job_id, { accessToken }).then(apply, () => apply(partial))
+    } else {
+      apply(partial)
+    }
+  }, [accessToken, handleStatusUpdates])
+
+  const handleEventsResync = useCallback(() => setStatusRefreshKey((key) => key + 1), [])
+
+  const documentEvents = useDocumentEvents({
+    accessToken,
+    enabled: pollingJobs.length > 0,
+    onJob: handleJobEvent,
+    onResync: handleEventsResync,
+  })
+
   useTranslationStatusPolling({
-    accessToken: session?.accessToken ?? null,
+    accessToken,
     jobs: pollingJobs,
     onUpdate: handleStatusUpdates,
     onTimeout: handleWaitingTimeout,
+    intervalMs: documentEvents === 'live' ? POLLING_WITH_EVENTS_MS : POLLING_WITHOUT_EVENTS_MS,
+    refreshKey: statusRefreshKey,
   })
 
   useEffect(() => {

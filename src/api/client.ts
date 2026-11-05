@@ -253,6 +253,31 @@ export class ApiClient {
     }
   }
 
+  /**
+   * Opens a long-lived streaming response such as Server-Sent Events. The
+   * opening request gets the usual token preparation and one retry after 401;
+   * the stream itself cannot be replayed, so a closed stream is reopened by
+   * the caller.
+   */
+  async requestStream(
+    path: string,
+    options: { accessToken: string; signal?: AbortSignal; headers?: HeadersInit },
+  ): Promise<ReadableStream<Uint8Array>> {
+    const headers = new Headers(options.headers)
+    const { response, token } = await this.fetchWithRecovery(
+      path,
+      { method: 'GET', headers, signal: options.signal, cache: 'no-store' },
+      options.accessToken,
+      false,
+    )
+
+    if (!response.ok) await this.throwResponseError(response, true, token)
+    if (!response.body) {
+      throw new ApiClientError('Backend returned an empty stream.', response.status, null, null, null)
+    }
+    return response.body
+  }
+
   private fetch(input: RequestInfo | URL, init: RequestInit) {
     const fetcher = this.fetchImplementation ?? globalThis.fetch
     return fetcher(input, init)

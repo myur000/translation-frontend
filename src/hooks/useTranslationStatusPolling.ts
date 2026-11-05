@@ -27,6 +27,8 @@ interface UseTranslationStatusPollingOptions {
   intervalMs?: number
   stallTimeoutMs?: number
   requestTimeoutMs?: number
+  /** Changing it re-reads all statuses immediately (e.g. after an SSE `resync`). */
+  refreshKey?: number
 }
 interface Observation {
   jobId: string
@@ -66,6 +68,7 @@ export function useTranslationStatusPolling({
   accessToken, jobs, onUpdate, onTimeout, intervalMs = 2_500,
   stallTimeoutMs = TRANSLATION_STALL_TIMEOUT_MS,
   requestTimeoutMs = TRANSLATION_REQUEST_TIMEOUT_MS,
+  refreshKey = 0,
 }: UseTranslationStatusPollingOptions) {
   const jobsRef = useRef(jobs)
   const observationsRef = useRef(new Map<string, Observation>())
@@ -150,5 +153,5 @@ export function useTranslationStatusPolling({
       controller.abort()
       window.clearInterval(intervalId)
     }
-  }, [accessToken, hasJobs, jobSetKey, intervalMs, stallTimeoutMs, requestTimeoutMs, onUpdate, onTimeout])
+  }, [accessToken, hasJobs, jobSetKey, intervalMs, stallTimeoutMs, requestTimeoutMs, onUpdate, onTimeout, refreshKey])
 }
