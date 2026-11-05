@@ -60,6 +60,12 @@ Frontend обновляет JWT за минуту до истечения и п�
 | POST | `/api/auth/password-reset/confirm` | public | `PasswordResetConfirmRequest` | `204` |
 | GET | `/api/languages` | public | — | `200 LanguageResponse[]` (NLLB-200, `max-age=3600`) |
 | POST | `/api/documents/upload` | verified JWT | multipart | `202 DocumentUploadResponse` |
+| POST | `/api/documents/estimate` | verified JWT | multipart `file` | `200 DocumentEstimateResponse` |
+| POST | `/api/documents/{jobId}/translations` | verified JWT + `Idempotency-Key` | `RetranslationRequest` | `202 DocumentUploadResponse` |
+| DELETE | `/api/documents/{jobId}` | JWT | — | `204` |
+| GET | `/api/documents/events` | JWT | — | `text/event-stream` |
+| GET / PUT | `/api/documents/{jobId}/feedback` | JWT | `DocumentFeedbackRequest` | `200 DocumentFeedbackResponse` |
+| GET | `/api/terms?source_lang=&target_lang=&size=1` | JWT | — | `200 TermListResponse` (frontend читает `total_elements`) |
 | GET | `/api/documents/{jobId}/status` | JWT | — | `200 DocumentStatusResponse` |
 | GET | `/api/documents/{jobId}/download` | JWT | — | file stream |
 | GET | `/api/documents/history?page=0&size=20` | JWT | query, `size` 1–100 | `200 DocumentHistoryResponse` |
@@ -123,8 +129,52 @@ BCP 47 (`eng_Latn` → `en-Latn`).
 - `DONE` — результат готов к скачиванию.
 - `FAILED` — перевод завершился ошибкой.
 
-Единственный текущий публичный `error_code`: `TRANSLATION_FAILED`. Статус нужно
-проверять polling-запросами; WebSocket и SSE backend не реализует.
+Единственный текущий публичный `error_code`: `TRANSLATION_FAILED`.
+
+### Поток статусов (SSE)
+
+Пока есть незавершённые документы, рабочая область держит один поток
+`GET /api/documents/events` (`src/hooks/useDocumentEvents.ts`). `EventSource`
+не умеет передавать `Authorization`, поэтому поток открывается через API-клиент
+(`requestStream`: подготовка токена и один повтор после 401) и разбирается
+парсером `src/api/sse.ts`.
+
+- `job` — сразу обновить статус и прогресс; на `DONE`/`FAILED` прочитать полный
+  статус (в событии нет текста ошибки).
+- `ready`, `resync` — перечитать статусы незавершённых документов.
+- Поток, закрытый сервером (истёк токен, периодическая ротация), открывается
+  снова; сетевые ошибки — с экспоненциальной задержкой до 30 секунд.
+- `404` (потоки выключены) и `429` (больше 5 потоков на аккаунт) — поток
+  отключается до перезагрузки страницы.
+
+Опрос `GET /status` остаётся страховкой: раз в 30 секунд при живом потоке и раз
+в 2,5 секунды без него. Логика «статус не меняется 2 минуты» не изменилась.
+
+## Документы: ссылка, удаление, другой язык, оценка
+
+- Маршрут `/documents/:jobId` — страница документа; на неё ведёт письмо о
+  готовности перевода. Задачи с первой страницы истории открываются сразу;
+  более старые подтверждаются запросом статуса и ищутся на следующих страницах
+  истории. `404` — экран «Документ не найден». Выбор документа и успешная
+  загрузка переводят URL на задачу.
+- `file_name` из истории и статуса показывается вместо локального имени; у
+  старых задач (`null`) остаётся имя из `sessionStorage`.
+- Меню «⋯» в панели инструментов: «Перевести на другой язык» и «Удалить
+  документ». Перевод на другой язык берёт оригинал, хранящийся на backend,
+  поэтому файл не нужен; каждый отличающийся запрос получает свой
+  `Idempotency-Key`, повтор того же запроса — тот же ключ. Неудачный перевод
+  повторяется так же, без выбора оригинала. `410` — оригинал удалён по сроку.
+- Удаление: подтверждение, `DELETE`; `409` — документ ещё переводится; `404`
+  считается уже удалённым. Черновик удаляется только локально.
+- Стоимость черновика (`POST /documents/estimate`) показывается под именем
+  файла, при нехватке квоты — предупреждение. Для неподтверждённого email
+  оценки нет (`403`), это не ошибка.
+- Глоссарий: галочка «Глоссарий · N» видна, только если для пары языков есть
+  термины; `use_glossary=true` уходит с загрузкой и переводом на другой язык;
+  `glossary_term_count` и `billed_units` показываются под именем файла.
+- Оценка перевода: звёзды 1–5 в заголовке панели «Перевод» у готовых
+  документов и необязательный комментарий. Повторная оценка отправляет и
+  текущий комментарий: backend заменяет их вместе.
 
 ## Регистрация и заблокированный аккаунт
 
@@ -167,11 +217,6 @@ OpenAPI выключен по умолчанию. После запуска с
 `OPENAPI_PUBLIC_ACCESS=true` они требуют JWT.
 
 ## Известный разрыв контракта с UI
-
-`DocumentHistoryItemResponse` не содержит исходное имя файла. После перехода
-Sidebar на реальные данные он сможет показывать только формат и `job_id`, пока
-backend-команда не добавит безопасное display-name поле или не согласует другой
-источник названия. Frontend не должен выдумывать `file_name` в DTO.
 
 REST API не отдаёт отдельный preview или извлечённый текст и не позволяет скачать
 исходник. Frontend отображает оригинал из локального File, а перевод получает

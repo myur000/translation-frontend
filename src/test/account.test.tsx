@@ -109,7 +109,7 @@ describe('plans UI and account state', () => {
   it('shows real remaining units, progress, reset date and read-only subscription information', async () => {
     const { mock } = installApi()
     renderPage()
-    expect(await screen.findByText('Осталось переводов: 7')).toBeTruthy()
+    expect(await screen.findByText('Осталось страниц: 7')).toBeTruthy()
     expect((screen.getByRole('progressbar') as HTMLProgressElement).value).toBe(3)
     expect((screen.getByRole('progressbar') as HTMLProgressElement).max).toBe(10)
     expect(screen.getByText('Бесплатный тариф')).toBeTruthy()
@@ -121,7 +121,7 @@ describe('plans UI and account state', () => {
   it('opens the plan page from the user menu and links to the profile page', async () => {
     installApi()
     renderPage()
-    await screen.findByText('Осталось переводов: 7')
+    await screen.findByText('Осталось страниц: 7')
     await userEvent.click(screen.getByRole('button', { name: 'Открыть меню пользователя' }))
     expect(screen.getByRole('menuitem', { name: 'Тариф и лимиты' }).getAttribute('href')).toBe('/plans')
     expect(screen.getByRole('menuitem', { name: 'Профиль' }).getAttribute('href')).toBe('/profile')
@@ -133,8 +133,8 @@ describe('plans UI and account state', () => {
   it('shows an exhausted allowance and clamps the progress without hiding already uploaded books', async () => {
     installApi({ ...freeUsage, used_units: 12, remaining_units: 0 })
     renderPage()
-    await screen.findByText('Осталось переводов: 0')
-    expect(screen.getByText(/Уже загруженные книги остаются/)).toBeTruthy()
+    await screen.findByText('Осталось страниц: 0')
+    expect(screen.getByText(/Уже переведённые документы по-прежнему можно открыть/)).toBeTruthy()
     expect((screen.getByRole('progressbar') as HTMLProgressElement).value).toBe(10)
   })
   it('renders unlimited Pro without treating nullable fields as zero', async () => {
@@ -147,7 +147,7 @@ describe('plans UI and account state', () => {
     await screen.findByText('Активна')
     expect(screen.getAllByText('Безлимит').length).toBeGreaterThan(0)
     expect(screen.queryByRole('progressbar')).toBeNull()
-    expect(screen.queryByText(/Осталось переводов: 0/)).toBeNull()
+    expect(screen.queryByText(/Осталось страниц: 0/)).toBeNull()
     expect(screen.getByText('Конец периода')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Открыть меню пользователя' }).textContent).toContain('Pro')
   })
@@ -155,11 +155,11 @@ describe('plans UI and account state', () => {
     installApi(freeUsage, { ...freeSubscription, plan_code: 'PRO', plan_display_name: 'Pro', status: 'PAST_DUE' })
     renderPage()
     await screen.findByText('Есть задолженность')
-    expect(screen.getByText(/Платная подписка не даёт расширенных/)).toBeTruthy()
+    expect(screen.getByText(/Пока подписка не оплачена, действуют ограничения бесплатного тарифа/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Открыть меню пользователя' }).textContent).toContain('Free')
     const section = screen.getByRole('region', { name: 'Действующий тариф' })
     expect(within(section).getByText('Pro')).toBeTruthy()
-    expect(screen.getByText('Осталось переводов: 7')).toBeTruthy()
+    expect(screen.getByText('Осталось страниц: 7')).toBeTruthy()
   })
   it('shows cancellation at period end without claiming immediate cancellation', async () => {
     installApi(freeUsage, { ...freeSubscription, status: 'ACTIVE', cancel_at_period_end: true })
@@ -169,7 +169,7 @@ describe('plans UI and account state', () => {
   it('preserves usable quota information when the subscription endpoint fails', async () => {
     installApi(freeUsage, async () => json({}, 500))
     renderPage()
-    await screen.findByText('Осталось переводов: 7')
+    await screen.findByText('Осталось страниц: 7')
     expect((await screen.findByRole('alert')).textContent).toContain('Не удалось получить подписку')
     expect((screen.getByRole('button', { name: 'Обновить данные' }) as HTMLButtonElement).disabled).toBe(false)
   })
@@ -177,21 +177,21 @@ describe('plans UI and account state', () => {
     installApi(async () => json({}, 500))
     renderPage()
     await screen.findByRole('alert')
-    expect(screen.queryByText(/Осталось переводов:/)).toBeNull()
+    expect(screen.queryByText(/Осталось страниц:/)).toBeNull()
     expect(screen.getByRole('button', { name: 'Открыть меню пользователя' }).textContent).not.toContain('Free')
     expect(screen.getByRole('button', { name: 'Открыть меню пользователя' }).textContent).toContain('Данные недоступны')
   })
   it('retains last values with a stale warning, then recovers on manual refresh', async () => {
     const { values } = installApi()
     renderPage()
-    await screen.findByText('Осталось переводов: 7')
+    await screen.findByText('Осталось страниц: 7')
     values.usage = async () => { throw new TypeError('Offline') }
     await userEvent.click(screen.getByRole('button', { name: 'Обновить данные' }))
     await screen.findAllByText(/они могут быть устаревшими/)
-    expect(screen.getByText('Осталось переводов: 7')).toBeTruthy()
+    expect(screen.getByText('Осталось страниц: 7')).toBeTruthy()
     values.usage = { ...freeUsage, used_units: 5, remaining_units: 5 }
     await userEvent.click(screen.getByRole('button', { name: 'Обновить данные' }))
-    expect(await screen.findByText('Осталось переводов: 5')).toBeTruthy()
+    expect(await screen.findByText('Осталось страниц: 5')).toBeTruthy()
     expect(screen.queryByText(/они могут быть устаревшими/)).toBeNull()
   })
   it('limits a hung request to 10 seconds without losing the other response', async () => {
@@ -207,7 +207,7 @@ describe('plans UI and account state', () => {
   it('updates credentials without refetching just because the access token rotated', async () => {
     const { mock } = installApi()
     const view = renderPage()
-    await screen.findByText('Осталось переводов: 7')
+    await screen.findByText('Осталось страниц: 7')
     auth.session = { ...auth.session, accessToken: 'token-2' }
     view.rerender(<TestApp />)
     expect(mock).toHaveBeenCalledTimes(2)
@@ -224,9 +224,9 @@ describe('plans UI and account state', () => {
     auth.session = { email: 'another@example.com', accessToken: 'other-token' }
     values.usage = { ...freeUsage, used_units: 9, remaining_units: 1 }
     view.rerender(<TestApp />)
-    await screen.findByText('Осталось переводов: 1')
+    await screen.findByText('Осталось страниц: 1')
     await act(async () => finish(json(freeUsage)))
-    expect(screen.queryByText('Осталось переводов: 7')).toBeNull()
+    expect(screen.queryByText('Осталось страниц: 7')).toBeNull()
   })
   it('refreshes on window focus but throttles closely repeated focus events', async () => {
     vi.useFakeTimers()
@@ -254,7 +254,7 @@ describe('plans UI and account state', () => {
     localStorage.setItem('doctranslate.preferences.v1', JSON.stringify({ theme: 'dark', language: 'en' }))
     installApi()
     renderPage()
-    expect(await screen.findByText('Translations remaining: 7')).toBeTruthy()
+    expect(await screen.findByText('Pages left: 7')).toBeTruthy()
     expect(document.documentElement.dataset.theme).toBe('dark')
     expect(document.documentElement.lang).toBe('en')
   })

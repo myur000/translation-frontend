@@ -1,7 +1,6 @@
 import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react'
 import { Link, useOutletContext } from 'react-router'
 import { ApiClientError } from '../api/client.ts'
-import { API_ENDPOINTS } from '../api/endpoints.ts'
 import { NotesPanel } from '../components/notes/NotesPanel.tsx'
 import type { DocumentAction } from '../components/toolbar/DocumentActionsMenu.tsx'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog.tsx'
@@ -221,7 +220,6 @@ function DocumentWorkspace({
           name: document.name,
           source: getLanguageLabel(sourceLanguage),
           target: getLanguageLabel(targetLanguage),
-          endpoint: API_ENDPOINTS.documents.upload,
         }),
       )
       return

@@ -113,6 +113,11 @@ export function languageTag(code: string) {
   }
 }
 
+/** Compact label for lists: `eng_Latn` → `EN`, `yue_Hant` → `YUE`. */
+export function shortLanguageCode(code: string) {
+  return (languageTag(code) ?? code).split('-')[0].toUpperCase()
+}
+
 const displayNamesCache = new Map<string, Intl.DisplayNames | null>()
 
 function displayNames(locale: LanguageLabelLocale, type: 'language' | 'script') {

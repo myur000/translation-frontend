@@ -125,7 +125,7 @@ export function DocumentPreview({
           }
         }}
       >
-        <div className={styles.pages} style={{ '--book-zoom': zoom / 100, '--book-page-width': `${pageWidth}px` } as CSSProperties}>
+        <div className={`${styles.pages} ${view.status === 'ready' ? '' : styles.pagesMessage}`} style={{ '--book-zoom': zoom / 100, '--book-page-width': `${pageWidth}px` } as CSSProperties}>
           <DocumentPages view={view} width={pageWidth} zoom={zoom} viewportRef={viewportRef} />
           {view.status === 'loading' ? <p className={styles.state} role="status">{t('viewer.loading')}</p> : null}
           {view.status === 'message' ? <div className={styles.state}>

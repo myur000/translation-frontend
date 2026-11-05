@@ -1,16 +1,19 @@
 .toolbar {
   min-height: var(--toolbar-height);
-  display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto minmax(240px, 1fr);
+  /* Wraps by the space it actually has (sidebar and notes take part of the
+     window), so groups never overlap at any width. */
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  padding: 6px 14px;
+  gap: 8px 16px;
+  padding: 8px 14px;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
 }
 
 .fileBlock {
-  min-width: 0;
+  min-width: 160px;
+  flex: 1 1 180px;
   display: flex;
   flex-direction: column;
 }
@@ -106,8 +109,16 @@
 }
 
 .actions {
+  margin-left: auto;
   justify-content: flex-end;
   gap: 6px;
+}
+
+/* Page navigation is a group of its own, separated from the buttons. */
+.pageNavigation {
+  margin-right: 6px;
+  padding-right: 10px;
+  border-right: 1px solid var(--color-border);
 }
 
 .pageNavigation {
@@ -163,26 +174,8 @@
   opacity: 0.35;
 }
 
-@media (max-width: 1180px) {
-  .toolbar {
-    grid-template-columns: minmax(180px, 1fr) auto;
-  }
-
-  .actions {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
-  }
-}
-
 @media (max-width: 720px) {
-  .toolbar {
-    grid-template-columns: 1fr;
-  }
-
-  .controls {
-    flex-wrap: wrap;
-  }
-
+  .controls,
   .actions {
     flex-wrap: wrap;
   }

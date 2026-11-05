@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   formatLanguageName,
+  shortLanguageCode,
   getLanguageCatalogState,
   languageTag,
   loadLanguageCatalog,
@@ -40,6 +41,12 @@ describe('language labels', () => {
     expect(formatLanguageName('de', 'en', names)).toBe('German')
     expect(toCatalogLanguageCode('de')).toBe('deu_Latn')
     expect(toCatalogLanguageCode('fra_Latn')).toBe('fra_Latn')
+  })
+
+  it('shortens codes for compact lists', () => {
+    expect(shortLanguageCode('eng_Latn')).toBe('EN')
+    expect(shortLanguageCode('yue_Hant')).toBe('YUE')
+    expect(shortLanguageCode('ru')).toBe('RU')
   })
 
   it('builds BCP 47 tags for the lang attribute', () => {

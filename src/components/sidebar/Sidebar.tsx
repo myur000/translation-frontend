@@ -13,6 +13,7 @@ import {
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import type { DocumentItem } from '../../types/document.ts'
 import { documentStatusLabel } from '../../documents/documentStatusLabel.ts'
+import { shortLanguageCode } from '../../languages/languageCatalog.ts'
 import { UserMenu } from '../user/UserMenu.tsx'
 import styles from './Sidebar.module.css'
 
@@ -128,6 +129,9 @@ export function Sidebar({
                 >
                   {t(documentStatusLabel(document))}
                   {document.progress !== undefined ? ` · ${document.progress}%` : ''}
+                  {document.jobId
+                    ? ` · ${shortLanguageCode(document.sourceLanguage)} → ${shortLanguageCode(document.targetLanguage)}`
+                    : ''}
                 </span>
               </span>
             </button>

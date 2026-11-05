@@ -216,12 +216,12 @@ describe('workspace interactions', () => {
     renderApp()
     await findWorkspaceRegion('Прокрутка панели «Оригинал»')
     expect(screen.queryByText(/^Осталось:/)).toBeNull()
-    expect(screen.queryByText('Осталось переводов: 7')).toBeNull()
+    expect(screen.queryByText('Осталось страниц: 7')).toBeNull()
     expect(screen.queryByRole('link', { name: /^Переводы/ })).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'Открыть меню пользователя' }))
     await user.click(screen.getByRole('menuitem', { name: 'Тариф и лимиты' }))
-    expect(await screen.findByText('Осталось переводов: 7')).toBeTruthy()
+    expect(await screen.findByText('Осталось страниц: 7')).toBeTruthy()
   })
 
   it('preserves relative reading position when fullscreen or notes change the viewport size', async () => {
@@ -875,14 +875,14 @@ describe('workspace interactions', () => {
     const file = new File(['test file'], 'unverified.pdf', { type: 'application/pdf' })
     await user.upload(container.querySelector<HTMLInputElement>('input[type="file"]')!, file)
     await user.click(screen.getByRole('button', { name: 'Перевести' }))
-    expect(await screen.findByText(/Backend отклонил загрузку/)).toBeTruthy()
+    expect(await screen.findByText(/Подтвердите email, чтобы переводить документы/)).toBeTruthy()
     const uploadCall = fetchMock.mock.calls.find(([url]) => url === '/api/documents/upload')
     expect(uploadCall).toBeTruthy()
     if (!uploadCall?.[1]) throw new Error('Expected upload request options')
     expect((uploadCall[1].body as FormData).get('file')).toBe(file)
     expect((uploadCall[1].headers as Headers).get('Authorization')).toContain('Bearer ')
     expect(screen.getByTitle('unverified.pdf').textContent).toContain('Черновик')
-    expect(screen.queryByText(/Задача перевода создана/)).toBeNull()
+    expect(screen.queryByText(/отправлен на перевод/)).toBeNull()
   })
 
   it('keeps synchronized scrolling enabled when another book is selected', async () => {
@@ -1175,7 +1175,7 @@ describe('workspace interactions', () => {
     await user.click(screen.getByRole('button', { name: 'Перевести' }))
 
     expect(
-      await screen.findByText(/Задача перевода создана.*00000000-0000-0000-0000-000000000042/),
+      await screen.findByText(/«new_document\.pdf» отправлен на перевод/),
     ).toBeTruthy()
     await waitFor(() => {
       expect(screen.getByTitle('new_document.pdf').textContent).toContain(

@@ -205,7 +205,7 @@ describe('translation download UI', () => {
     await userEvent.setup().upload(input, new File(['document'], 'draft.pdf', { type: 'application/pdf' }))
     const button = await screen.findByRole('button', { name: 'Скачать' }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
-    expect(button.title).toContain('черновик')
+    expect(button.title).toBe('Сначала отправьте документ на перевод.')
     expect(handler).not.toHaveBeenCalled()
   })
 
@@ -244,7 +244,7 @@ describe('translation download UI', () => {
   })
 
   it.each([
-    ['', 'application/pdf', 'Backend вернул пустой файл.'],
+    ['', 'application/pdf', 'Файл перевода оказался пустым.'],
     ['<html>not a file</html>', 'text/html', 'Вместо файла получен некорректный ответ.'],
     ['{"message":"error"}', 'application/problem+json', 'Вместо файла получен некорректный ответ.'],
   ])('rejects empty or invalid successful responses', async (body, contentType, message) => {
