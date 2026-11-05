@@ -4,8 +4,10 @@ interface BrandMarkProps {
 }
 
 /**
- * Parallel logo: two parallel strokes — the original and its translation
- * side by side. Decorative; the brand name next to it carries the meaning.
+ * Parallel logo: two parallel scrollbars forming the letter P — a solid
+ * stem and a hollow track with its thumb as the bowl. Two texts scrolling
+ * side by side is what the product does. Decorative; the brand name next to
+ * it carries the meaning.
  */
 export function BrandMark({ size = 28, className }: BrandMarkProps) {
   return (
@@ -18,8 +20,9 @@ export function BrandMark({ size = 28, className }: BrandMarkProps) {
       focusable="false"
     >
       <rect width="32" height="32" rx="8" fill="#1E3A52" />
-      <path d="M8.5 24.5h4.6l6.4-17h-4.6z" fill="#CADCEA" />
-      <path d="M15.5 24.5h4.6l6.4-17h-4.6z" fill="#8FB1C9" />
+      <rect x="9" y="6" width="5.5" height="20" rx="2.75" fill="#CADCEA" />
+      <rect x="17.9" y="6.4" width="4.7" height="11.6" rx="2.35" fill="none" stroke="#8FB1C9" strokeWidth="1.3" />
+      <rect x="19.1" y="8.2" width="2.3" height="4.6" rx="1.15" fill="#8FB1C9" />
     </svg>
   )
 }
