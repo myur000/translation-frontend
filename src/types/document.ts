@@ -27,6 +27,15 @@ export interface DocumentItem {
   billedUnits?: number
   /** Terms passed to the translator; `null` when the glossary was not requested. */
   glossaryTermCount?: number | null
+  /** Cost of a draft before upload; absent while unknown or unavailable. */
+  estimate?: DocumentEstimate
+}
+
+export interface DocumentEstimate {
+  billedUnits: number
+  enoughQuota: boolean
+  unlimited: boolean
+  remainingUnits: number | null
 }
 
 export interface DocumentContent {

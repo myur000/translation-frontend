@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type RefObject, type UIEventHandler } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject, type UIEventHandler } from 'react'
 import { BOOK_ZOOM_STEP } from '../../hooks/useBookZoom.ts'
 import { TRANSLATION_STALL_TIMEOUT_MS } from '../../config/translationPolling.ts'
 import { usePreviewZoom } from '../../hooks/usePreviewZoom.ts'
@@ -29,6 +29,8 @@ interface DocumentPreviewProps {
   onVisiblePage: (page: number) => void
   onRetry: () => void
   onChooseOriginal?: (file: File) => string | null
+  /** Extra controls next to the panel title, e.g. the translation rating. */
+  headerExtra?: ReactNode
 }
 
 export function DocumentPreview({
@@ -49,6 +51,7 @@ export function DocumentPreview({
   onVisiblePage,
   onRetry,
   onChooseOriginal,
+  headerExtra,
 }: DocumentPreviewProps) {
   const { t } = useTranslation()
   const pageWidth = usePreviewZoom(viewportRef, zoom, onZoomChange)
@@ -74,6 +77,7 @@ export function DocumentPreview({
           <div>
             <span className={styles.panelLabel}>{label}</span>
             <span className={styles.language}>{language}</span>
+            {headerExtra}
           </div>
           <div className={styles.panelActions}>
             <ZoomControls label={label} zoom={zoom} onChange={onZoomChange} />

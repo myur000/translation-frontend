@@ -38,6 +38,21 @@
   gap: 8px;
 }
 
+.glossaryToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.glossaryToggle input {
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+
 .swapButton {
   width: 28px;
   height: 28px;

@@ -7,6 +7,8 @@ import type { DocumentAction } from '../components/toolbar/DocumentActionsMenu.t
 import { ConfirmDialog } from '../components/ui/ConfirmDialog.tsx'
 import { createIdempotencyKey } from '../api/idempotency.ts'
 import { RetranslateDialog } from '../components/workspace/RetranslateDialog.tsx'
+import { TranslationFeedback } from '../components/workspace/TranslationFeedback.tsx'
+import { useGlossaryTermCount } from '../documents/useGlossaryTermCount.ts'
 import { TopToolbar } from '../components/toolbar/TopToolbar.tsx'
 import { OriginalPanel } from '../components/workspace/OriginalPanel.tsx'
 import { TranslationPanel } from '../components/workspace/TranslationPanel.tsx'
@@ -88,6 +90,11 @@ function DocumentWorkspace({
   const [dialog, setDialog] = useState<WorkspaceDialog>(null)
   const [isDeleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [useGlossary, setUseGlossary] = useState(false)
+  // Only a local file can be uploaded with a glossary from the toolbar.
+  const canUploadFile = Boolean(document.sourceFile) &&
+    (!document.jobId || document.status === 'failed')
+  const glossaryTermCount = useGlossaryTermCount(sourceLanguage, targetLanguage, canUploadFile)
   const notesPanel = useResizableNotesPanel()
   const synchronizedScroll = useSynchronizedScroll(
     isScrollSyncEnabled,
@@ -227,6 +234,7 @@ function DocumentWorkspace({
         document.id,
         sourceLanguage,
         targetLanguage,
+        { useGlossary: useGlossary && Boolean(glossaryTermCount) },
       )
       setNotice(
         t('workspace.uploadStarted', {
@@ -266,6 +274,24 @@ function DocumentWorkspace({
       setDeleting(false)
     }
   }
+
+  const details: string[] = []
+  if (!document.jobId && document.estimate) {
+    details.push(t('estimate.cost', { units: document.estimate.billedUnits }))
+  } else if (document.billedUnits) {
+    details.push(t('document.billed', { units: document.billedUnits }))
+  }
+  if (document.jobId && document.glossaryTermCount != null) {
+    details.push(document.glossaryTermCount > 0
+      ? t('glossary.applied', { count: document.glossaryTermCount })
+      : t('glossary.appliedNone'))
+  }
+  const quotaWarning = !document.jobId && document.estimate && !document.estimate.enoughQuota
+    ? t('estimate.notEnough', {
+        units: document.estimate.billedUnits,
+        remaining: document.estimate.remainingUnits ?? 0,
+      })
+    : ''
 
   const isUploaded = Boolean(document.jobId)
   const isProcessing = document.status === 'processing'
@@ -357,6 +383,10 @@ function DocumentWorkspace({
         }
         translationStatus={document.jobId ? document.status : null}
         documentActions={documentActions}
+        details={details}
+        glossaryTermCount={canUploadFile ? glossaryTermCount : null}
+        useGlossary={useGlossary}
+        onUseGlossaryChange={setUseGlossary}
         onSourceLanguageChange={handleSourceLanguageChange}
         onTargetLanguageChange={handleTargetLanguageChange}
         onSwapLanguages={handleSwapLanguages}
@@ -370,12 +400,12 @@ function DocumentWorkspace({
       />
       ) : null}
 
-      {!isImmersiveMode && (visibleNotice || document.status === 'failed') ? (
+      {!isImmersiveMode && (visibleNotice || quotaWarning || document.status === 'failed') ? (
         <div
-          className={styles.notice}
+          className={`${styles.notice} ${quotaWarning && !visibleNotice ? styles.noticeWarning : ''}`}
           role={isNoticeError || (document.status === 'failed' && !visibleNotice) ? 'alert' : 'status'}
         >
-          {visibleNotice || document.errorMessage || t('workspace.translationFailed')}
+          {visibleNotice || quotaWarning || document.errorMessage || t('workspace.translationFailed')}
           {visibleNotice ? (
             <button
               type="button"
@@ -421,6 +451,9 @@ function DocumentWorkspace({
             view={translationView}
             language={getLanguageLabel(targetLanguage)}
             languageCode={targetLanguage}
+            headerExtra={document.status === 'ready' && document.jobId
+              ? <TranslationFeedback key={document.jobId} jobId={document.jobId} />
+              : null}
             page={displayedPage}
             navigationRevision={navigationRevision}
             onVisiblePage={setCurrentPage}

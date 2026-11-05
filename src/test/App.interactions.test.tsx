@@ -1437,6 +1437,97 @@ describe('document actions', () => {
   })
 })
 
+describe('cost, glossary and rating', () => {
+  const firstJob = '00000000-0000-0000-0000-000000000101'
+  const uploadDraft = async (user: ReturnType<typeof userEvent.setup>, container: HTMLElement) => {
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')
+    await user.upload(input as HTMLInputElement, new File(['%PDF'], 'Договор.pdf', { type: 'application/pdf' }))
+  }
+
+  it('shows the cost of a draft and warns when the quota is not enough', async () => {
+    const user = userEvent.setup()
+    renderDocumentRoute('/', {
+      '/api/documents/estimate': () => jsonResponse({
+        format: 'pdf', characters: 54210, billed_units: 31, unlimited: false,
+        remaining_units: 12, enough_quota: false,
+      }),
+    })
+    await screen.findAllByText('english_course_book.pdf')
+    await uploadDraft(user, document.body)
+
+    expect(await screen.findByText(/≈ 31 стр\. к списанию/)).toBeTruthy()
+    expect(screen.getByText(/Не хватает страниц: документ займёт 31 стр\., осталось 12/)).toBeTruthy()
+  })
+
+  it('uploads with the glossary when the pair has terms', async () => {
+    const user = userEvent.setup()
+    const newJob = '00000000-0000-0000-0000-000000000501'
+    const { fetchMock } = renderDocumentRoute('/', {
+      '/api/terms?source_lang=eng_Latn&target_lang=rus_Cyrl&size=1': () =>
+        jsonResponse({ items: [], page: 0, size: 1, total_elements: 4, total_pages: 4 }),
+      '/api/documents/upload': () => jsonResponse({ job_id: newJob, billed_units: 2, glossary_term_count: 4 }, 202),
+      [`/api/documents/${newJob}/status`]: () => jsonResponse({
+        job_id: newJob, status: 'PENDING', progress: 0, error_code: null, error_message: null,
+        file_name: 'Договор.pdf', glossary_term_count: 4,
+      }),
+    })
+    await screen.findAllByText('english_course_book.pdf')
+    await uploadDraft(user, document.body)
+
+    await user.click(await screen.findByRole('checkbox', { name: 'Глоссарий · 4' }))
+    await user.click(screen.getByRole('button', { name: 'Перевести' }))
+
+    expect(await screen.findByText(/списано 2 стр\. · глоссарий: 4/)).toBeTruthy()
+    const [, init] = callsTo(fetchMock, '/api/documents/upload', 'POST')[0]
+    expect((init?.body as FormData).get('use_glossary')).toBe('true')
+    expect((init?.body as FormData).get('source_lang')).toBe('eng_Latn')
+  })
+
+  it('rates a finished translation and adds a comment', async () => {
+    const user = userEvent.setup()
+    let saved: unknown = null
+    const { fetchMock } = renderDocumentRoute(`/documents/${firstJob}`, {
+      [`/api/documents/${firstJob}/feedback`]: (init) => {
+        if (init?.method !== 'PUT') return jsonResponse(apiErrorBody(404, 'Перевод ещё не оценён'), 404)
+        saved = JSON.parse(String(init.body))
+        return jsonResponse({ job_id: firstJob, ...(saved as object), created_at: '2026-11-05T00:00:00Z', updated_at: '2026-11-05T00:00:00Z' })
+      },
+    })
+
+    const rating = await screen.findByRole('radiogroup', { name: 'Оценка перевода' })
+    await user.click(within(rating).getByRole('radio', { name: '4 из 5' }))
+
+    await waitFor(() => expect(saved).toEqual({ rating: 4, comment: null }))
+    expect(within(rating).getByRole('radio', { name: '4 из 5' }).getAttribute('aria-checked')).toBe('true')
+
+    await user.click(screen.getByRole('button', { name: 'Комментарий' }))
+    await user.type(screen.getByLabelText('Что стоит улучшить в переводе?'), 'Термины не те')
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }))
+
+    await waitFor(() => expect(saved).toEqual({ rating: 4, comment: 'Термины не те' }))
+    expect(await screen.findByRole('button', { name: 'Изменить комментарий' })).toBeTruthy()
+    expect(callsTo(fetchMock, `/api/documents/${firstJob}/feedback`, 'PUT')).toHaveLength(2)
+  })
+
+  it('shows an existing rating and keeps its comment when the rating changes', async () => {
+    const user = userEvent.setup()
+    let saved: unknown = null
+    renderDocumentRoute(`/documents/${firstJob}`, {
+      [`/api/documents/${firstJob}/feedback`]: (init) => {
+        if (init?.method === 'PUT') saved = JSON.parse(String(init.body))
+        return jsonResponse({ job_id: firstJob, rating: init?.method === 'PUT' ? 2 : 5,
+          comment: 'Хорошо', created_at: '2026-11-05T00:00:00Z', updated_at: '2026-11-05T00:00:00Z' })
+      },
+    })
+
+    const rating = await screen.findByRole('radiogroup', { name: 'Оценка перевода' })
+    expect(within(rating).getByRole('radio', { name: '5 из 5' }).getAttribute('aria-checked')).toBe('true')
+    await user.click(within(rating).getByRole('radio', { name: '2 из 5' }))
+
+    await waitFor(() => expect(saved).toEqual({ rating: 2, comment: 'Хорошо' }))
+  })
+})
+
 describe('routing', () => {
   it('renders a useful fallback for an unknown route', () => {
     renderApp('/missing-page')

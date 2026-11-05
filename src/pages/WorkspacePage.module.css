@@ -60,6 +60,12 @@
   font-size: 12px;
 }
 
+.noticeWarning {
+  color: var(--color-warning-text);
+  background: var(--color-warning-surface);
+  border-bottom-color: var(--color-warning-border);
+}
+
 .notice button {
   width: 26px;
   height: 26px;

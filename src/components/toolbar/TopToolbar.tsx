@@ -21,6 +21,12 @@ interface TopToolbarProps {
   canTranslate: boolean
   translationStatus: DocumentItem['status'] | null
   documentActions: DocumentAction[]
+  /** Short facts under the file name: cost, glossary, pages. */
+  details: string[]
+  /** Terms available for the pair; the glossary option shows only when > 0. */
+  glossaryTermCount: number | null
+  useGlossary: boolean
+  onUseGlossaryChange: (useGlossary: boolean) => void
   onSourceLanguageChange: (language: LanguageCode) => void
   onTargetLanguageChange: (language: LanguageCode) => void
   onSwapLanguages: () => void
@@ -60,7 +66,9 @@ export function TopToolbar(props: TopToolbarProps) {
     <header className={styles.toolbar}>
       <div className={styles.fileBlock}>
         <span className={styles.fileName}>{document.name}</span>
-        <span className={styles.fileMeta}>{props.pageCount === null ? t('viewer.pageCountUnknown') : t('toolbar.fileMeta', { pages: props.pageCount })}</span>
+        <span className={styles.fileMeta}>
+          {[props.pageCount === null ? t('viewer.pageCountUnknown') : t('toolbar.fileMeta', { pages: props.pageCount }), ...props.details].join(' · ')}
+        </span>
       </div>
       <div className={styles.controls}>
         <LanguagePicker value={sourceLanguage} label={t('toolbar.sourceLanguage')} prefix={t('toolbar.from')} onChange={props.onSourceLanguageChange} />
@@ -68,6 +76,12 @@ export function TopToolbar(props: TopToolbarProps) {
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 5.5h9.5m0 0L10 3m2.5 2.5L10 8M13 10.5H3.5m0 0L6 8m-2.5 2.5L6 13" /></svg>
         </button>
         <LanguagePicker value={targetLanguage} label={t('toolbar.targetLanguage')} prefix={t('toolbar.to')} onChange={props.onTargetLanguageChange} />
+        {props.glossaryTermCount && canTranslate && !document.waitingIssue ? (
+          <label className={styles.glossaryToggle} title={t('glossary.hint')}>
+            <input type="checkbox" checked={props.useGlossary} onChange={(event) => props.onUseGlossaryChange(event.currentTarget.checked)} />
+            <span>{t('glossary.short', { count: props.glossaryTermCount })}</span>
+          </label>
+        ) : null}
         <button type="button" className={styles.translateButton} disabled={isTranslating || !canTranslate} onClick={props.onTranslate}>{translateLabel}</button>
       </div>
       <div className={styles.actions}>

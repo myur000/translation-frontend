@@ -4,6 +4,7 @@ import { useAccount } from '../account/useAccount.ts'
 import { Outlet, useLocation, useMatch, useNavigate } from 'react-router'
 import {
   deleteDocument as deleteDocumentRequest,
+  estimateDocument,
   getDocumentHistory,
   retranslateDocument as retranslateDocumentRequest,
   uploadDocument as uploadDocumentRequest,
@@ -18,7 +19,7 @@ import {
   readDocumentMetadata,
   rememberDocumentMetadata,
 } from '../documents/documentMetadataStorage.ts'
-import { documentPath } from '../documents/documentRoutes.ts'
+import { createLocalDocumentId, documentPath } from '../documents/documentRoutes.ts'
 import {
   useRouteDocument,
   type RouteDocumentState,
@@ -76,7 +77,6 @@ export type ExpandedPanel = 'original' | 'translation' | null
 
 const MAX_DOCUMENT_SIZE = 20 * 1024 * 1024
 const SUPPORTED_EXTENSIONS = new Set(['pdf', 'doc', 'docx'])
-let localDocumentSequence = 0
 
 export function AppLayout() {
   return <AccountProvider><AppLayoutContent /></AccountProvider>
@@ -288,9 +288,8 @@ function AppLayoutContent() {
     if (!SUPPORTED_EXTENSIONS.has(extension)) return t('workspace.unsupportedFile')
     if (file.size > MAX_DOCUMENT_SIZE) return t('workspace.fileTooLarge')
 
-    localDocumentSequence += 1
     const document: DocumentItem = {
-      id: `local-${Date.now()}-${localDocumentSequence}`,
+      id: createLocalDocumentId(),
       name: file.name,
       sourceLanguage: DEFAULT_SOURCE_LANGUAGE,
       targetLanguage: DEFAULT_TARGET_LANGUAGE,
@@ -301,7 +300,25 @@ function AppLayoutContent() {
     setDocuments((current) => [document, ...current])
     setActiveDocumentId(document.id)
     void navigate('/')
+    if (session) void loadEstimate(document.id, file, session.accessToken)
     return t('workspace.fileReady', { name: file.name })
+  }
+
+  /** Optional hint: unverified accounts (403) and failures simply show no estimate. */
+  const loadEstimate = async (documentId: string, file: File, accessToken: string) => {
+    try {
+      const response = await estimateDocument(file, { accessToken })
+      const estimate = {
+        billedUnits: response.billed_units,
+        enoughQuota: response.enough_quota,
+        unlimited: response.unlimited,
+        remainingUnits: response.remaining_units,
+      }
+      setDocuments((current) => current.map((item) =>
+        item.id === documentId && !item.jobId ? { ...item, estimate } : item))
+    } catch {
+      // The upload validates the file again and reports real errors.
+    }
   }
 
   const attachOriginal = (documentId: string, file: File) => {

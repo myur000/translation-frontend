@@ -11,14 +11,18 @@ interface Count {
  * Number of the user's terms for a language pair, so the glossary option is
  * offered only when it would change something. `null` while unknown.
  */
-export function useGlossaryTermCount(sourceLanguage: string, targetLanguage: string) {
+export function useGlossaryTermCount(
+  sourceLanguage: string,
+  targetLanguage: string,
+  enabled = true,
+) {
   const { session } = useAuth()
   const accessToken = session?.accessToken ?? null
   const key = `${sourceLanguage}>${targetLanguage}`
   const [count, setCount] = useState<Count | null>(null)
 
   useEffect(() => {
-    if (!accessToken || sourceLanguage === targetLanguage) return
+    if (!enabled || !accessToken || sourceLanguage === targetLanguage) return
     const controller = new AbortController()
     getTerms(
       { source_lang: sourceLanguage, target_lang: targetLanguage, size: 1 },
@@ -33,7 +37,7 @@ export function useGlossaryTermCount(sourceLanguage: string, targetLanguage: str
       },
     )
     return () => controller.abort()
-  }, [accessToken, key, sourceLanguage, targetLanguage])
+  }, [accessToken, enabled, key, sourceLanguage, targetLanguage])
 
-  return count?.key === key ? count.value : null
+  return enabled && count?.key === key ? count.value : null
 }
