@@ -189,23 +189,23 @@ describe('translation download UI', () => {
     expect(files.createUrl).toHaveBeenCalledTimes(1)
   })
 
-  it.each(['PENDING', 'PROCESSING', 'FAILED'])('disables download for %s jobs', async (status) => {
+  // Downloading is the main action only once the result exists; before that
+  // the toolbar offers translation or shows progress instead.
+  it.each(['PENDING', 'PROCESSING', 'FAILED'])('offers no download for %s jobs', async (status) => {
     const handler = vi.fn(async () => fileResponse())
     renderWorkspace(handler, [historyItem(jobId, status)])
-    const button = await screen.findByRole('button', { name: 'Скачать' }) as HTMLButtonElement
-    expect(button.disabled).toBe(true)
-    fireEvent.click(button)
+    await screen.findByRole('button', { name: 'Действия с документом' })
+    expect(screen.queryByRole('button', { name: 'Скачать' })).toBeNull()
     expect(handler).not.toHaveBeenCalled()
   })
 
-  it('disables download for a local draft with no job_id', async () => {
+  it('offers translation instead of download for a local draft', async () => {
     const handler = vi.fn(async () => fileResponse())
     const { container } = renderWorkspace(handler, [])
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
     await userEvent.setup().upload(input, new File(['document'], 'draft.pdf', { type: 'application/pdf' }))
-    const button = await screen.findByRole('button', { name: 'Скачать' }) as HTMLButtonElement
-    expect(button.disabled).toBe(true)
-    expect(button.title).toBe('Сначала отправьте документ на перевод.')
+    expect(await screen.findByRole('button', { name: 'Перевести' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Скачать' })).toBeNull()
     expect(handler).not.toHaveBeenCalled()
   })
 

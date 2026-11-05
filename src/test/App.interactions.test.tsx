@@ -185,6 +185,15 @@ function renderApp(path = '/', emailVerified = true) {
   )
 }
 
+/** Adds a local draft: only drafts (and failed jobs) offer language pickers. */
+async function addDraft(user: ReturnType<typeof userEvent.setup>, name = 'draft.pdf') {
+  await screen.findByRole('button', { name: /english_course_book\.pdf/ })
+  const input = document.querySelector<HTMLInputElement>('input[type="file"]')
+  await user.upload(input as HTMLInputElement, new File(['%PDF'], name, { type: 'application/pdf' }))
+}
+
+const sidebarList = () => screen.getByRole('navigation', { name: 'Мои книги' })
+
 function mockBookViewportGeometry() {
   const size = { width: 600, height: 400 }
   for (const property of ['scrollHeight', 'clientHeight', 'scrollWidth', 'clientWidth'] as const) {
@@ -702,7 +711,7 @@ describe('workspace interactions', () => {
     // research_notes.doc predates NLLB codes: legacy `de`/`ru` map to the catalog.
     expect(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }).getAttribute('lang')).toBe('de-Latn')
     expect(screen.getByRole('region', { name: 'Прокрутка панели «Перевод»' }).getAttribute('lang')).toBe('ru-Cyrl')
-    expect(screen.getByRole('button', { name: 'Исходный язык: Немецкий' })).toBeTruthy()
+    expect(screen.getByText(/Языки перевода/).parentElement?.textContent).toMatch(/Немецкий.*Русский/)
   })
 
   it('disables page navigation until real PDF metadata is available', async () => {
@@ -824,10 +833,12 @@ describe('workspace interactions', () => {
     const user = userEvent.setup()
     renderApp()
     await findWorkspaceRegion('Оригинал')
-    await user.click(screen.getByRole('button', { name: /^Исходный язык:/ }))
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Найти язык' }), { key: 'f', code: 'KeyF' })
+    // Typing into a field must not switch views.
+    const field = document.createElement('input')
+    document.body.append(field)
+    fireEvent.keyDown(field, { key: 'f', code: 'KeyF' })
     expect(screen.getByText('Мои книги')).toBeTruthy()
-    await user.keyboard('{Escape}')
+    field.remove()
     fireEvent.keyDown(window, { key: 'f', code: 'KeyF', ctrlKey: true })
     expect(screen.getByText('Мои книги')).toBeTruthy()
     fireEvent.keyDown(window, { key: 'f', code: 'KeyF', repeat: true })
@@ -881,7 +892,7 @@ describe('workspace interactions', () => {
     if (!uploadCall?.[1]) throw new Error('Expected upload request options')
     expect((uploadCall[1].body as FormData).get('file')).toBe(file)
     expect((uploadCall[1].headers as Headers).get('Authorization')).toContain('Bearer ')
-    expect(screen.getByTitle('unverified.pdf').textContent).toContain('Черновик')
+    expect(within(sidebarList()).getByTitle('unverified.pdf').textContent).toContain('Черновик')
     expect(screen.queryByText(/отправлен на перевод/)).toBeNull()
   })
 
@@ -906,6 +917,7 @@ describe('workspace interactions', () => {
   it('swaps languages instead of allowing an invalid equal pair', async () => {
     const user = userEvent.setup()
     renderApp()
+    await addDraft(user)
 
     await user.click(
       await screen.findByRole('button', { name: 'Исходный язык: Английский' }),
@@ -926,6 +938,7 @@ describe('workspace interactions', () => {
   it('loads the NLLB catalog into the language picker and searches it', async () => {
     const user = userEvent.setup()
     renderApp()
+    await addDraft(user)
 
     await user.click(
       await screen.findByRole('button', { name: 'Язык перевода: Русский' }),
@@ -954,6 +967,7 @@ describe('workspace interactions', () => {
   it('opens the language list towards the side that fits in the viewport', async () => {
     const user = userEvent.setup()
     renderApp()
+    await addDraft(user)
     const trigger = await screen.findByRole('button', { name: 'Язык перевода: Русский' })
     vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(
       DOMRect.fromRect({ x: window.innerWidth - 140, y: 10, width: 120, height: 30 }),
@@ -974,6 +988,7 @@ describe('workspace interactions', () => {
   it('keeps popular languages available when the catalog fails to load', async () => {
     const user = userEvent.setup()
     renderApp()
+    await addDraft(user)
     const defaultFetch = globalThis.fetch
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
       input === '/api/languages'
@@ -1178,14 +1193,13 @@ describe('workspace interactions', () => {
       await screen.findByText(/«new_document\.pdf» отправлен на перевод/),
     ).toBeTruthy()
     await waitFor(() => {
-      expect(screen.getByTitle('new_document.pdf').textContent).toContain(
+      expect(within(sidebarList()).getByTitle('new_document.pdf').textContent).toContain(
         'Готов',
       )
     })
-    expect(
-      (screen.getByRole('button', { name: 'Готово' }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true)
+    // A finished translation makes downloading the main action.
+    expect(screen.getByRole('button', { name: 'Скачать' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Перевести' })).toBeNull()
     expect(
       fetchMock.mock.calls.some(
         ([url]) =>
@@ -1350,8 +1364,8 @@ describe('document actions', () => {
     expect(JSON.parse(String(init?.body))).toEqual({ target_lang: 'deu_Latn', use_glossary: true })
     expect(new Headers(init?.headers).get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/)
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(await screen.findByRole('button', { name: 'Язык перевода: Немецкий' })).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: /english_course_book\.pdf/ })).toHaveLength(2)
+    await waitFor(() => expect(screen.getByText(/Языки перевода/).parentElement?.textContent).toMatch(/Английский.*Немецкий/))
+    expect(within(sidebarList()).getAllByRole('button', { name: /english_course_book\.pdf/ })).toHaveLength(2)
   })
 
   it('explains that the original has expired on the server', async () => {
@@ -1561,16 +1575,17 @@ describe('document status events', () => {
       '/api/documents/events': stream.response,
       [`/api/documents/${job}/status`]: () => statusResponse(...server)(),
     })
-    expect(await screen.findByText(/Переводится · 10%/)).toBeTruthy()
+    expect(await within(sidebarList()).findByText(/Переводится · 10%/)).toBeTruthy()
 
     await stream.send('ready', { expires_at: '2026-11-05T01:00:00Z' })
     server = ['PROCESSING', 60]
     await stream.send('job', { job_id: job, status: 'PROCESSING', progress: 60 })
-    expect(await screen.findByText(/Переводится · 60%/)).toBeTruthy()
+    expect(await within(sidebarList()).findByText(/Переводится · 60%/)).toBeTruthy()
 
     server = ['DONE', 100]
     await stream.send('job', { job_id: job, status: 'DONE', progress: 100 })
-    expect(await screen.findByText(/Готов · 100%/)).toBeTruthy()
+    expect(await within(sidebarList()).findByText(/Готов · 100%/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Скачать' })).toBeTruthy()
   })
 
   it('falls back to polling when the server has no event stream', async () => {

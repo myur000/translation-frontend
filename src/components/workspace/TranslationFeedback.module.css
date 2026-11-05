@@ -132,7 +132,7 @@
 }
 
 .popoverFooter .primary {
-  color: #ffffff;
+  color: var(--color-on-primary);
   background: var(--color-primary);
   border-color: var(--color-primary);
 }

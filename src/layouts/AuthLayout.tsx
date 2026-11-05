@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router'
+import { BrandMark } from '../components/brand/BrandMark.tsx'
 import { ThemeToggle } from '../components/theme/ThemeToggle.tsx'
 import { useTranslation } from '../i18n/useTranslation.ts'
 import styles from './AuthLayout.module.css'
@@ -9,8 +10,8 @@ export function AuthLayout() {
     <div className={styles.layout}>
       <main className={styles.formArea}>
         <ThemeToggle />
-        <div className={styles.brand} aria-label="DocTranslate">
-          <span>D</span><strong>DocTranslate</strong>
+        <div className={styles.brand}>
+          <BrandMark size={30} /><strong>Parallel</strong>
         </div>
         <div className={styles.formContainer}><Outlet /></div>
         <p className={styles.securityNote}>{t('auth.securityNote')}</p>

@@ -28,7 +28,7 @@
 .emptyWorkspace a {
   margin-top: 4px;
   padding: 8px 14px;
-  color: #ffffff;
+  color: var(--color-on-primary);
   background: var(--color-primary);
   border: 1px solid var(--color-primary);
   border-radius: var(--radius-sm);
@@ -78,7 +78,7 @@
 }
 
 .notice button:hover {
-  background: rgb(37 99 235 / 8%);
+  background: color-mix(in srgb, currentColor 10%, transparent);
 }
 
 .workArea {

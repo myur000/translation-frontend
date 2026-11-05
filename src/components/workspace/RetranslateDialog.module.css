@@ -11,7 +11,7 @@
 }
 
 .dialog::backdrop {
-  background: rgb(0 0 0 / 40%);
+  background: var(--color-backdrop);
 }
 
 .dialog h2 {
@@ -90,7 +90,7 @@
 }
 
 .actions .primary {
-  color: #ffffff;
+  color: var(--color-on-primary);
   background: var(--color-primary);
   border-color: var(--color-primary);
 }

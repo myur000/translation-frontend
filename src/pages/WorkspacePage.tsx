@@ -8,6 +8,7 @@ import { createIdempotencyKey } from '../api/idempotency.ts'
 import { RetranslateDialog } from '../components/workspace/RetranslateDialog.tsx'
 import { TranslationFeedback } from '../components/workspace/TranslationFeedback.tsx'
 import { useGlossaryTermCount } from '../documents/useGlossaryTermCount.ts'
+import { ReaderBar } from '../components/toolbar/ReaderBar.tsx'
 import { TopToolbar } from '../components/toolbar/TopToolbar.tsx'
 import { OriginalPanel } from '../components/workspace/OriginalPanel.tsx'
 import { TranslationPanel } from '../components/workspace/TranslationPanel.tsx'
@@ -366,11 +367,7 @@ function DocumentWorkspace({
         document={document}
         sourceLanguage={sourceLanguage}
         targetLanguage={targetLanguage}
-        currentPage={displayedPage}
         pageCount={pageCount}
-        notesOpen={notesVisible}
-        isScrollSyncEnabled={isScrollSyncEnabled}
-        isDualPanelFullscreen={isDualPanelFullscreen}
         isTranslating={isTranslating}
         isDownloading={translationDownload.isDownloading}
         canDownload={translationDownload.canDownload}
@@ -379,7 +376,6 @@ function DocumentWorkspace({
           !document.jobId ||
           document.status === 'failed'
         }
-        translationStatus={document.jobId ? document.status : null}
         documentActions={documentActions}
         details={details}
         glossaryTermCount={canUploadFile ? glossaryTermCount : null}
@@ -388,13 +384,8 @@ function DocumentWorkspace({
         onSourceLanguageChange={handleSourceLanguageChange}
         onTargetLanguageChange={handleTargetLanguageChange}
         onSwapLanguages={handleSwapLanguages}
-        onPreviousPage={() => navigatePage(-1)}
-        onNextPage={() => navigatePage(1)}
         onTranslate={() => void handleTranslate()}
         onDownload={handleDownload}
-        onToggleNotes={handleToggleNotes}
-        onToggleScrollSync={handleToggleScrollSync}
-        onToggleDualPanelFullscreen={handleDualPanelFullscreenToggle}
       />
       ) : null}
 
@@ -492,6 +483,21 @@ function DocumentWorkspace({
           </div>
         ) : null}
       </div>
+
+      {!isImmersiveMode ? (
+        <ReaderBar
+          currentPage={displayedPage}
+          pageCount={pageCount}
+          notesOpen={notesVisible}
+          isScrollSyncEnabled={isScrollSyncEnabled}
+          isDualPanelFullscreen={isDualPanelFullscreen}
+          onPreviousPage={() => navigatePage(-1)}
+          onNextPage={() => navigatePage(1)}
+          onToggleNotes={handleToggleNotes}
+          onToggleScrollSync={handleToggleScrollSync}
+          onToggleDualPanelFullscreen={handleDualPanelFullscreenToggle}
+        />
+      ) : null}
 
       {dialog === 'retranslate' ? (
         <RetranslateDialog

@@ -1,35 +1,72 @@
+/*
+ * Parallel palette (taken from the brand swatches):
+ *   Ink   #091423 — text, dark surfaces
+ *   Navy  #1E3A52 — primary actions, active states
+ *   Steel #4A6F8C — secondary text and icons
+ *   Mist  #8FB1C9 — borders, accents on dark
+ *   Ice   #CADCEA — soft fills, selection
+ * Text pairs meet WCAG AA (4.5:1) on their intended surfaces.
+ */
 :root {
   color-scheme: light;
-  --color-bg: #f5f6f8;
+  --palette-ink: #091423;
+  --palette-navy: #1e3a52;
+  --palette-steel: #4a6f8c;
+  --palette-mist: #8fb1c9;
+  --palette-ice: #cadcea;
+
+  --color-bg: #eef3f7;
   --color-surface: #ffffff;
-  --color-surface-subtle: #fafafa;
-  --color-text: #1f2937;
-  --color-text-muted: #667085;
-  --color-text-soft: #98a2b3;
-  --color-border: #e4e7ec;
-  --color-border-strong: #d0d5dd;
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-soft: #eff6ff;
-  --color-primary-border: #bfdbfe;
-  --color-success: #15803d;
-  --color-success-text: #166534;
-  --color-success-surface: #f0fdf4;
-  --color-success-border: #bbf7d0;
-  --color-success-icon: #dcfce7;
-  --color-warning: #b45309;
-  --color-warning-text: #92400e;
-  --color-warning-muted: #a16207;
-  --color-warning-surface: #fffbeb;
-  --color-warning-border: #fde68a;
-  --color-warning-icon: #fef3c7;
-  --color-danger-text: #b42318;
-  --color-danger-surface: #fef3f2;
-  --color-danger-border: #fecdca;
+  --color-surface-subtle: #f5f8fb;
+  /* Behind document pages, so the white paper stands out. */
+  --color-canvas: #e1e9f0;
+  --color-text: var(--palette-ink);
+  --color-text-muted: var(--palette-steel);
+  --color-text-soft: #5e7890;
+  --color-border: #d6e2ec;
+  --color-border-strong: #b5c9d9;
+  --color-primary: var(--palette-navy);
+  --color-primary-hover: #152a3c;
+  --color-primary-soft: #e4edf4;
+  --color-primary-border: var(--palette-ice);
+  --color-on-primary: #ffffff;
+  --color-focus-ring: rgb(74 111 140 / 28%);
+  --color-selection: rgb(74 111 140 / 22%);
+  --color-backdrop: rgb(9 20 35 / 45%);
+
+  --color-success: #2f7d5b;
+  --color-success-text: #1f5c42;
+  --color-success-surface: #edf7f2;
+  --color-success-border: #bfe3d1;
+  --color-success-icon: #d6efe2;
+  --color-warning: #b07219;
+  --color-warning-text: #7a4e0f;
+  --color-warning-muted: #946016;
+  --color-warning-surface: #fcf6ea;
+  --color-warning-border: #ecd5a6;
+  --color-warning-icon: #f6e7c6;
+  --color-danger: #c03b3b;
+  --color-danger-text: #a12f2f;
+  --color-danger-surface: #fcf1f1;
+  --color-danger-border: #f0c7c7;
+
+  /* The sidebar stays dark in both themes: it frames the documents. */
+  --sidebar-bg: var(--palette-ink);
+  --sidebar-hover: #12233a;
+  --sidebar-active: var(--palette-navy);
+  --sidebar-text: #e6eef5;
+  --sidebar-muted: var(--palette-mist);
+  --sidebar-soft: #6f8fa8;
+  --sidebar-border: rgb(143 177 201 / 14%);
+  --sidebar-action: var(--palette-ice);
+  --sidebar-action-hover: #dce8f1;
+  --sidebar-action-text: var(--palette-ink);
+
   --radius-sm: 6px;
-  --radius-md: 8px;
-  --shadow-page: 0 2px 10px rgb(15 23 42 / 8%);
-  --shadow-popover: 0 12px 32px rgb(15 23 42 / 14%), 0 2px 6px rgb(15 23 42 / 6%);
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-page: 0 1px 2px rgb(9 20 35 / 6%), 0 8px 24px rgb(9 20 35 / 8%);
+  --shadow-popover: 0 12px 32px rgb(9 20 35 / 16%), 0 2px 6px rgb(9 20 35 / 6%);
   --sidebar-width: 244px;
   --notes-width: 280px;
   --toolbar-height: 56px;
@@ -39,32 +76,49 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --color-bg: #0f141d;
-  --color-surface: #171d27;
-  --color-surface-subtle: #1d2531;
-  --color-text: #eef2f7;
-  --color-text-muted: #a7b0bf;
-  --color-text-soft: #7d899a;
-  --color-border: #2a3442;
-  --color-border-strong: #3b4758;
-  --color-primary: #60a5fa;
-  --color-primary-hover: #3b82f6;
-  --color-primary-soft: #172b48;
-  --color-primary-border: #315b88;
-  --color-success: #4ade80;
-  --color-success-text: #86efac;
-  --color-success-surface: #132a1c;
-  --color-success-border: #256c3c;
-  --color-success-icon: #1d4d2e;
-  --color-warning: #fbbf24;
-  --color-warning-text: #fde68a;
-  --color-warning-muted: #fbbf24;
-  --color-warning-surface: #2b2413;
-  --color-warning-border: #705a18;
-  --color-warning-icon: #453711;
-  --color-danger-text: #fda4af;
-  --color-danger-surface: #381d24;
-  --color-danger-border: #6f2d3b;
-  --shadow-page: 0 8px 24px rgb(0 0 0 / 28%);
-  --shadow-popover: 0 16px 40px rgb(0 0 0 / 45%), 0 2px 8px rgb(0 0 0 / 30%);
+  --color-bg: #0e1a2b;
+  --color-surface: #14243a;
+  --color-surface-subtle: #1a2d45;
+  --color-canvas: #0a1422;
+  --color-text: #e6eef5;
+  --color-text-muted: var(--palette-mist);
+  --color-text-soft: #6f8fa8;
+  --color-border: #24384f;
+  --color-border-strong: #34506b;
+  --color-primary: var(--palette-mist);
+  --color-primary-hover: #a9c4d7;
+  --color-primary-soft: #1a3048;
+  --color-primary-border: #34506b;
+  --color-on-primary: var(--palette-ink);
+  --color-focus-ring: rgb(143 177 201 / 30%);
+  --color-selection: rgb(143 177 201 / 28%);
+  --color-backdrop: rgb(3 8 15 / 65%);
+
+  --color-success: #6fcf9f;
+  --color-success-text: #a6e3c3;
+  --color-success-surface: #11291f;
+  --color-success-border: #24573f;
+  --color-success-icon: #1b4532;
+  --color-warning: #e6b45e;
+  --color-warning-text: #f1d39c;
+  --color-warning-muted: #e6b45e;
+  --color-warning-surface: #2a2214;
+  --color-warning-border: #6a5222;
+  --color-warning-icon: #44361a;
+  --color-danger: #ef8b8b;
+  --color-danger-text: #f4a9a9;
+  --color-danger-surface: #341b20;
+  --color-danger-border: #6b2f37;
+
+  --sidebar-bg: #070f1a;
+  --sidebar-hover: #0f1d2f;
+  --sidebar-active: #1a3048;
+  --sidebar-border: rgb(143 177 201 / 12%);
+
+  --shadow-page: 0 8px 24px rgb(0 0 0 / 35%);
+  --shadow-popover: 0 16px 40px rgb(0 0 0 / 50%), 0 2px 8px rgb(0 0 0 / 30%);
+}
+
+::selection {
+  background: var(--color-selection);
 }

@@ -1,11 +1,29 @@
 .sidebar {
+  /* Dark in both themes. Re-pointing the shared tokens makes nested
+     components (user menu, badges, links) follow without own overrides. */
+  --color-bg: var(--sidebar-hover);
+  --color-surface: #12233a;
+  --color-surface-subtle: var(--sidebar-hover);
+  --color-text: var(--sidebar-text);
+  --color-text-muted: var(--sidebar-muted);
+  --color-text-soft: var(--sidebar-soft);
+  --color-border: var(--sidebar-border);
+  --color-border-strong: rgb(143 177 201 / 26%);
+  --color-primary: var(--palette-mist);
+  --color-primary-hover: #a9c4d7;
+  --color-primary-soft: var(--sidebar-active);
+  --color-primary-border: rgb(143 177 201 / 30%);
+  --color-on-primary: var(--palette-ink);
+  --color-focus-ring: rgb(143 177 201 / 30%);
+
   position: relative;
   height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--color-surface);
-  border-right: 1px solid var(--color-border);
+  color: var(--sidebar-text);
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
 }
 
 .brand {
@@ -14,10 +32,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 18px;
-  font-size: 16px;
+  padding: 0 14px 0 16px;
+  font-size: 17px;
   font-weight: 650;
-  border-bottom: 1px solid var(--color-border);
+  letter-spacing: -0.02em;
 }
 
 .brandName {
@@ -29,15 +47,9 @@
 }
 
 .brandMark {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  color: #ffffff;
-  background: var(--color-primary);
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 700;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px rgb(143 177 201 / 18%);
 }
 
 .collapseButton {
@@ -61,7 +73,7 @@
 }
 
 .primaryAction {
-  padding: 16px 14px 12px;
+  padding: 8px 14px 12px;
 }
 
 .fileInput {
@@ -90,26 +102,27 @@
   justify-content: center;
   gap: 8px;
   padding: 9px 12px;
-  color: #ffffff;
-  background: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius-sm);
+  color: var(--sidebar-action-text);
+  background: var(--sidebar-action);
+  border: 1px solid var(--sidebar-action);
+  border-radius: var(--radius-md);
   font-weight: 600;
+  transition: background-color 120ms ease;
 }
 
 .uploadButton:hover {
-  background: var(--color-primary-hover);
+  background: var(--sidebar-action-hover);
 }
 
 .sectionHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
-  color: var(--color-text-muted);
-  font-size: 12px;
+  padding: 8px 18px;
+  color: var(--sidebar-soft);
+  font-size: 11px;
   font-weight: 650;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -130,38 +143,58 @@
 }
 
 .documentItem {
+  position: relative;
   width: 100%;
   display: flex;
   gap: 10px;
-  padding: 10px;
+  margin-bottom: 2px;
+  padding: 9px 10px;
   color: inherit;
   text-align: left;
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border: 0;
+  border-radius: var(--radius-md);
 }
 
 .documentItem:hover {
-  background: var(--color-surface-subtle);
+  background: var(--sidebar-hover);
 }
 
-.active {
-  background: var(--color-primary-soft);
-  border-color: var(--color-primary-border);
+.active,
+.active:hover {
+  background: var(--sidebar-active);
+}
+
+/* Accent bar on the active document, so the selection reads without color alone. */
+.active::before {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 3px;
+  background: var(--palette-mist);
+  border-radius: 0 3px 3px 0;
+  content: '';
 }
 
 .fileIcon {
-  width: 34px;
+  width: 32px;
   height: 38px;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  color: var(--color-primary);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-strong);
-  border-radius: 4px;
-  font-size: 9px;
+  color: var(--palette-ice);
+  background: rgb(143 177 201 / 10%);
+  border: 1px solid rgb(143 177 201 / 22%);
+  border-radius: 5px;
+  font-size: 8.5px;
   font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.active .fileIcon {
+  background: rgb(202 220 234 / 14%);
+  border-color: rgb(202 220 234 / 32%);
 }
 
 .documentInfo {
@@ -182,7 +215,7 @@
 
 .documentMeta {
   margin-top: 2px;
-  color: var(--color-text-muted);
+  color: var(--sidebar-muted);
   font-size: 11px;
 }
 
@@ -286,7 +319,7 @@
     max-height: none;
     overflow: visible;
     border-right: 0;
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--sidebar-border);
   }
 
   .collapseButton,

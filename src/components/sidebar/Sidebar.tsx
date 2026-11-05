@@ -14,6 +14,7 @@ import { useTranslation } from '../../i18n/useTranslation.ts'
 import type { DocumentItem } from '../../types/document.ts'
 import { documentStatusLabel } from '../../documents/documentStatusLabel.ts'
 import { shortLanguageCode } from '../../languages/languageCatalog.ts'
+import { BrandMark } from '../brand/BrandMark.tsx'
 import { UserMenu } from '../user/UserMenu.tsx'
 import styles from './Sidebar.module.css'
 
@@ -64,8 +65,8 @@ export function Sidebar({
   return (
     <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''}`}>
       <div className={styles.brand}>
-        <span className={styles.brandMark}>D</span>
-        <span className={styles.brandName}>DocTranslate</span>
+        <BrandMark className={styles.brandMark} size={28} />
+        <span className={styles.brandName}>Parallel</span>
         <button
           type="button"
           className={styles.collapseButton}

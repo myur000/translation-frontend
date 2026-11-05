@@ -16,7 +16,7 @@
 .card small, .note { color: var(--color-text-muted); font-size: 11px; overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
 .primary, .secondary { padding: 9px 16px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); }
-.primary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; font-weight: 600; }
+.primary { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); font-weight: 600; }
 .primary:hover:not(:disabled) { background: var(--color-primary-hover); }
 .secondary:hover:not(:disabled) { border-color: var(--color-primary); }
 .primary:disabled, .secondary:disabled { opacity: .55; cursor: default; }

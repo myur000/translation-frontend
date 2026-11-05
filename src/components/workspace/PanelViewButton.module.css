@@ -24,7 +24,7 @@
 .button[aria-pressed='true'] {
   color: var(--color-primary);
   background: var(--color-primary-soft);
-  border-color: #bfdbfe;
+  border-color: var(--color-primary-border);
 }
 
 .button svg {

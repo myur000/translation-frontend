@@ -69,10 +69,10 @@ await context.route((url) => url.pathname.startsWith('/api/'), async (route) => 
 try {
   const baseUrl = process.env.ACCOUNT_TEST_URL ?? 'http://localhost:3000/'
   await page.goto(new URL('/plans', baseUrl).href)
-  await page.getByText('Осталось переводов: 8', { exact: true }).waitFor()
+  await page.getByText('Осталось страниц: 8', { exact: true }).waitFor()
   assert.equal(await page.getByText(/^Осталось:/).count(), 0)
   await page.getByRole('link', { name: 'Вернуться к рабочей области' }).click()
-  assert.equal(await page.getByText(/^Осталось переводов:/).count(), 0)
+  assert.equal(await page.getByText(/^Осталось страниц:/).count(), 0)
   await page.locator('input[type="file"]').first().setInputFiles({
     name: 'limits-test.doc', mimeType: 'application/msword', buffer: Buffer.from('local DOC fixture'),
   })
@@ -94,7 +94,7 @@ try {
   await page.getByRole('button', { name: 'Открыть меню пользователя' }).click()
   await page.getByRole('menuitem', { name: 'Тариф и лимиты' }).click()
   await page.getByRole('heading', { name: 'Тариф и лимиты' }).waitFor()
-  await page.getByText('Осталось переводов: 0', { exact: true }).waitFor()
+  await page.getByText('Осталось страниц: 0', { exact: true }).waitFor()
   assert.equal(await page.getByRole('progressbar').getAttribute('value'), '10')
   await page.getByText(/Уже загруженные книги остаются/).waitFor()
   await mkdir('test-results', { recursive: true })
@@ -103,14 +103,14 @@ try {
   unavailable = true
   await page.getByRole('button', { name: 'Обновить данные' }).click()
   await page.getByText(/они могут быть устаревшими/).first().waitFor()
-  await page.getByText('Осталось переводов: 0', { exact: true }).waitFor()
+  await page.getByText('Осталось страниц: 0', { exact: true }).waitFor()
   unavailable = false
   pro = true
   await page.getByRole('button', { name: 'Обновить данные' }).click()
   await page.getByText('Активна', { exact: true }).waitFor()
   await page.getByText('Подписка будет отменена в конце текущего периода.', { exact: true }).waitFor()
   assert.equal(await page.getByRole('progressbar').count(), 0)
-  assert.equal(await page.getByText(/Осталось переводов:/).count(), 0)
+  assert.equal(await page.getByText(/Осталось страниц:/).count(), 0)
 
   await page.getByRole('button', { name: 'Открыть меню пользователя' }).click()
   await page.getByRole('menuitem', { name: 'Настройки' }).click()

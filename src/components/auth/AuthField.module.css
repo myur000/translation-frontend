@@ -28,16 +28,16 @@
 }
 
 .inputContainer input:hover {
-  border-color: #98a2b3;
+  border-color: var(--color-text-soft);
 }
 
 .inputContainer input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgb(37 99 235 / 10%);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
 .inputContainer input[aria-invalid='true'] {
-  border-color: #dc2626;
+  border-color: var(--color-danger);
 }
 
 .revealButton {
@@ -62,7 +62,7 @@
 }
 
 .field small {
-  color: #b42318;
+  color: var(--color-danger-text);
   font-size: 11px;
   font-weight: 400;
 }
