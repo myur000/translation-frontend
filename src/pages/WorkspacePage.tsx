@@ -3,6 +3,10 @@ import { Link, useOutletContext } from 'react-router'
 import { ApiClientError } from '../api/client.ts'
 import { API_ENDPOINTS } from '../api/endpoints.ts'
 import { NotesPanel } from '../components/notes/NotesPanel.tsx'
+import type { DocumentAction } from '../components/toolbar/DocumentActionsMenu.tsx'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog.tsx'
+import { createIdempotencyKey } from '../api/idempotency.ts'
+import { RetranslateDialog } from '../components/workspace/RetranslateDialog.tsx'
 import { TopToolbar } from '../components/toolbar/TopToolbar.tsx'
 import { OriginalPanel } from '../components/workspace/OriginalPanel.tsx'
 import { TranslationPanel } from '../components/workspace/TranslationPanel.tsx'
@@ -17,6 +21,7 @@ import { useTranslationDownload } from '../hooks/useTranslationDownload.ts'
 import { useDocumentAssets } from '../hooks/useDocumentAssets.ts'
 import { useDocumentView } from '../hooks/useDocumentView.ts'
 import { DocumentUploadPreparationError } from '../errors/DocumentUploadPreparationError.ts'
+import { isQuotaExceeded } from '../documents/documentErrors.ts'
 import type {
   AppLayoutContextValue,
   ExpandedPanel,
@@ -50,7 +55,11 @@ interface DocumentWorkspaceProps {
   onStartTranslation: AppLayoutContextValue['startDocumentTranslation']
   onAttachOriginal: AppLayoutContextValue['attachOriginal']
   onResumeTranslationWaiting: AppLayoutContextValue['resumeTranslationWaiting']
+  onRetranslate: AppLayoutContextValue['retranslateDocument']
+  onDelete: AppLayoutContextValue['deleteDocument']
 }
+
+type WorkspaceDialog = 'retranslate' | 'delete' | null
 
 function DocumentWorkspace({
   document,
@@ -63,6 +72,8 @@ function DocumentWorkspace({
   onStartTranslation,
   onAttachOriginal,
   onResumeTranslationWaiting,
+  onRetranslate,
+  onDelete,
 }: DocumentWorkspaceProps) {
   const { t } = useTranslation()
   const { getLabel: getLanguageLabel } = useLanguageCatalog()
@@ -74,6 +85,9 @@ function DocumentWorkspace({
   const [notesOpen, setNotesOpen] = useState(false)
   const [notice, setNotice] = useState('')
   const [isTranslating, setTranslating] = useState(false)
+  const [dialog, setDialog] = useState<WorkspaceDialog>(null)
+  const [isDeleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const notesPanel = useResizableNotesPanel()
   const synchronizedScroll = useSynchronizedScroll(
     isScrollSyncEnabled,
@@ -173,6 +187,27 @@ function DocumentWorkspace({
       onResumeTranslationWaiting(document.id)
       return
     }
+    // A failed job can be retried from the source kept on the server.
+    if (!document.sourceFile && document.jobId && document.status === 'failed') {
+      if (sourceLanguage !== toCatalogLanguageCode(document.sourceLanguage)) {
+        setNotice(t('retranslate.needsFile'))
+        return
+      }
+      setTranslating(true)
+      setNotice('')
+      try {
+        await onRetranslate(document.id, {
+          targetLanguage,
+          useGlossary: false,
+          idempotencyKey: createIdempotencyKey(),
+        })
+      } catch (error) {
+        setNotice(translationErrorMessage(error))
+      } finally {
+        setTranslating(false)
+      }
+      return
+    }
     if (!document.sourceFile) {
       setNotice(
         t('workspace.translateReady', {
@@ -200,27 +235,67 @@ function DocumentWorkspace({
         }),
       )
     } catch (error) {
-      if (error instanceof DocumentUploadPreparationError) {
-        setNotice(error.message)
-      } else if (error instanceof ApiClientError) {
-        if (error.status === 403) {
-          setNotice(t('workspace.verifyEmailBeforeUpload'))
-        } else if (error.status === 413) {
-          setNotice(t('workspace.uploadTooLargeBackend'))
-        } else if (error.status === 429) {
-          // The backend currently has no machine-readable code for quota errors.
-          setNotice(error.details?.message === 'Лимит использования функции на текущий период исчерпан'
-            ? t('plans.uploadQuotaExceeded') : t('workspace.uploadRateLimit'))
-        } else {
-          setNotice(error.details?.message || t('workspace.uploadFailed'))
-        }
-      } else {
-        setNotice(t('workspace.uploadFailed'))
-      }
+      setNotice(translationErrorMessage(error))
     } finally {
       setTranslating(false)
     }
   }
+
+  function translationErrorMessage(error: unknown) {
+    if (error instanceof DocumentUploadPreparationError) return error.message
+    if (!(error instanceof ApiClientError)) return t('workspace.uploadFailed')
+    if (error.status === 403) return t('workspace.verifyEmailBeforeUpload')
+    if (error.status === 410) return t('retranslate.sourceExpired')
+    if (error.status === 413) return t('workspace.uploadTooLargeBackend')
+    if (error.status === 429) {
+      return isQuotaExceeded(error) ? t('plans.uploadQuotaExceeded') : t('workspace.uploadRateLimit')
+    }
+    return error.details?.message || t('workspace.uploadFailed')
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await onDelete(document.id)
+      // The workspace unmounts with the deleted document.
+    } catch (error) {
+      setDeleteError(error instanceof ApiClientError && error.status === 409
+        ? t('delete.processing')
+        : t('delete.failed'))
+      setDeleting(false)
+    }
+  }
+
+  const isUploaded = Boolean(document.jobId)
+  const isProcessing = document.status === 'processing'
+  const documentActions: DocumentAction[] = [
+    {
+      id: 'retranslate',
+      label: t('documentActions.retranslate'),
+      disabledReason: !isUploaded
+        ? t('documentActions.notUploaded')
+        : isProcessing ? t('documentActions.processing') : undefined,
+      onSelect: () => setDialog('retranslate'),
+    },
+    isUploaded
+      ? {
+          id: 'delete',
+          label: t('documentActions.delete'),
+          danger: true,
+          disabledReason: isProcessing ? t('documentActions.processing') : undefined,
+          onSelect: () => {
+            setDeleteError(null)
+            setDialog('delete')
+          },
+        }
+      : {
+          id: 'remove-draft',
+          label: t('documentActions.removeDraft'),
+          danger: true,
+          onSelect: () => void onDelete(document.id),
+        },
+  ]
 
   const handleDownload = () => {
     setNotice('')
@@ -278,9 +353,10 @@ function DocumentWorkspace({
         canTranslate={
           Boolean(document.waitingIssue) ||
           !document.jobId ||
-          (document.status === 'failed' && Boolean(document.sourceFile))
+          document.status === 'failed'
         }
         translationStatus={document.jobId ? document.status : null}
+        documentActions={documentActions}
         onSourceLanguageChange={handleSourceLanguageChange}
         onTargetLanguageChange={handleTargetLanguageChange}
         onSwapLanguages={handleSwapLanguages}
@@ -385,6 +461,25 @@ function DocumentWorkspace({
           </div>
         ) : null}
       </div>
+
+      {dialog === 'retranslate' ? (
+        <RetranslateDialog
+          document={document}
+          onSubmit={(request) => onRetranslate(document.id, request)}
+          onClose={() => setDialog(null)}
+        />
+      ) : null}
+      {dialog === 'delete' ? (
+        <ConfirmDialog
+          title={t('delete.title', { name: document.name })}
+          description={t('delete.description')}
+          confirmLabel={t('delete.confirm')}
+          busy={isDeleting}
+          error={deleteError}
+          onConfirm={() => void handleDelete()}
+          onClose={() => setDialog(null)}
+        />
+      ) : null}
     </div>
   )
 }
@@ -402,6 +497,8 @@ export function WorkspacePage() {
     startDocumentTranslation,
     attachOriginal,
     resumeTranslationWaiting,
+    retranslateDocument,
+    deleteDocument,
   } = useOutletContext<AppLayoutContextValue>()
   const { t } = useTranslation()
   const [isScrollSyncEnabled, setIsScrollSyncEnabled] = useState(false)
@@ -466,6 +563,8 @@ export function WorkspacePage() {
       onStartTranslation={startDocumentTranslation}
       onAttachOriginal={attachOriginal}
       onResumeTranslationWaiting={resumeTranslationWaiting}
+      onRetranslate={retranslateDocument}
+      onDelete={deleteDocument}
     />
   )
 }

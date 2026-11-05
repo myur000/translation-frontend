@@ -3,7 +3,9 @@ import { AccountProvider } from '../account/AccountProvider.tsx'
 import { useAccount } from '../account/useAccount.ts'
 import { Outlet, useLocation, useMatch, useNavigate } from 'react-router'
 import {
+  deleteDocument as deleteDocumentRequest,
   getDocumentHistory,
+  retranslateDocument as retranslateDocumentRequest,
   uploadDocument as uploadDocumentRequest,
 } from '../api/documents.ts'
 import type { DocumentUploadResponse } from '../api/contracts/documents.ts'
@@ -57,7 +59,18 @@ export interface AppLayoutContextValue {
     documentId: string,
     sourceLanguage: LanguageCode,
     targetLanguage: LanguageCode,
+    options?: { useGlossary?: boolean },
   ) => Promise<DocumentUploadResponse>
+  /**
+   * Translates an uploaded document into another language from the source
+   * kept by the backend; resolves with the new job, which becomes active.
+   */
+  retranslateDocument: (
+    documentId: string,
+    request: { targetLanguage: LanguageCode; useGlossary: boolean; idempotencyKey: string },
+  ) => Promise<DocumentUploadResponse>
+  /** Deletes the job on the backend (drafts only locally) and drops it from the list. */
+  deleteDocument: (documentId: string) => Promise<void>
 }
 export type ExpandedPanel = 'original' | 'translation' | null
 
@@ -307,6 +320,7 @@ function AppLayoutContent() {
     documentId: string,
     sourceLanguage: LanguageCode,
     targetLanguage: LanguageCode,
+    options: { useGlossary?: boolean } = {},
   ) => {
     const document = documents.find((item) => item.id === documentId)
     if (!document?.sourceFile) {
@@ -322,6 +336,7 @@ function AppLayoutContent() {
           file: document.sourceFile,
           source_lang: sourceLanguage,
           target_lang: targetLanguage,
+          use_glossary: options.useGlossary,
         },
         { accessToken: session.accessToken },
       )
@@ -343,6 +358,8 @@ function AppLayoutContent() {
                 progress: 0,
                 jobId: response.job_id,
                 errorMessage: undefined,
+                billedUnits: response.billed_units,
+                glossaryTermCount: response.glossary_term_count,
               }
             : item,
         ),
@@ -358,6 +375,76 @@ function AppLayoutContent() {
       if (error instanceof ApiClientError && error.status === 429) reloadAccount()
       if (error instanceof ApiClientError) throw error
       throw new DocumentUploadPreparationError(t('workspace.uploadFailed'))
+    }
+  }
+
+  const retranslateDocument: AppLayoutContextValue['retranslateDocument'] = async (
+    documentId,
+    { targetLanguage, useGlossary, idempotencyKey },
+  ) => {
+    const document = documents.find((item) => item.id === documentId)
+    if (!document?.jobId || !session) {
+      throw new DocumentUploadPreparationError(t('workspace.uploadUnavailable'))
+    }
+
+    try {
+      const response = await retranslateDocumentRequest(
+        document.jobId,
+        { target_lang: targetLanguage, use_glossary: useGlossary || undefined },
+        { accessToken: session.accessToken, idempotencyKey },
+      )
+      // A repeated key returns the same job: never list it twice.
+      const translated: DocumentItem = {
+        id: response.job_id,
+        name: document.name,
+        format: document.format,
+        sourceLanguage: document.sourceLanguage,
+        targetLanguage,
+        pages: 0,
+        status: 'processing',
+        serverStatus: 'PENDING',
+        progress: 0,
+        jobId: response.job_id,
+        billedUnits: response.billed_units,
+        glossaryTermCount: response.glossary_term_count,
+        createdAt: new Date().toISOString(),
+      }
+      rememberDocumentMetadata(session.email, response.job_id, {
+        name: document.name,
+        documentId: translated.id,
+      })
+      setDocuments((current) => current.some((item) => item.jobId === response.job_id)
+        ? current
+        : [translated, ...current])
+      setActiveDocumentId(translated.id)
+      reloadAccount()
+      void navigate(documentPath(response.job_id))
+      return response
+    } catch (error) {
+      if (error instanceof ApiClientError && error.status === 429) reloadAccount()
+      throw error
+    }
+  }
+
+  const deleteDocument = async (documentId: string) => {
+    const document = documents.find((item) => item.id === documentId)
+    if (!document) return
+    if (document.jobId) {
+      if (!session) throw new DocumentUploadPreparationError(t('workspace.uploadUnavailable'))
+      try {
+        await deleteDocumentRequest(document.jobId, { accessToken: session.accessToken })
+      } catch (error) {
+        // 404: already deleted (another tab) or never ours — the list is stale either way.
+        if (!(error instanceof ApiClientError && error.status === 404)) throw error
+      }
+    }
+
+    const remaining = documents.filter((item) => item.id !== documentId)
+    setDocuments((current) => current.filter((item) => item.id !== documentId))
+    if (activeDocument?.id === documentId) {
+      const next = remaining[0]
+      setActiveDocumentId(next?.id ?? null)
+      void navigate(next?.jobId ? documentPath(next.jobId) : '/', { replace: true })
     }
   }
 
@@ -402,6 +489,8 @@ function AppLayoutContent() {
                 attachOriginal,
                 resumeTranslationWaiting,
                 startDocumentTranslation,
+                retranslateDocument,
+                deleteDocument,
               } satisfies AppLayoutContextValue}
             />
           </div>

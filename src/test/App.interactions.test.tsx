@@ -1,11 +1,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router'
 import App from '../App.tsx'
 import { AUTH_SESSION_STORAGE_KEY } from '../auth/authStorage.ts'
 import { resetLanguageCatalogForTests } from '../languages/languageCatalog.ts'
 import { installBrowserSessionMock } from './browserSessionMock.ts'
+import { installDialogPolyfill } from './dialogPolyfill.ts'
 
 // These tests exercise layout/upload/navigation, not the PDF rendering engine.
 vi.mock('../viewer/pdfEngine.ts', () => ({ openPdf: async () => { throw new Error('Invalid test PDF') } }))
@@ -1220,26 +1221,37 @@ describe('history integration', () => {
   })
 })
 
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+
+const apiErrorBody = (status: number, message: string) => ({
+  timestamp: '2026-11-05T00:00:00Z', status, message, path: '/api', fieldErrors: {}, correlation_id: `c-${status}`,
+})
+
+type ApiOverride = (init?: RequestInit) => Response
+
+/** Default API plus per-URL overrides; returns the router to inspect the URL. */
+function renderDocumentRoute(path: string, overrides: Record<string, ApiOverride> = {}) {
+  seedAuthenticatedSession()
+  seedDocumentMetadata()
+  installDefaultApiMock()
+  installBrowserSessionMock()
+  const defaultFetch = globalThis.fetch
+  const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const override = overrides[String(input)]
+    return override ? Promise.resolve(override(init)) : defaultFetch(input, init)
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  const router = createMemoryRouter([{ path: '*', element: <App /> }], { initialEntries: [path] })
+  render(<RouterProvider router={router} />)
+  return { router, fetchMock }
+}
+
+const callsTo = (fetchMock: ReturnType<typeof vi.fn>, url: string, method: string) =>
+  fetchMock.mock.calls.filter(([input, init]) =>
+    String(input) === url && ((init as RequestInit | undefined)?.method ?? 'GET') === method)
+
 describe('document route', () => {
-  const jsonResponse = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
-
-  /** Default API plus per-test overrides; returns the router to inspect the URL. */
-  function renderDocumentRoute(path: string, overrides: Record<string, () => Response> = {}) {
-    seedAuthenticatedSession()
-    seedDocumentMetadata()
-    installDefaultApiMock()
-    installBrowserSessionMock()
-    const defaultFetch = globalThis.fetch
-    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const override = overrides[String(input)]
-      return override ? Promise.resolve(override()) : defaultFetch(input, init)
-    }))
-    const router = createMemoryRouter([{ path: '*', element: <App /> }], { initialEntries: [path] })
-    render(<RouterProvider router={router} />)
-    return router
-  }
-
   it('opens a document by its link', async () => {
     renderDocumentRoute('/documents/00000000-0000-0000-0000-000000000102')
 
@@ -1249,7 +1261,7 @@ describe('document route', () => {
 
   it('gives a selected document its own address', async () => {
     const user = userEvent.setup()
-    const router = renderDocumentRoute('/')
+    const { router } = renderDocumentRoute('/')
 
     await user.click(await screen.findByRole('button', { name: /research_notes\.doc/ }))
 
@@ -1295,6 +1307,133 @@ describe('document route', () => {
     })
 
     expect(await screen.findAllByText('Договор поставки.pdf')).toHaveLength(2)
+  })
+})
+
+describe('document actions', () => {
+  let restoreDialog: () => void
+  beforeEach(() => { restoreDialog = installDialogPolyfill() })
+  // Unmount open dialogs before their methods disappear.
+  afterEach(() => {
+    cleanup()
+    restoreDialog()
+  })
+
+  const firstJob = '00000000-0000-0000-0000-000000000101'
+  const newJob = '00000000-0000-0000-0000-000000000201'
+  const openActions = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(await screen.findByRole('button', { name: 'Действия с документом' }))
+    return screen.getByRole('menu', { name: 'Действия с документом' })
+  }
+
+  it('translates an uploaded document into another language without a new upload', async () => {
+    const user = userEvent.setup()
+    const { router, fetchMock } = renderDocumentRoute(`/documents/${firstJob}`, {
+      '/api/terms?source_lang=eng_Latn&target_lang=deu_Latn&size=1': () =>
+        jsonResponse({ items: [], page: 0, size: 1, total_elements: 3, total_pages: 3 }),
+      [`/api/documents/${firstJob}/translations`]: () =>
+        jsonResponse({ job_id: newJob, billed_units: 2, glossary_term_count: 3 }, 202),
+      [`/api/documents/${newJob}/status`]: () => jsonResponse({
+        job_id: newJob, status: 'PENDING', progress: 0, error_code: null, error_message: null,
+        file_name: 'english_course_book.pdf', glossary_term_count: 3,
+      }),
+    })
+
+    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Перевести на другой язык…' }))
+    const dialog = screen.getByRole('dialog', { name: 'Перевести на другой язык' })
+    expect(within(dialog).getByRole('button', { name: 'Язык перевода: Немецкий' })).toBeTruthy()
+    await user.click(await within(dialog).findByRole('checkbox', { name: 'Применить мой глоссарий · терминов: 3' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Перевести' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/documents/${newJob}`))
+    const [, init] = callsTo(fetchMock, `/api/documents/${firstJob}/translations`, 'POST')[0]
+    expect(JSON.parse(String(init?.body))).toEqual({ target_lang: 'deu_Latn', use_glossary: true })
+    expect(new Headers(init?.headers).get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(await screen.findByRole('button', { name: 'Язык перевода: Немецкий' })).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: /english_course_book\.pdf/ })).toHaveLength(2)
+  })
+
+  it('explains that the original has expired on the server', async () => {
+    const user = userEvent.setup()
+    renderDocumentRoute(`/documents/${firstJob}`, {
+      [`/api/documents/${firstJob}/translations`]: () =>
+        jsonResponse(apiErrorBody(410, 'Исходный файл удалён'), 410),
+    })
+
+    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Перевести на другой язык…' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Перевести' }))
+
+    expect((await within(screen.getByRole('dialog')).findByRole('alert')).textContent)
+      .toBe('Оригинал уже удалён с сервера по сроку хранения. Добавьте файл заново.')
+  })
+
+  it('deletes a document after confirmation and opens the next one', async () => {
+    const user = userEvent.setup()
+    const { router, fetchMock } = renderDocumentRoute(`/documents/${firstJob}`, {
+      [`/api/documents/${firstJob}`]: () => new Response(null, { status: 204 }),
+    })
+
+    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Удалить документ…' }))
+    const dialog = screen.getByRole('alertdialog', { name: 'Удалить «english_course_book.pdf»?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Удалить' }))
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: /english_course_book\.pdf/ })).toBeNull())
+    expect(callsTo(fetchMock, `/api/documents/${firstJob}`, 'DELETE')).toHaveLength(1)
+    expect(router.state.location.pathname).toBe('/documents/00000000-0000-0000-0000-000000000102')
+  })
+
+  it('keeps a document that is still being translated', async () => {
+    const user = userEvent.setup()
+    renderDocumentRoute(`/documents/${firstJob}`, {
+      [`/api/documents/${firstJob}`]: () => jsonResponse(apiErrorBody(409, 'Документ переводится'), 409),
+    })
+
+    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Удалить документ…' }))
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Удалить' }))
+
+    expect((await within(screen.getByRole('alertdialog')).findByRole('alert')).textContent)
+      .toBe('Документ ещё переводится — удалить его можно после завершения.')
+    expect(screen.getAllByRole('button', { name: /english_course_book\.pdf/ }).length).toBeGreaterThan(0)
+  })
+
+  it('retries a failed translation from the server copy of the original', async () => {
+    const user = userEvent.setup()
+    const failedJob = '00000000-0000-0000-0000-000000000301'
+    const { router, fetchMock } = renderDocumentRoute(`/documents/${failedJob}`, {
+      '/api/documents/history?page=0&size=100': () => jsonResponse({
+        items: [{ ...historyItems[0], job_id: failedJob, status: 'FAILED', progress: 5,
+          error_code: 'TRANSLATION_FAILED', error_message: 'Не удалось перевести документ', file_name: 'Отчёт.pdf' }],
+        page: 0, size: 100, total_elements: 1, total_pages: 1, first: true, last: true,
+      }),
+      [`/api/documents/${failedJob}/translations`]: () =>
+        jsonResponse({ job_id: newJob, billed_units: 1, glossary_term_count: null }, 202),
+      [`/api/documents/${newJob}/status`]: () => jsonResponse({
+        job_id: newJob, status: 'PENDING', progress: 0, error_code: null, error_message: null,
+        file_name: 'Отчёт.pdf', glossary_term_count: null,
+      }),
+    })
+
+    await user.click(await screen.findByRole('button', { name: 'Повторить' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/documents/${newJob}`))
+    const [, init] = callsTo(fetchMock, `/api/documents/${failedJob}/translations`, 'POST')[0]
+    expect(JSON.parse(String(init?.body))).toEqual({ target_lang: 'rus_Cyrl' })
+  })
+
+  it('explains why actions are unavailable for a draft', async () => {
+    const user = userEvent.setup()
+    const { container } = renderApp()
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')
+    await user.upload(input as HTMLInputElement, new File(['draft'], 'draft.pdf', { type: 'application/pdf' }))
+
+    const menu = await openActions(user)
+    const retranslate = within(menu).getByRole('menuitem', { name: 'Перевести на другой язык…' })
+    expect(retranslate.getAttribute('aria-disabled')).toBe('true')
+    expect(retranslate.getAttribute('title')).toBe('Сначала отправьте документ на перевод')
+
+    await user.click(within(menu).getByRole('menuitem', { name: 'Убрать черновик' }))
+    expect(screen.queryByRole('button', { name: /draft\.pdf/ })).toBeNull()
   })
 })
 

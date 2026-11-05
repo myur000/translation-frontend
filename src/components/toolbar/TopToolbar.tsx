@@ -1,5 +1,6 @@
 import type { DocumentItem, LanguageCode } from '../../types/document.ts'
 import { LanguagePicker } from '../languages/LanguagePicker.tsx'
+import { DocumentActionsMenu, type DocumentAction } from './DocumentActionsMenu.tsx'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import { ScrollSyncButton } from './ScrollSyncButton.tsx'
 import { WorkspaceViewButton } from './WorkspaceViewButton.tsx'
@@ -19,6 +20,7 @@ interface TopToolbarProps {
   canDownload: boolean
   canTranslate: boolean
   translationStatus: DocumentItem['status'] | null
+  documentActions: DocumentAction[]
   onSourceLanguageChange: (language: LanguageCode) => void
   onTargetLanguageChange: (language: LanguageCode) => void
   onSwapLanguages: () => void
@@ -78,6 +80,7 @@ export function TopToolbar(props: TopToolbarProps) {
         <WorkspaceViewButton isEnabled={isDualPanelFullscreen} onToggle={props.onToggleDualPanelFullscreen} />
         <button type="button" className={styles.secondaryButton} disabled={props.isDownloading || !props.canDownload} aria-busy={props.isDownloading} title={downloadTitle} onClick={props.onDownload}>{t(props.isDownloading ? 'toolbar.downloading' : 'toolbar.download')}</button>
         <button type="button" className={`${styles.secondaryButton} ${notesOpen ? styles.activeAction : ''}`} aria-pressed={notesOpen} onClick={props.onToggleNotes}>{t('toolbar.notes')}</button>
+        <DocumentActionsMenu actions={props.documentActions} />
       </div>
     </header>
   )
