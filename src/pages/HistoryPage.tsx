@@ -1,12 +1,13 @@
 import { useOutletContext } from 'react-router'
 import { useTranslation } from '../i18n/useTranslation.ts'
 import type { AppLayoutContextValue } from '../layouts/AppLayout.tsx'
-import { getLanguageLabel } from '../types/document.ts'
+import { useLanguageCatalog } from '../languages/useLanguageCatalog.ts'
 import { documentStatusLabel } from '../documents/documentStatusLabel.ts'
 import styles from './HistoryPage.module.css'
 
 export function HistoryPage() {
-  const { language, t } = useTranslation()
+  const { t } = useTranslation()
+  const { getLabel: getLanguageLabel } = useLanguageCatalog()
   const { documents, historyState, retryHistory, selectDocument } =
     useOutletContext<AppLayoutContextValue>()
   const historyDocuments = documents.filter((document) => document.jobId)
@@ -44,8 +45,8 @@ export function HistoryPage() {
               <span className={styles.details}>
                 <strong>{document.name}</strong>
                 <small>
-                  {getLanguageLabel(document.sourceLanguage, language)} →{' '}
-                  {getLanguageLabel(document.targetLanguage, language)}
+                  {getLanguageLabel(document.sourceLanguage)} →{' '}
+                  {getLanguageLabel(document.targetLanguage)}
                 </small>
                 <code>{document.jobId}</code>
               </span>

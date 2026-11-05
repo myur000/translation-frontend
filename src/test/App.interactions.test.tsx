@@ -1,9 +1,10 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router'
 import App from '../App.tsx'
 import { AUTH_SESSION_STORAGE_KEY } from '../auth/authStorage.ts'
+import { resetLanguageCatalogForTests } from '../languages/languageCatalog.ts'
 import { installBrowserSessionMock } from './browserSessionMock.ts'
 
 // These tests exercise layout/upload/navigation, not the PDF rendering engine.
@@ -17,6 +18,7 @@ afterEach(() => {
   document.documentElement.lang = ''
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  resetLanguageCatalogForTests()
 })
 
 function createJwt(emailVerified = true) {
@@ -46,11 +48,19 @@ function seedAuthenticatedSession(emailVerified = true) {
   )
 }
 
+const languageCatalog = [
+  { code: 'eng_Latn', name: 'Английский' },
+  { code: 'zho_Hans', name: 'Китайский (упрощённый)' },
+  { code: 'deu_Latn', name: 'Немецкий' },
+  { code: 'rus_Cyrl', name: 'Русский' },
+  { code: 'fra_Latn', name: 'Французский' },
+]
+
 const historyItems = [
   {
     job_id: '00000000-0000-0000-0000-000000000101',
-    source_lang: 'en',
-    target_lang: 'ru',
+    source_lang: 'eng_Latn',
+    target_lang: 'rus_Cyrl',
     format: 'pdf',
     status: 'DONE',
     progress: 100,
@@ -61,8 +71,8 @@ const historyItems = [
   },
   {
     job_id: '00000000-0000-0000-0000-000000000102',
-    source_lang: 'en',
-    target_lang: 'ru',
+    source_lang: 'eng_Latn',
+    target_lang: 'rus_Cyrl',
     format: 'docx',
     status: 'DONE',
     progress: 100,
@@ -91,6 +101,14 @@ function installDefaultApiMock() {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      if (input === '/api/languages') {
+        return Promise.resolve(
+          new Response(JSON.stringify(languageCatalog), {
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+
       if (input === '/api/documents/history?page=0&size=100') {
         return Promise.resolve(
           new Response(
@@ -668,7 +686,7 @@ describe('workspace interactions', () => {
 
     expect(screen.queryByRole('complementary', { name: 'Заметки' })).toBeNull()
     expect(screen.getAllByText('project_report.docx')).toHaveLength(2)
-    expect(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }).getAttribute('lang')).toBe('en')
+    expect(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }).getAttribute('lang')).toBe('en-Latn')
     expect(screen.queryByRole('heading', { name: 'Translation service progress' })).toBeNull()
   })
 
@@ -680,8 +698,10 @@ describe('workspace interactions', () => {
       await screen.findByRole('button', { name: /research_notes\.doc/i }),
     )
 
-    expect(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }).getAttribute('lang')).toBe('de')
-    expect(screen.getByRole('region', { name: 'Прокрутка панели «Перевод»' }).getAttribute('lang')).toBe('ru')
+    // research_notes.doc predates NLLB codes: legacy `de`/`ru` map to the catalog.
+    expect(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }).getAttribute('lang')).toBe('de-Latn')
+    expect(screen.getByRole('region', { name: 'Прокрутка панели «Перевод»' }).getAttribute('lang')).toBe('ru-Cyrl')
+    expect(screen.getByRole('button', { name: 'Исходный язык: Немецкий' })).toBeTruthy()
   })
 
   it('disables page navigation until real PDF metadata is available', async () => {
@@ -803,8 +823,10 @@ describe('workspace interactions', () => {
     const user = userEvent.setup()
     renderApp()
     await findWorkspaceRegion('Оригинал')
-    fireEvent.keyDown(screen.getByLabelText('Исходный язык'), { key: 'f', code: 'KeyF' })
+    await user.click(screen.getByRole('button', { name: /^Исходный язык:/ }))
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Найти язык' }), { key: 'f', code: 'KeyF' })
     expect(screen.getByText('Мои книги')).toBeTruthy()
+    await user.keyboard('{Escape}')
     fireEvent.keyDown(window, { key: 'f', code: 'KeyF', ctrlKey: true })
     expect(screen.getByText('Мои книги')).toBeTruthy()
     fireEvent.keyDown(window, { key: 'f', code: 'KeyF', repeat: true })
@@ -884,17 +906,88 @@ describe('workspace interactions', () => {
     const user = userEvent.setup()
     renderApp()
 
-    const sourceSelect = (await screen.findByRole('combobox', {
-      name: 'Исходный язык',
-    })) as HTMLSelectElement
-    const targetSelect = screen.getByRole('combobox', {
-      name: 'Язык перевода',
-    }) as HTMLSelectElement
+    await user.click(
+      await screen.findByRole('button', { name: 'Исходный язык: Английский' }),
+    )
+    await user.click(
+      within(screen.getByRole('listbox', { name: 'Исходный язык' })).getAllByRole('option', { name: 'Русский' })[0],
+    )
 
-    await user.selectOptions(sourceSelect, 'ru')
+    expect(screen.getByRole('button', { name: 'Исходный язык: Русский' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Язык перевода: Английский' })).toBeTruthy()
+    expect(screen.queryByRole('listbox')).toBeNull()
 
-    expect(sourceSelect.value).toBe('ru')
-    expect(targetSelect.value).toBe('en')
+    await user.click(screen.getByRole('button', { name: 'Поменять языки местами' }))
+    expect(screen.getByRole('button', { name: 'Исходный язык: Английский' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Язык перевода: Русский' })).toBeTruthy()
+  })
+
+  it('loads the NLLB catalog into the language picker and searches it', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Язык перевода: Русский' }),
+    )
+    const listbox = screen.getByRole('listbox', { name: 'Язык перевода' })
+    expect(await within(listbox).findByText('Все языки · 5')).toBeTruthy()
+    // Popular languages are repeated in the full alphabetical list.
+    expect(within(listbox).getAllByRole('option', { name: 'Китайский (упрощённый)' })).toHaveLength(2)
+
+    const search = screen.getByRole('combobox', { name: 'Найти язык' })
+    await user.type(search, 'фран')
+    expect(within(listbox).getAllByRole('option').map((option) => option.textContent)).toEqual(['Французский'])
+
+    await user.clear(search)
+    await user.type(search, 'deu_')
+    expect(within(listbox).getAllByRole('option').map((option) => option.textContent)).toEqual(['Немецкий'])
+    await user.keyboard('{Enter}')
+    const trigger = screen.getByRole('button', { name: 'Язык перевода: Немецкий' })
+    expect(document.activeElement).toBe(trigger)
+
+    await user.click(trigger)
+    await user.type(screen.getByRole('combobox', { name: 'Найти язык' }), 'клингонский')
+    expect(screen.getByText('Такого языка нет в списке.')).toBeTruthy()
+  })
+
+  it('opens the language list towards the side that fits in the viewport', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    const trigger = await screen.findByRole('button', { name: 'Язык перевода: Русский' })
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(
+      DOMRect.fromRect({ x: window.innerWidth - 140, y: 10, width: 120, height: 30 }),
+    )
+
+    await user.click(trigger)
+
+    const listbox = screen.getByRole('listbox', { name: 'Язык перевода' })
+    expect(listbox.parentElement?.dataset.align).toBe('end')
+    await user.keyboard('{Escape}')
+    vi.mocked(trigger.getBoundingClientRect).mockReturnValue(
+      DOMRect.fromRect({ x: 20, y: 10, width: 120, height: 30 }),
+    )
+    await user.click(trigger)
+    expect(screen.getByRole('listbox', { name: 'Язык перевода' }).parentElement?.dataset.align).toBe('start')
+  })
+
+  it('keeps popular languages available when the catalog fails to load', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    const defaultFetch = globalThis.fetch
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+      input === '/api/languages'
+        ? Promise.resolve(new Response(null, { status: 503 }))
+        : defaultFetch(input, init),
+    ))
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Исходный язык: Английский' }),
+    )
+
+    expect(await screen.findByText('Не удалось загрузить все языки.')).toBeTruthy()
+    const listbox = screen.getByRole('listbox', { name: 'Исходный язык' })
+    expect(within(listbox).getByRole('option', { name: 'Французский' })).toBeTruthy()
+    expect(within(listbox).queryByText(/Все языки/)).toBeNull()
   })
 
   it('responds to document actions and toggles notes', async () => {
@@ -1076,10 +1169,8 @@ describe('workspace interactions', () => {
       screen.getByText(/готов к отправке.*нажмите «Перевести»/),
     ).toBeTruthy()
 
-    await user.selectOptions(
-      screen.getByLabelText('Исходный язык'),
-      'de',
-    )
+    await user.click(screen.getByRole('button', { name: 'Исходный язык: Английский' }))
+    await user.type(screen.getByRole('combobox', { name: 'Найти язык' }), 'немец{Enter}')
     await user.click(screen.getByRole('button', { name: 'Перевести' }))
 
     expect(
@@ -1110,8 +1201,8 @@ describe('workspace interactions', () => {
     const uploadBody = uploadCall?.[1]?.body as FormData
     expect(uploadHeaders.get('Authorization')).toContain('Bearer ')
     expect(uploadBody.get('file')).toBe(file)
-    expect(uploadBody.get('source_lang')).toBe('de')
-    expect(uploadBody.get('target_lang')).toBe('ru')
+    expect(uploadBody.get('source_lang')).toBe('deu_Latn')
+    expect(uploadBody.get('target_lang')).toBe('rus_Cyrl')
   })
 })
 

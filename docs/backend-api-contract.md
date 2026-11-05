@@ -49,7 +49,7 @@ Frontend обновляет JWT за минуту до истечения и п�
 
 | Method | Path | Access | Request | Success response |
 | --- | --- | --- | --- | --- |
-| POST | `/api/auth/register` | public | `RegisterRequest` | `201 RegisterResponse` |
+| POST | `/api/auth/register` | public | `RegisterRequest` | `202` без тела (и для нового, и для занятого email) |
 | POST | `/api/auth/login` | public | `LoginRequest` | `200 LoginResponse` |
 | POST | `/api/auth/refresh` | refresh cookie + custom header | — | `200 LoginResponse` + rotated cookie |
 | POST | `/api/auth/logout` | refresh cookie + custom header | — | `204` + deleted cookie |
@@ -58,6 +58,7 @@ Frontend обновляет JWT за минуту до истечения и п�
 | POST | `/api/auth/email-verification/confirm` | public | `AccountTokenRequest` | `204` |
 | POST | `/api/auth/password-reset/request` | public | `AccountEmailRequest` | `202` |
 | POST | `/api/auth/password-reset/confirm` | public | `PasswordResetConfirmRequest` | `204` |
+| GET | `/api/languages` | public | — | `200 LanguageResponse[]` (NLLB-200, `max-age=3600`) |
 | POST | `/api/documents/upload` | verified JWT | multipart | `202 DocumentUploadResponse` |
 | GET | `/api/documents/{jobId}/status` | JWT | — | `200 DocumentStatusResponse` |
 | GET | `/api/documents/{jobId}/download` | JWT | — | file stream |
@@ -77,8 +78,24 @@ Frontend обновляет JWT за минуту до истечения и п�
 
 `multipart/form-data` содержит `file`, `source_lang`, `target_lang`. Разрешены
 `pdf`, `doc`, `docx`, максимальный размер по умолчанию — 20 MB. Коды языков —
-2–3 латинские буквы, регистр нормализуется; исходный и целевой языки должны
+NLLB-200 (`eng_Latn`, `rus_Cyrl`, …) из `GET /api/languages`; старые коды
+`en`/`ru`/`de` backend отклоняет с `400`. Исходный и целевой языки должны
 различаться.
+
+### Языки
+
+Каталог — 202 языка, `[{"code": "rus_Cyrl", "name": "Русский"}]`, отсортирован
+по русскому названию. Frontend загружает его один раз за сессию страницы, при
+первом открытии выбора языка (`src/languages/languageCatalog.ts`). Подписи:
+в русском интерфейсе — `name` из каталога, в английском — `Intl.DisplayNames`
+(для языков с несколькими письменностями добавляется письменность), иначе
+русское название или сам код. «Часто используемые» языки доступны, даже если
+каталог не загрузился.
+
+У документов, созданных до перехода на NLLB, в истории остались коды
+`en`/`ru`/`de`: они показываются по названию языка, а при повторном переводе
+выбор подставляет соответствующий NLLB-код. Атрибут `lang` панелей получает
+BCP 47 (`eng_Latn` → `en-Latn`).
 
 Отдельного endpoint запуска перевода нет. Успешная загрузка сразу создаёт
 асинхронное задание и возвращает `job_id`.
@@ -108,6 +125,18 @@ Frontend обновляет JWT за минуту до истечения и п�
 
 Единственный текущий публичный `error_code`: `TRANSLATION_FAILED`. Статус нужно
 проверять polling-запросами; WebSocket и SSE backend не реализует.
+
+## Регистрация и заблокированный аккаунт
+
+Регистрация всегда отвечает `202` без тела, в том числе для занятого email:
+backend не раскрывает, существует ли аккаунт, а владельцу адреса уходит письмо
+подтверждения или сброса пароля. Экран успеха поэтому просит проверить почту
+и не утверждает, что аккаунт создан.
+
+Администратор может заблокировать аккаунт. Тогда вход с верным паролем
+возвращает `403`, и форма входа показывает «Аккаунт заблокирован», а не
+«неверный пароль». Уже открытые сессии закрываются: следующий запрос и refresh
+получают `401`, frontend ведёт себя как после выхода.
 
 ## Ошибки
 

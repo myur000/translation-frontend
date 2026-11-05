@@ -11,7 +11,6 @@ interface RegisterErrors { email?: string; password?: string; passwordConfirmati
 type T = (key: TranslationKey, variables?: Record<string, string | number>) => string
 function getRegisterErrorMessage(error: unknown, t: T) {
   if (error instanceof ApiClientError) {
-    if (error.status === 409) return t('error.accountExists')
     if (error.status === 429) return t('error.tooManyRequests')
     return error.message
   }
@@ -37,7 +36,7 @@ export function RegisterPage() {
     setErrors(nextErrors); setFormError('')
     if (Object.keys(nextErrors).length > 0) return
     setSubmitting(true)
-    try { const response = await register({ email: email.trim(), password }); setRegisteredEmail(response.email) }
+    try { await register({ email: email.trim(), password }); setRegisteredEmail(email.trim()) }
     catch (error) {
       if (error instanceof ApiClientError && error.details?.fieldErrors) setErrors(error.details.fieldErrors)
       setFormError(getRegisterErrorMessage(error, t))

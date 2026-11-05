@@ -2,32 +2,11 @@ import type { TranslationStatus } from '../api/contracts/documents.ts'
 
 export type DocumentStatus = 'ready' | 'processing' | 'draft' | 'failed'
 export type TranslationWaitingIssue = 'stalled' | 'unreachable'
-export type LanguageCode = 'en' | 'ru' | 'de'
-export type LanguageLabelLocale = 'ru' | 'en'
-
-const LANGUAGE_LABELS: Record<
-  LanguageCode,
-  Record<LanguageLabelLocale, string>
-> = {
-  en: { ru: 'English', en: 'English' },
-  ru: { ru: 'Русский', en: 'Russian' },
-  de: { ru: 'Deutsch', en: 'German' },
-}
-
-export const LANGUAGE_OPTIONS: ReadonlyArray<{
-  code: LanguageCode
-  label: string
-}> = (Object.keys(LANGUAGE_LABELS) as LanguageCode[]).map((code) => ({
-  code,
-  label: LANGUAGE_LABELS[code].ru,
-}))
-
-export function getLanguageLabel(
-  code: LanguageCode,
-  locale: LanguageLabelLocale = 'ru',
-) {
-  return LANGUAGE_LABELS[code]?.[locale] ?? code
-}
+/**
+ * NLLB-200 code (`eng_Latn`). Documents created before the switch keep their
+ * legacy two-letter codes (`en`), so any string from the backend is accepted.
+ */
+export type LanguageCode = string
 
 export interface DocumentItem {
   id: string

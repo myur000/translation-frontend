@@ -10,7 +10,6 @@ import type {
   LoginResponse,
   PasswordResetConfirmRequest,
   RegisterRequest,
-  RegisterResponse,
 } from './contracts/auth.ts'
 import { API_ENDPOINTS } from './endpoints.ts'
 import { abortable } from './abortable.ts'
@@ -19,9 +18,12 @@ export function register(
   request: RegisterRequest,
   options: ApiCallOptions = {},
 ) {
-  return apiClient.request<RegisterResponse>(API_ENDPOINTS.auth.register, {
+  // 202 without a body for both new and already registered emails: the
+  // backend does not reveal whether the address is taken.
+  return apiClient.request<void>(API_ENDPOINTS.auth.register, {
     method: 'POST',
     json: request,
+    responseType: 'void',
     signal: options.signal,
   })
 }

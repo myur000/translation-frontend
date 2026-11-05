@@ -29,6 +29,7 @@
   --radius-sm: 6px;
   --radius-md: 8px;
   --shadow-page: 0 2px 10px rgb(15 23 42 / 8%);
+  --shadow-popover: 0 12px 32px rgb(15 23 42 / 14%), 0 2px 6px rgb(15 23 42 / 6%);
   --sidebar-width: 244px;
   --notes-width: 280px;
   --toolbar-height: 56px;
@@ -65,4 +66,5 @@
   --color-danger-surface: #381d24;
   --color-danger-border: #6f2d3b;
   --shadow-page: 0 8px 24px rgb(0 0 0 / 28%);
+  --shadow-popover: 0 16px 40px rgb(0 0 0 / 45%), 0 2px 8px rgb(0 0 0 / 30%);
 }

@@ -22,11 +22,9 @@ import type {
   ExpandedPanel,
 } from '../layouts/AppLayout.tsx'
 import { useTranslation } from '../i18n/useTranslation.ts'
-import {
-  getLanguageLabel,
-  type DocumentItem,
-  type LanguageCode,
-} from '../types/document.ts'
+import { toCatalogLanguageCode } from '../languages/languageCatalog.ts'
+import { useLanguageCatalog } from '../languages/useLanguageCatalog.ts'
+import type { DocumentItem, LanguageCode } from '../types/document.ts'
 import styles from './WorkspacePage.module.css'
 
 type FullscreenView = 'both' | Exclude<ExpandedPanel, null>
@@ -66,9 +64,11 @@ function DocumentWorkspace({
   onAttachOriginal,
   onResumeTranslationWaiting,
 }: DocumentWorkspaceProps) {
-  const { language: interfaceLanguage, t } = useTranslation()
-  const [sourceLanguage, setSourceLanguage] = useState(document.sourceLanguage)
-  const [targetLanguage, setTargetLanguage] = useState(document.targetLanguage)
+  const { t } = useTranslation()
+  const { getLabel: getLanguageLabel } = useLanguageCatalog()
+  // Old documents carry two-letter codes; the backend now accepts only NLLB.
+  const [sourceLanguage, setSourceLanguage] = useState(() => toCatalogLanguageCode(document.sourceLanguage))
+  const [targetLanguage, setTargetLanguage] = useState(() => toCatalogLanguageCode(document.targetLanguage))
   const [currentPage, setCurrentPage] = useState(1)
   const [navigationRevision, setNavigationRevision] = useState(0)
   const [notesOpen, setNotesOpen] = useState(false)
@@ -161,6 +161,12 @@ function DocumentWorkspace({
     setNotice('')
   }
 
+  const handleSwapLanguages = () => {
+    setSourceLanguage(targetLanguage)
+    setTargetLanguage(sourceLanguage)
+    setNotice('')
+  }
+
   const handleTranslate = async () => {
     if (document.waitingIssue) {
       setNotice('')
@@ -171,8 +177,8 @@ function DocumentWorkspace({
       setNotice(
         t('workspace.translateReady', {
           name: document.name,
-          source: getLanguageLabel(sourceLanguage, interfaceLanguage),
-          target: getLanguageLabel(targetLanguage, interfaceLanguage),
+          source: getLanguageLabel(sourceLanguage),
+          target: getLanguageLabel(targetLanguage),
           endpoint: API_ENDPOINTS.documents.upload,
         }),
       )
@@ -277,6 +283,7 @@ function DocumentWorkspace({
         translationStatus={document.jobId ? document.status : null}
         onSourceLanguageChange={handleSourceLanguageChange}
         onTargetLanguageChange={handleTargetLanguageChange}
+        onSwapLanguages={handleSwapLanguages}
         onPreviousPage={() => navigatePage(-1)}
         onNextPage={() => navigatePage(1)}
         onTranslate={() => void handleTranslate()}
@@ -316,7 +323,7 @@ function DocumentWorkspace({
         {expandedPanel !== 'translation' ? (
           <OriginalPanel
             view={originalView}
-            language={getLanguageLabel(sourceLanguage, interfaceLanguage)}
+            language={getLanguageLabel(sourceLanguage)}
             languageCode={sourceLanguage}
             page={displayedPage}
             navigationRevision={navigationRevision}
@@ -336,7 +343,7 @@ function DocumentWorkspace({
         {expandedPanel !== 'original' ? (
           <TranslationPanel
             view={translationView}
-            language={getLanguageLabel(targetLanguage, interfaceLanguage)}
+            language={getLanguageLabel(targetLanguage)}
             languageCode={targetLanguage}
             page={displayedPage}
             navigationRevision={navigationRevision}

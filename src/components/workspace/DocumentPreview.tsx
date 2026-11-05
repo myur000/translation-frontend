@@ -3,6 +3,7 @@ import { BOOK_ZOOM_STEP } from '../../hooks/useBookZoom.ts'
 import { TRANSLATION_STALL_TIMEOUT_MS } from '../../config/translationPolling.ts'
 import { usePreviewZoom } from '../../hooks/usePreviewZoom.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
+import { languageTag } from '../../languages/languageCatalog.ts'
 import type { LanguageCode } from '../../types/document.ts'
 import type { DocumentView } from '../../viewer/types.ts'
 import { DocumentPages } from './DocumentPages.tsx'
@@ -89,7 +90,7 @@ export function DocumentPreview({
         className={styles.viewport}
         role="region"
         aria-label={t('panel.scroll', { panel: label })}
-        lang={languageCode}
+        lang={languageTag(languageCode)}
         onScroll={(event) => {
           onViewportScroll(event)
           const pages = event.currentTarget.querySelectorAll<HTMLElement>('[data-document-page]')

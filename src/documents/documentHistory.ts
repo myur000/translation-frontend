@@ -2,11 +2,7 @@ import type {
   DocumentHistoryItemResponse,
   TranslationStatus,
 } from '../api/contracts/documents.ts'
-import type {
-  DocumentItem,
-  DocumentStatus,
-  LanguageCode,
-} from '../types/document.ts'
+import type { DocumentItem, DocumentStatus } from '../types/document.ts'
 
 export interface StoredDocumentMetadata {
   name: string
@@ -14,14 +10,6 @@ export interface StoredDocumentMetadata {
 }
 
 export type DocumentMetadataByJobId = Record<string, StoredDocumentMetadata>
-
-const SUPPORTED_LANGUAGES = new Set<LanguageCode>(['en', 'ru', 'de'])
-
-function toLanguageCode(value: string, fallback: LanguageCode): LanguageCode {
-  return SUPPORTED_LANGUAGES.has(value as LanguageCode)
-    ? (value as LanguageCode)
-    : fallback
-}
 
 function toDocumentStatus(status: TranslationStatus): DocumentStatus {
   if (status === 'DONE') return 'ready'
@@ -38,8 +26,9 @@ export function historyItemToDocument(
     name:
       metadata?.name ??
       `document-${item.job_id.slice(0, 8)}.${item.format}`,
-    sourceLanguage: toLanguageCode(item.source_lang, 'en'),
-    targetLanguage: toLanguageCode(item.target_lang, 'ru'),
+    // Kept as sent by the backend: legacy codes are shown as is.
+    sourceLanguage: item.source_lang,
+    targetLanguage: item.target_lang,
     pages: 0,
     format: item.format,
     status: toDocumentStatus(item.status),

@@ -10,6 +10,7 @@ export const API_ENDPOINTS = {
     requestPasswordReset: '/auth/password-reset/request',
     confirmPasswordReset: '/auth/password-reset/confirm',
   },
+  languages: '/languages',
   documents: {
     upload: '/documents/upload',
     status: (jobId: string) =>

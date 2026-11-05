@@ -24,6 +24,10 @@ import {
 } from '../hooks/useTranslationStatusPolling.ts'
 import { DocumentUploadPreparationError } from '../errors/DocumentUploadPreparationError.ts'
 import { useTranslation } from '../i18n/useTranslation.ts'
+import {
+  DEFAULT_SOURCE_LANGUAGE,
+  DEFAULT_TARGET_LANGUAGE,
+} from '../languages/languageCatalog.ts'
 import { ProfileProvider } from '../profile/ProfileProvider.tsx'
 import type { DocumentItem, LanguageCode } from '../types/document.ts'
 import styles from './AppLayout.module.css'
@@ -251,8 +255,8 @@ function AppLayoutContent() {
     const document: DocumentItem = {
       id: `local-${Date.now()}-${localDocumentSequence}`,
       name: file.name,
-      sourceLanguage: 'en',
-      targetLanguage: 'ru',
+      sourceLanguage: DEFAULT_SOURCE_LANGUAGE,
+      targetLanguage: DEFAULT_TARGET_LANGUAGE,
       pages: 0,
       status: 'draft',
       sourceFile: file,

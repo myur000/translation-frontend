@@ -141,6 +141,26 @@ describe('authentication flow', () => {
     )
   })
 
+  it('explains a blocked account instead of reporting a wrong password', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        apiErrorResponse(403, 'Аккаунт заблокирован. Обратитесь в поддержку'),
+      ),
+    )
+    renderApp('/login')
+
+    await user.type(screen.getByLabelText('Email'), 'blocked@example.com')
+    await user.type(screen.getByLabelText('Пароль'), 'password123')
+    await user.click(screen.getByRole('button', { name: 'Войти' }))
+
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Аккаунт заблокирован. Обратитесь в поддержку.',
+    )
+    expect(sessionStorage.length).toBe(0)
+  })
+
   it('returns from registration to login with the header arrow', async () => {
     const user = userEvent.setup()
     renderApp('/register')
@@ -154,16 +174,9 @@ describe('authentication flow', () => {
 
   it('registers an account and shows the email verification handoff', async () => {
     const user = userEvent.setup()
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          id: 'user-1',
-          email: 'new@example.com',
-          createdAt: '2026-10-05T00:00:00Z',
-        }),
-        { headers: { 'Content-Type': 'application/json' } },
-      ),
-    )
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 202 }))
     vi.stubGlobal('fetch', fetchMock)
     renderApp('/register')
 
@@ -175,7 +188,7 @@ describe('authentication flow', () => {
     )
 
     expect(
-      await screen.findByRole('heading', { name: 'Аккаунт создан' }),
+      await screen.findByRole('heading', { name: 'Проверьте почту' }),
     ).toBeTruthy()
     expect(screen.getByText(/new@example\.com/)).toBeTruthy()
     expect(fetchMock.mock.calls[0][0]).toBe('/api/auth/register')

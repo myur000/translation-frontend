@@ -38,25 +38,32 @@
   gap: 8px;
 }
 
-.languageField {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.swapButton {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  flex: none;
+  place-items: center;
   color: var(--color-text-muted);
-  font-size: 12px;
-}
-
-.languageField select {
-  height: 30px;
-  padding: 0 28px 0 10px;
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
 }
 
-.direction {
-  color: var(--color-text-soft);
+.swapButton svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.swapButton:hover {
+  color: var(--color-text);
+  background: var(--color-bg);
+  border-color: var(--color-border);
 }
 
 .translateButton,

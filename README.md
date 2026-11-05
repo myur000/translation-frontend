@@ -103,7 +103,10 @@ npm run test:profile
 - DTO: `src/api/contracts`.
 - HTTP-клиент и единая обработка ошибок: `src/api/client.ts`.
 - Доменные API-модули: `src/api/auth.ts`, `src/api/documents.ts`,
-  `src/api/translations.ts`, `src/api/account.ts`, `src/api/profile.ts`.
+  `src/api/translations.ts`, `src/api/account.ts`, `src/api/profile.ts`,
+  `src/api/languages.ts`.
+- Языки — коды NLLB-200 из `GET /api/languages`; выбор с поиском —
+  `src/components/languages/LanguagePicker.tsx`.
 - Полное описание JWT, ошибок, статусов и ограничений API:
   `docs/backend-api-contract.md`.
 

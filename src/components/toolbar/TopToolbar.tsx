@@ -1,10 +1,9 @@
-import { LANGUAGE_OPTIONS, type DocumentItem, type LanguageCode } from '../../types/document.ts'
+import type { DocumentItem, LanguageCode } from '../../types/document.ts'
+import { LanguagePicker } from '../languages/LanguagePicker.tsx'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import { ScrollSyncButton } from './ScrollSyncButton.tsx'
 import { WorkspaceViewButton } from './WorkspaceViewButton.tsx'
 import styles from './TopToolbar.module.css'
-
-const languageKeys = { en: 'language.en', ru: 'language.ru', de: 'language.de' } as const
 
 interface TopToolbarProps {
   document: DocumentItem
@@ -22,6 +21,7 @@ interface TopToolbarProps {
   translationStatus: DocumentItem['status'] | null
   onSourceLanguageChange: (language: LanguageCode) => void
   onTargetLanguageChange: (language: LanguageCode) => void
+  onSwapLanguages: () => void
   onPreviousPage: () => void
   onNextPage: () => void
   onTranslate: () => void
@@ -61,19 +61,11 @@ export function TopToolbar(props: TopToolbarProps) {
         <span className={styles.fileMeta}>{props.pageCount === null ? t('viewer.pageCountUnknown') : t('toolbar.fileMeta', { pages: props.pageCount })}</span>
       </div>
       <div className={styles.controls}>
-        <label className={styles.languageField}>
-          <span>{t('toolbar.from')}</span>
-          <select value={sourceLanguage} aria-label={t('toolbar.sourceLanguage')} onChange={(event) => props.onSourceLanguageChange(event.currentTarget.value as LanguageCode)}>
-            {LANGUAGE_OPTIONS.map((item) => <option key={item.code} value={item.code}>{t(languageKeys[item.code])}</option>)}
-          </select>
-        </label>
-        <span className={styles.direction} aria-hidden="true">→</span>
-        <label className={styles.languageField}>
-          <span>{t('toolbar.to')}</span>
-          <select value={targetLanguage} aria-label={t('toolbar.targetLanguage')} onChange={(event) => props.onTargetLanguageChange(event.currentTarget.value as LanguageCode)}>
-            {LANGUAGE_OPTIONS.map((item) => <option key={item.code} value={item.code}>{t(languageKeys[item.code])}</option>)}
-          </select>
-        </label>
+        <LanguagePicker value={sourceLanguage} label={t('toolbar.sourceLanguage')} prefix={t('toolbar.from')} onChange={props.onSourceLanguageChange} />
+        <button type="button" className={styles.swapButton} aria-label={t('toolbar.swapLanguages')} title={t('toolbar.swapLanguages')} onClick={props.onSwapLanguages}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 5.5h9.5m0 0L10 3m2.5 2.5L10 8M13 10.5H3.5m0 0L6 8m-2.5 2.5L6 13" /></svg>
+        </button>
+        <LanguagePicker value={targetLanguage} label={t('toolbar.targetLanguage')} prefix={t('toolbar.to')} onChange={props.onTargetLanguageChange} />
         <button type="button" className={styles.translateButton} disabled={isTranslating || !canTranslate} onClick={props.onTranslate}>{translateLabel}</button>
       </div>
       <div className={styles.actions}>

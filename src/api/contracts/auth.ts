@@ -1,14 +1,8 @@
-import type { ISO8601DateTime, UUID } from './common.ts'
+import type { UUID } from './common.ts'
 
 export interface RegisterRequest {
   email: string
   password: string
-}
-
-export interface RegisterResponse {
-  id: UUID
-  email: string
-  createdAt: ISO8601DateTime
 }
 
 export interface LoginRequest {
