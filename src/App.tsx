@@ -32,6 +32,7 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
               <Route path="/" element={<WorkspacePage />} />
+              <Route path="/documents/:jobId" element={<WorkspacePage />} />
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/plans" element={<PlansPage />} />

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { AccountProvider } from '../account/AccountProvider.tsx'
 import { useAccount } from '../account/useAccount.ts'
-import { Outlet, useLocation, useNavigate } from 'react-router'
+import { Outlet, useLocation, useMatch, useNavigate } from 'react-router'
 import {
   getDocumentHistory,
   uploadDocument as uploadDocumentRequest,
@@ -16,6 +16,11 @@ import {
   readDocumentMetadata,
   rememberDocumentMetadata,
 } from '../documents/documentMetadataStorage.ts'
+import { documentPath } from '../documents/documentRoutes.ts'
+import {
+  useRouteDocument,
+  type RouteDocumentState,
+} from '../documents/useRouteDocument.ts'
 import { useResizableSidebar } from '../hooks/useResizableSidebar.ts'
 import {
   useTranslationStatusPolling,
@@ -36,6 +41,8 @@ export type HistoryLoadState = 'loading' | 'ready' | 'error'
 
 export interface AppLayoutContextValue {
   activeDocument: DocumentItem | null
+  /** Resolution of `/documents/:jobId`; `none` on the plain workspace route. */
+  routeDocumentState: RouteDocumentState
   documents: DocumentItem[]
   historyState: HistoryLoadState
   expandedPanel: ExpandedPanel
@@ -77,6 +84,8 @@ function AppLayoutContent() {
   const [isDualPanelFullscreen, setDualPanelFullscreen] = useState(false)
   const [fullscreenLocationKey, setFullscreenLocationKey] = useState(location.key)
   const sidebar = useResizableSidebar()
+  const routeJobId = useMatch('/documents/:jobId')?.params.jobId ?? null
+  const isWorkspaceRoute = location.pathname === '/' || routeJobId !== null
 
   // AppLayout survives navigation. React retries this render before committing
   // children, so stale fullscreen state never reaches the new page.
@@ -86,8 +95,22 @@ function AppLayoutContent() {
     setDualPanelFullscreen(false)
   }
 
-  const activeDocument =
-    documents.find((item) => item.id === activeDocumentId) ?? documents[0] ?? null
+  const addFoundDocument = useCallback((document: DocumentItem) => {
+    setDocuments((current) =>
+      current.some((item) => item.jobId === document.jobId) ? current : [...current, document])
+  }, [])
+  const routeDocumentState = useRouteDocument({
+    jobId: routeJobId,
+    documents,
+    historyState,
+    session,
+    onFound: addFoundDocument,
+  })
+  // A document link wins over the last selection; the plain workspace route
+  // keeps showing the last selected document.
+  const activeDocument = routeJobId !== null
+    ? documents.find((item) => item.jobId === routeJobId) ?? null
+    : documents.find((item) => item.id === activeDocumentId) ?? documents[0] ?? null
   const pollingJobs = documents.flatMap((document) =>
     document.jobId && document.status === 'processing' && !document.waitingIssue
       ? [{ documentId: document.id, jobId: document.jobId,
@@ -234,11 +257,12 @@ function AppLayoutContent() {
   }, [expandedPanel, isDualPanelFullscreen])
 
   const isFullscreenMode =
-    location.pathname === '/' && (expandedPanel !== null || isDualPanelFullscreen)
+    isWorkspaceRoute && (expandedPanel !== null || isDualPanelFullscreen)
 
   const handleSelectDocument = (documentId: string) => {
     setActiveDocumentId(documentId)
-    void navigate('/')
+    const jobId = documents.find((item) => item.id === documentId)?.jobId
+    void navigate(jobId ? documentPath(jobId) : '/')
   }
 
   const handleRetryHistory = () => {
@@ -325,6 +349,10 @@ function AppLayoutContent() {
       )
 
       reloadAccount()
+      // Give the job its own address: a reload or a shared link reopens it.
+      if (activeDocument?.id === documentId) {
+        void navigate(documentPath(response.job_id), { replace: true })
+      }
       return response
     } catch (error) {
       if (error instanceof ApiClientError && error.status === 429) reloadAccount()
@@ -342,7 +370,7 @@ function AppLayoutContent() {
         {!isFullscreenMode ? (
           <Sidebar
             documents={documents}
-            activeDocumentId={location.pathname === '/' ? activeDocument?.id : undefined}
+            activeDocumentId={isWorkspaceRoute ? activeDocument?.id : undefined}
             onSelectDocument={handleSelectDocument}
             onUploadDocument={handlePrepareDocument}
             width={sidebar.expandedWidth}
@@ -362,6 +390,7 @@ function AppLayoutContent() {
             <Outlet
               context={{
                 activeDocument,
+                routeDocumentState,
                 documents,
                 historyState,
                 expandedPanel,

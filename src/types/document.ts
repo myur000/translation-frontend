@@ -23,6 +23,10 @@ export interface DocumentItem {
   format?: 'pdf' | 'docx' | 'doc'
   errorMessage?: string
   createdAt?: string
+  /** Billing pages charged for the job. */
+  billedUnits?: number
+  /** Terms passed to the translator; `null` when the glossary was not requested. */
+  glossaryTermCount?: number | null
 }
 
 export interface DocumentContent {

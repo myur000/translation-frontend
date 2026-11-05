@@ -18,7 +18,15 @@ export const API_ENDPOINTS = {
     download: (jobId: string) =>
       `/documents/${encodeURIComponent(jobId)}/download`,
     history: '/documents/history',
+    estimate: '/documents/estimate',
+    events: '/documents/events',
+    document: (jobId: string) => `/documents/${encodeURIComponent(jobId)}`,
+    translations: (jobId: string) =>
+      `/documents/${encodeURIComponent(jobId)}/translations`,
+    feedback: (jobId: string) =>
+      `/documents/${encodeURIComponent(jobId)}/feedback`,
   },
+  terms: '/terms',
   profile: {
     details: '/profile',
     avatar: '/profile/avatar',

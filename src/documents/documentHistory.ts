@@ -23,7 +23,10 @@ export function historyItemToDocument(
 ): DocumentItem {
   return {
     id: metadata?.documentId ?? item.job_id,
+    // The backend name works across devices; the local one covers jobs created
+    // before the backend stored names.
     name:
+      item.file_name ??
       metadata?.name ??
       `document-${item.job_id.slice(0, 8)}.${item.format}`,
     // Kept as sent by the backend: legacy codes are shown as is.
@@ -37,5 +40,7 @@ export function historyItemToDocument(
     jobId: item.job_id,
     errorMessage: item.error_message ?? undefined,
     createdAt: item.created_at,
+    billedUnits: item.billed_units,
+    glossaryTermCount: item.glossary_term_count,
   }
 }

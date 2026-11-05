@@ -1220,6 +1220,84 @@ describe('history integration', () => {
   })
 })
 
+describe('document route', () => {
+  const jsonResponse = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+
+  /** Default API plus per-test overrides; returns the router to inspect the URL. */
+  function renderDocumentRoute(path: string, overrides: Record<string, () => Response> = {}) {
+    seedAuthenticatedSession()
+    seedDocumentMetadata()
+    installDefaultApiMock()
+    installBrowserSessionMock()
+    const defaultFetch = globalThis.fetch
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const override = overrides[String(input)]
+      return override ? Promise.resolve(override()) : defaultFetch(input, init)
+    }))
+    const router = createMemoryRouter([{ path: '*', element: <App /> }], { initialEntries: [path] })
+    render(<RouterProvider router={router} />)
+    return router
+  }
+
+  it('opens a document by its link', async () => {
+    renderDocumentRoute('/documents/00000000-0000-0000-0000-000000000102')
+
+    expect(await screen.findAllByText('project_report.docx')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: /project_report\.docx/ }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('gives a selected document its own address', async () => {
+    const user = userEvent.setup()
+    const router = renderDocumentRoute('/')
+
+    await user.click(await screen.findByRole('button', { name: /research_notes\.doc/ }))
+
+    expect(router.state.location.pathname).toBe('/documents/00000000-0000-0000-0000-000000000103')
+  })
+
+  it('explains a link to a deleted or foreign document', async () => {
+    const missing = '00000000-0000-0000-0000-000000000404'
+    renderDocumentRoute(`/documents/${missing}`, {
+      [`/api/documents/${missing}/status`]: () => jsonResponse({
+        timestamp: '2026-11-05T00:00:00Z', status: 404, message: 'Задача не найдена',
+        path: `/api/documents/${missing}/status`, fieldErrors: {}, correlation_id: 'c-404',
+      }, 404),
+    })
+
+    expect(await screen.findByRole('heading', { name: 'Документ не найден' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Вернуться к рабочей области' }).getAttribute('href')).toBe('/')
+  })
+
+  it('finds an older document beyond the first history page', async () => {
+    const older = '00000000-0000-0000-0000-000000000900'
+    renderDocumentRoute(`/documents/${older}`, {
+      [`/api/documents/${older}/status`]: () => jsonResponse({
+        job_id: older, status: 'DONE', progress: 100, error_code: null, error_message: null,
+        file_name: 'Архивный договор.pdf', glossary_term_count: null,
+      }),
+      '/api/documents/history?page=1&size=100': () => jsonResponse({
+        items: [{ ...historyItems[0], job_id: older, file_name: 'Архивный договор.pdf' }],
+        page: 1, size: 100, total_elements: 101, total_pages: 2, first: false, last: true,
+      }),
+    })
+
+    expect(await screen.findAllByText('Архивный договор.pdf')).toHaveLength(2)
+  })
+
+  it('prefers the file name stored by the backend', async () => {
+    const named = '00000000-0000-0000-0000-000000000777'
+    renderDocumentRoute(`/documents/${named}`, {
+      '/api/documents/history?page=0&size=100': () => jsonResponse({
+        items: [{ ...historyItems[0], job_id: named, file_name: 'Договор поставки.pdf' }],
+        page: 0, size: 100, total_elements: 1, total_pages: 1, first: true, last: true,
+      }),
+    })
+
+    expect(await screen.findAllByText('Договор поставки.pdf')).toHaveLength(2)
+  })
+})
+
 describe('routing', () => {
   it('renders a useful fallback for an unknown route', () => {
     renderApp('/missing-page')

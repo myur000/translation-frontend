@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react'
-import { useOutletContext } from 'react-router'
+import { Link, useOutletContext } from 'react-router'
 import { ApiClientError } from '../api/client.ts'
 import { API_ENDPOINTS } from '../api/endpoints.ts'
 import { NotesPanel } from '../components/notes/NotesPanel.tsx'
@@ -392,6 +392,7 @@ function DocumentWorkspace({
 export function WorkspacePage() {
   const {
     activeDocument,
+    routeDocumentState,
     historyState,
     expandedPanel,
     isDualPanelFullscreen,
@@ -405,6 +406,26 @@ export function WorkspacePage() {
   const { t } = useTranslation()
   const [isScrollSyncEnabled, setIsScrollSyncEnabled] = useState(false)
 
+  if (!activeDocument && routeDocumentState === 'missing') {
+    return (
+      <section className={styles.emptyWorkspace} role="alert">
+        <span aria-hidden="true">▤</span>
+        <h1>{t('document.missingTitle')}</h1>
+        <p>{t('document.missingDescription')}</p>
+        <Link to="/">{t('common.backToWorkspace')}</Link>
+      </section>
+    )
+  }
+
+  if (!activeDocument && routeDocumentState === 'loading') {
+    return (
+      <section className={styles.emptyWorkspace} role="status">
+        <span aria-hidden="true">▤</span>
+        <h1>{t('document.opening')}</h1>
+      </section>
+    )
+  }
+
   if (!activeDocument) {
     return (
       <section className={styles.emptyWorkspace}>
@@ -412,16 +433,16 @@ export function WorkspacePage() {
         <h1>
           {historyState === 'loading'
             ? t('history.loading')
-            : historyState === 'error'
+            : historyState === 'error' || routeDocumentState === 'error'
               ? t('history.errorTitle')
               : t('workspace.emptyTitle')}
         </h1>
         <p>
-          {historyState === 'error'
+          {historyState === 'error' || routeDocumentState === 'error'
             ? t('history.errorDescription')
             : t('workspace.emptyDescription')}
         </p>
-        {historyState === 'error' ? (
+        {historyState === 'error' || routeDocumentState === 'error' ? (
           <button type="button" onClick={retryHistory}>
             {t('history.retry')}
           </button>
