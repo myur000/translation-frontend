@@ -155,39 +155,39 @@ export function Sidebar({
           const isActive = document.id === activeDocumentId
           return (
             <div key={document.id} className={styles.documentRow}>
-            <button
-              type="button"
-              className={`${styles.documentItem} ${isActive ? styles.active : ''}`}
-              aria-pressed={isActive}
-              onClick={() => onSelectDocument(document.id)}
-              title={document.name}
-            >
-              <span className={styles.fileIcon} aria-hidden="true">
-                {document.name.split('.').at(-1)?.toUpperCase()}
-              </span>
-              <span className={styles.documentInfo}>
-                <span className={styles.documentName}>{document.name}</span>
-                <span
-                  className={styles.documentMeta}
-                  title={document.errorMessage}
-                >
-                  {t(documentStatusLabel(document))}
-                  {document.progress !== undefined ? ` · ${document.progress}%` : ''}
-                  {document.jobId
-                    ? ` · ${shortLanguageCode(document.sourceLanguage)} → ${shortLanguageCode(document.targetLanguage)}`
-                    : ''}
+              <button
+                type="button"
+                className={`${styles.documentItem} ${isActive ? styles.active : ''}`}
+                aria-pressed={isActive}
+                onClick={() => onSelectDocument(document.id)}
+                title={document.name}
+              >
+                <span className={styles.fileIcon} aria-hidden="true">
+                  {document.name.split('.').at(-1)?.toUpperCase()}
                 </span>
-              </span>
-            </button>
-            {!isCollapsed ? (
-              <DocumentActionsMenu
-                className={styles.rowActions}
-                variant="quiet"
-                portal
-                label={t('sidebar.documentActions', { name: document.name })}
-                actions={actionsFor(document)}
-              />
-            ) : null}
+                <span className={styles.documentInfo}>
+                  <span className={styles.documentName}>{document.name}</span>
+                  <span
+                    className={styles.documentMeta}
+                    title={document.errorMessage}
+                  >
+                    {t(documentStatusLabel(document))}
+                    {document.progress !== undefined ? ` · ${document.progress}%` : ''}
+                    {document.jobId
+                      ? ` · ${shortLanguageCode(document.sourceLanguage)} → ${shortLanguageCode(document.targetLanguage)}`
+                      : ''}
+                  </span>
+                </span>
+              </button>
+              {!isCollapsed ? (
+                <DocumentActionsMenu
+                  className={styles.rowActions}
+                  variant="quiet"
+                  portal
+                  label={t('sidebar.documentActions', { name: document.name })}
+                  actions={actionsFor(document)}
+                />
+              ) : null}
             </div>
           )
         })}
