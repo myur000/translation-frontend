@@ -44,3 +44,26 @@ export function historyItemToDocument(
     glossaryTermCount: item.glossary_term_count,
   }
 }
+
+/**
+ * Maps a history page to documents with unique ids. Retrying a failed
+ * document keeps the document's id for the new job, and that id can be
+ * another job's id (documents restored from history use their job id). A
+ * job's own id therefore wins: a stored id is used only when no other job
+ * in the list owns it and no newer job (history is newest first) took it.
+ */
+export function historyItemsToDocuments(
+  items: readonly DocumentHistoryItemResponse[],
+  metadata: DocumentMetadataByJobId,
+  reservedIds: ReadonlySet<string> = new Set(),
+): DocumentItem[] {
+  const jobIds = new Set(items.map((item) => item.job_id))
+  const usedIds = new Set(reservedIds)
+  return items.map((item) => {
+    const document = historyItemToDocument(item, metadata[item.job_id])
+    const ownsStoredId = document.id === item.job_id || !jobIds.has(document.id)
+    const id = ownsStoredId && !usedIds.has(document.id) ? document.id : item.job_id
+    usedIds.add(id)
+    return id === document.id ? document : { ...document, id }
+  })
+}

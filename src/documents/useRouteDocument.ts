@@ -3,7 +3,7 @@ import { ApiClientError } from '../api/client.ts'
 import { getDocumentHistory } from '../api/documents.ts'
 import { getTranslationStatus } from '../api/translations.ts'
 import type { DocumentItem } from '../types/document.ts'
-import { historyItemToDocument } from './documentHistory.ts'
+import { historyItemsToDocuments } from './documentHistory.ts'
 import { readDocumentMetadata } from './documentMetadataStorage.ts'
 
 /** How `/documents/:jobId` resolves against the loaded document list. */
@@ -48,6 +48,10 @@ export function useRouteDocument({
   useEffect(() => {
     onFoundRef.current = onFound
   })
+  const documentIdsRef = useRef<ReadonlySet<string>>(new Set())
+  useEffect(() => {
+    documentIdsRef.current = new Set(documents.map((item) => item.id))
+  })
   const isLoaded = jobId !== null && documents.some((item) => item.jobId === jobId)
   const shouldSearch = jobId !== null && !isLoaded && historyState === 'ready' && session !== null
 
@@ -67,7 +71,9 @@ export function useRouteDocument({
           const response = await getDocumentHistory(options, { page, size: HISTORY_PAGE_SIZE })
           const item = response.items.find((candidate) => candidate.job_id === jobId)
           if (item) {
-            if (!controller.signal.aborted) onFoundRef.current(historyItemToDocument(item, metadata[jobId]))
+            if (controller.signal.aborted) return
+            const [document] = historyItemsToDocuments([item], metadata, documentIdsRef.current)
+            onFoundRef.current(document)
             return
           }
           if (response.last) break

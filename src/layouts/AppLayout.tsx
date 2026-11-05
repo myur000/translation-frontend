@@ -19,7 +19,7 @@ import { ApiClientError } from '../api/client.ts'
 import { useAuth } from '../auth/useAuth.ts'
 import { EmailVerificationBanner } from '../components/auth/EmailVerificationBanner.tsx'
 import { Sidebar } from '../components/sidebar/Sidebar.tsx'
-import { historyItemToDocument } from '../documents/documentHistory.ts'
+import { historyItemsToDocuments } from '../documents/documentHistory.ts'
 import {
   readDocumentMetadata,
   rememberDocumentMetadata,
@@ -156,9 +156,7 @@ function AppLayoutContent() {
           setHistoryState('error')
           return
         }
-        const historyDocuments = response.items.map((item) =>
-          historyItemToDocument(item, metadata[item.job_id]),
-        )
+        const historyDocuments = historyItemsToDocuments(response.items, metadata)
 
         setDocuments((current) => {
           const localDrafts = current.filter((document) => !document.jobId)
