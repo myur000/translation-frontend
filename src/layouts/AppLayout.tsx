@@ -24,7 +24,12 @@ import {
   readDocumentMetadata,
   rememberDocumentMetadata,
 } from '../documents/documentMetadataStorage.ts'
-import { createLocalDocumentId, documentPath } from '../documents/documentRoutes.ts'
+import {
+  createLocalDocumentId,
+  documentPath,
+  draftPath,
+  pathForDocument,
+} from '../documents/documentRoutes.ts'
 import {
   useRouteDocument,
   type RouteDocumentState,
@@ -78,6 +83,11 @@ export interface AppLayoutContextValue {
   ) => Promise<DocumentUploadResponse>
   /** Deletes the job on the backend (drafts only locally) and drops it from the list. */
   deleteDocument: (documentId: string) => Promise<void>
+  /**
+   * Adds a local draft from a chosen file and opens it. Returns an error
+   * message for an unsupported or too large file, otherwise `null`.
+   */
+  prepareDocument: (file: File, languages?: { source: LanguageCode; target: LanguageCode }) => string | null
 }
 export type ExpandedPanel = 'original' | 'translation' | null
 
@@ -99,15 +109,17 @@ function AppLayoutContent() {
   const location = useLocation()
   const navigate = useNavigate()
   const [documents, setDocuments] = useState<DocumentItem[]>([])
-  const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null)
   const [historyState, setHistoryState] = useState<HistoryLoadState>('loading')
   const [historyRevision, setHistoryRevision] = useState(0)
   const [expandedPanel, setExpandedPanel] = useState<ExpandedPanel>(null)
   const [isDualPanelFullscreen, setDualPanelFullscreen] = useState(false)
   const [fullscreenLocationKey, setFullscreenLocationKey] = useState(location.key)
   const sidebar = useResizableSidebar()
+  // The address is the single source of the open document: `/` is the home
+  // screen, uploaded jobs and local drafts each have their own path.
   const routeJobId = useMatch('/documents/:jobId')?.params.jobId ?? null
-  const isWorkspaceRoute = location.pathname === '/' || routeJobId !== null
+  const routeDraftId = useMatch('/drafts/:draftId')?.params.draftId ?? null
+  const isWorkspaceRoute = routeJobId !== null || routeDraftId !== null
 
   // AppLayout survives navigation. React retries this render before committing
   // children, so stale fullscreen state never reaches the new page.
@@ -121,18 +133,21 @@ function AppLayoutContent() {
     setDocuments((current) =>
       current.some((item) => item.jobId === document.jobId) ? current : [...current, document])
   }, [])
-  const routeDocumentState = useRouteDocument({
+  const jobRouteState = useRouteDocument({
     jobId: routeJobId,
     documents,
     historyState,
     session,
     onFound: addFoundDocument,
   })
-  // A document link wins over the last selection; the plain workspace route
-  // keeps showing the last selected document.
   const activeDocument = routeJobId !== null
     ? documents.find((item) => item.jobId === routeJobId) ?? null
-    : documents.find((item) => item.id === activeDocumentId) ?? documents[0] ?? null
+    : routeDraftId !== null
+      ? documents.find((item) => item.id === routeDraftId) ?? null
+      : null
+  const routeDocumentState: RouteDocumentState = routeDraftId !== null
+    ? activeDocument ? 'found' : 'draft-missing'
+    : jobRouteState
   const pollingJobs = documents.flatMap((document) =>
     document.jobId && document.status === 'processing' && !document.waitingIssue
       ? [{ documentId: document.id, jobId: document.jobId,
@@ -175,7 +190,6 @@ function AppLayoutContent() {
           })
           return [...localDrafts, ...restoredHistory]
         })
-        setActiveDocumentId((current) => current ?? historyDocuments[0]?.id ?? null)
         setHistoryState('ready')
       },
       () => {
@@ -314,9 +328,8 @@ function AppLayoutContent() {
     isWorkspaceRoute && (expandedPanel !== null || isDualPanelFullscreen)
 
   const handleSelectDocument = (documentId: string) => {
-    setActiveDocumentId(documentId)
-    const jobId = documents.find((item) => item.id === documentId)?.jobId
-    void navigate(jobId ? documentPath(jobId) : '/')
+    const document = documents.find((item) => item.id === documentId)
+    void navigate(document ? pathForDocument(document) : '/')
   }
 
   const handleRetryHistory = () => {
@@ -324,7 +337,7 @@ function AppLayoutContent() {
     setHistoryRevision((revision) => revision + 1)
   }
 
-  const handlePrepareDocument = (file: File) => {
+  const prepareDocument: AppLayoutContextValue['prepareDocument'] = (file, languages) => {
     const extension = file.name.split('.').at(-1)?.toLowerCase() ?? ''
     if (!SUPPORTED_EXTENSIONS.has(extension)) return t('workspace.unsupportedFile')
     if (file.size > MAX_DOCUMENT_SIZE) return t('workspace.fileTooLarge')
@@ -332,18 +345,20 @@ function AppLayoutContent() {
     const document: DocumentItem = {
       id: createLocalDocumentId(),
       name: file.name,
-      sourceLanguage: DEFAULT_SOURCE_LANGUAGE,
-      targetLanguage: DEFAULT_TARGET_LANGUAGE,
+      sourceLanguage: languages?.source ?? DEFAULT_SOURCE_LANGUAGE,
+      targetLanguage: languages?.target ?? DEFAULT_TARGET_LANGUAGE,
       pages: 0,
       status: 'draft',
       sourceFile: file,
     }
     setDocuments((current) => [document, ...current])
-    setActiveDocumentId(document.id)
-    void navigate('/')
+    void navigate(draftPath(document.id))
     if (session) void loadEstimate(document.id, file, session.accessToken)
-    return t('workspace.fileReady', { name: file.name })
+    return null
   }
+
+  const handleSidebarUpload = (file: File) =>
+    prepareDocument(file) ?? t('workspace.fileReady', { name: file.name })
 
   /** Optional hint: unverified accounts (403) and failures simply show no estimate. */
   const loadEstimate = async (documentId: string, file: File, accessToken: string) => {
@@ -474,7 +489,6 @@ function AppLayoutContent() {
       setDocuments((current) => current.some((item) => item.jobId === response.job_id)
         ? current
         : [translated, ...current])
-      setActiveDocumentId(translated.id)
       reloadAccount()
       void navigate(documentPath(response.job_id))
       return response
@@ -501,8 +515,7 @@ function AppLayoutContent() {
     setDocuments((current) => current.filter((item) => item.id !== documentId))
     if (activeDocument?.id === documentId) {
       const next = remaining[0]
-      setActiveDocumentId(next?.id ?? null)
-      void navigate(next?.jobId ? documentPath(next.jobId) : '/', { replace: true })
+      void navigate(next ? pathForDocument(next) : '/', { replace: true })
     }
   }
 
@@ -517,7 +530,7 @@ function AppLayoutContent() {
             documents={documents}
             activeDocumentId={isWorkspaceRoute ? activeDocument?.id : undefined}
             onSelectDocument={handleSelectDocument}
-            onUploadDocument={handlePrepareDocument}
+            onUploadDocument={handleSidebarUpload}
             onDeleteDocument={deleteDocument}
             width={sidebar.expandedWidth}
             isCollapsed={sidebar.isCollapsed}
@@ -550,6 +563,7 @@ function AppLayoutContent() {
                 startDocumentTranslation,
                 retranslateDocument,
                 deleteDocument,
+                prepareDocument,
               } satisfies AppLayoutContextValue}
             />
           </div>

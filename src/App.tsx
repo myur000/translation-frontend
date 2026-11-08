@@ -6,6 +6,7 @@ import { AuthLayout } from './layouts/AuthLayout.tsx'
 import { EmailVerificationPage } from './pages/EmailVerificationPage.tsx'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage.tsx'
 import { HistoryPage } from './pages/HistoryPage.tsx'
+import { HomePage } from './pages/HomePage.tsx'
 import { LoginPage } from './pages/LoginPage.tsx'
 import { NotFoundPage } from './pages/NotFoundPage.tsx'
 import { RegisterPage } from './pages/RegisterPage.tsx'
@@ -31,8 +32,9 @@ function App() {
 
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
-              <Route path="/" element={<WorkspacePage />} />
+              <Route path="/" element={<HomePage />} />
               <Route path="/documents/:jobId" element={<WorkspacePage />} />
+              <Route path="/drafts/:draftId" element={<WorkspacePage />} />
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/plans" element={<PlansPage />} />

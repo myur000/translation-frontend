@@ -25,18 +25,23 @@ interface DocumentActionsMenuProps {
    * scrolling containers (the sidebar list), which would clip it.
    */
   portal?: boolean
+  /** Trigger icon: "⋯" for document actions, "+" for adding. */
+  icon?: 'more' | 'plus'
+  /** Which trigger edge the menu lines up with. */
+  align?: 'start' | 'end'
 }
 
 const MENU_WIDTH = 230
 const MENU_ITEM_HEIGHT = 34
 
-function fixedMenuPosition(trigger: DOMRect, itemCount: number): CSSProperties {
+function fixedMenuPosition(trigger: DOMRect, itemCount: number, align: 'start' | 'end'): CSSProperties {
   const height = itemCount * MENU_ITEM_HEIGHT + 8
   const opensUp = trigger.bottom + 6 + height > window.innerHeight - 8
+  const left = align === 'start' ? trigger.left : trigger.right - MENU_WIDTH
   return {
     position: 'fixed',
     top: opensUp ? Math.max(8, trigger.top - 6 - height) : trigger.bottom + 6,
-    left: Math.max(8, Math.min(trigger.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8)),
+    left: Math.max(8, Math.min(left, window.innerWidth - MENU_WIDTH - 8)),
     right: 'auto',
   }
 }
@@ -48,6 +53,8 @@ export function DocumentActionsMenu({
   className,
   variant = 'default',
   portal = false,
+  icon = 'more',
+  align = 'end',
 }: DocumentActionsMenuProps) {
   const { t } = useTranslation()
   const menuId = useId()
@@ -107,16 +114,22 @@ export function DocumentActionsMenu({
           // Inside a list item the click must not also select the item.
           event.stopPropagation()
           if (!isOpen && portal) {
-            setMenuStyle(fixedMenuPosition(event.currentTarget.getBoundingClientRect(), actions.length))
+            setMenuStyle(fixedMenuPosition(event.currentTarget.getBoundingClientRect(), actions.length, align))
           }
           setOpen((value) => !value)
         }}
       >
-        <svg viewBox="0 0 16 16" aria-hidden="true">
-          <circle cx="3.5" cy="8" r="1.25" />
-          <circle cx="8" cy="8" r="1.25" />
-          <circle cx="12.5" cy="8" r="1.25" />
-        </svg>
+        {icon === 'plus' ? (
+          <svg viewBox="0 0 16 16" aria-hidden="true" className={styles.plusIcon}>
+            <path d="M8 3v10M3 8h10" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="3.5" cy="8" r="1.25" />
+            <circle cx="8" cy="8" r="1.25" />
+            <circle cx="12.5" cy="8" r="1.25" />
+          </svg>
+        )}
       </button>
       {isOpen ? renderMenu() : null}
     </div>

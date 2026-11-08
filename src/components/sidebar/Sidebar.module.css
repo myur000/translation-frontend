@@ -38,6 +38,17 @@
   letter-spacing: -0.02em;
 }
 
+.brandLink {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+
 .brandName {
   min-width: 0;
   flex: 1;
@@ -311,6 +322,10 @@
   padding: 0 6px;
 }
 
+.collapsed .brandLink {
+  flex: none;
+}
+
 .collapsed .brandName,
 .collapsed .uploadLabel,
 .collapsed .sectionHeader,
@@ -384,6 +399,10 @@
   .collapsed .uploadLabel,
   .collapsed .footerLabel {
     display: inline;
+  }
+
+  .collapsed .brandLink {
+    flex: 1;
   }
 
   .collapsed .sectionHeader,

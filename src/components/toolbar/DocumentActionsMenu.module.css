@@ -82,3 +82,10 @@
 .menu .danger:focus-visible {
   background: var(--color-danger-surface);
 }
+
+.plusIcon {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.6;
+}

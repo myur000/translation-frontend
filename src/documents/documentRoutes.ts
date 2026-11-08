@@ -8,3 +8,10 @@ export function createLocalDocumentId() {
 
 /** Address of a translation job; the "translation ready" email links here. */
 export const documentPath = (jobId: string) => `/documents/${encodeURIComponent(jobId)}`
+
+/** Address of a local draft; it lives only until the page is reloaded. */
+export const draftPath = (draftId: string) => `/drafts/${encodeURIComponent(draftId)}`
+
+/** Where a document opens: its job once uploaded, otherwise its draft. */
+export const pathForDocument = (document: { id: string; jobId?: string }) =>
+  document.jobId ? documentPath(document.jobId) : draftPath(document.id)

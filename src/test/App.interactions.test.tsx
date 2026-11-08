@@ -172,7 +172,10 @@ function seedDocumentMetadata() {
   )
 }
 
-function renderApp(path = '/', emailVerified = true) {
+/** `/` is the home screen; workspace tests open the first history document. */
+const FIRST_DOCUMENT = '/documents/00000000-0000-0000-0000-000000000101'
+
+function renderApp(path = FIRST_DOCUMENT, emailVerified = true) {
   seedAuthenticatedSession(emailVerified)
   seedDocumentMetadata()
   installDefaultApiMock()
@@ -400,7 +403,7 @@ describe('workspace interactions', () => {
     installDefaultApiMock()
     installBrowserSessionMock()
     const router = createMemoryRouter([{ path: '*', element: <App /> }], {
-      initialEntries: [path, '/'],
+      initialEntries: [path, FIRST_DOCUMENT],
       initialIndex: 1,
     })
     render(<RouterProvider router={router} />)
@@ -434,7 +437,7 @@ describe('workspace interactions', () => {
     installDefaultApiMock()
     installBrowserSessionMock()
     const router = createMemoryRouter([{ path: '*', element: <App /> }], {
-      initialEntries: ['/', '/'],
+      initialEntries: [FIRST_DOCUMENT, FIRST_DOCUMENT],
       initialIndex: 1,
     })
     render(<RouterProvider router={router} />)
@@ -457,7 +460,7 @@ describe('workspace interactions', () => {
     installDefaultApiMock()
     installBrowserSessionMock()
     const router = createMemoryRouter([{ path: '*', element: <App /> }], {
-      initialEntries: ['/'],
+      initialEntries: [FIRST_DOCUMENT],
     })
     render(<RouterProvider router={router} />)
     await user.click(await screen.findByRole('button', { name: /^project_report.docx/ }))
@@ -1645,6 +1648,85 @@ describe('document status events', () => {
 
     expect(await screen.findByText(/Готов · 100%/)).toBeTruthy()
     expect(callsTo(fetchMock, '/api/documents/events', 'GET')).toHaveLength(1)
+  })
+})
+
+describe('home screen', () => {
+  const pdf = (name = 'Глава 1.pdf') => new File(['%PDF'], name, { type: 'application/pdf' })
+  const fileInput = () => screen.getByLabelText(/Перетащите документ сюда/) as HTMLInputElement
+
+  it('greets on entry instead of opening the last document', async () => {
+    renderDocumentRoute('/')
+
+    expect(await screen.findByRole('heading', { name: 'Что полистаем сегодня?' })).toBeTruthy()
+    expect(screen.queryByRole('region', { name: 'Оригинал' })).toBeNull()
+    expect(within(sidebarList()).queryAllByRole('button', { pressed: true })).toHaveLength(0)
+  })
+
+  it('opens a chosen file as a draft with the language pair picked on the home screen', async () => {
+    const user = userEvent.setup()
+    const { router } = renderDocumentRoute('/')
+    await user.click(await screen.findByRole('button', { name: 'Язык перевода: Русский' }))
+    await user.type(screen.getByRole('combobox', { name: 'Найти язык' }), 'немец{Enter}')
+
+    await user.upload(fileInput(), pdf())
+
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/drafts\/local-/))
+    expect(await screen.findByRole('button', { name: 'Язык перевода: Немецкий' })).toBeTruthy()
+    expect(JSON.parse(localStorage.getItem('parallel.home-languages.v1') ?? '{}'))
+      .toEqual({ source: 'eng_Latn', target: 'deu_Latn' })
+  })
+
+  it('opens a document dropped onto the page', async () => {
+    const { router } = renderDocumentRoute('/')
+    const heading = await screen.findByRole('heading', { name: 'Что полистаем сегодня?' })
+    const dataTransfer = { files: [pdf('Перетащенный.pdf')], types: ['Files'] }
+
+    fireEvent.dragEnter(heading, { dataTransfer })
+    expect(screen.getByText('Отпустите, чтобы открыть')).toBeTruthy()
+    fireEvent.drop(heading, { dataTransfer })
+
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/drafts\//))
+    expect(within(sidebarList()).getByRole('button', { name: /^Перетащенный\.pdf/ })).toBeTruthy()
+  })
+
+  it('explains an unsupported file and stays home', async () => {
+    const { router } = renderDocumentRoute('/')
+    await screen.findByRole('heading', { name: 'Что полистаем сегодня?' })
+
+    // Drop bypasses the input's accept filter, as a real drag does.
+    fireEvent.drop(screen.getByRole('heading', { name: 'Что полистаем сегодня?' }), {
+      dataTransfer: { files: [new File(['x'], 'notes.txt', { type: 'text/plain' })], types: ['Files'] },
+    })
+
+    expect((await screen.findByRole('alert')).textContent).toMatch(/PDF|DOC/)
+    expect(router.state.location.pathname).toBe('/')
+  })
+
+  it('offers upload and recent documents in the "+" menu', async () => {
+    const user = userEvent.setup()
+    const { router } = renderDocumentRoute('/')
+    await within(await screen.findByRole('navigation', { name: 'Мои книги' })).findByRole('button', { name: /^english_course_book\.pdf/ })
+    const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {})
+
+    await user.click(screen.getByRole('button', { name: 'Добавить документ' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Загрузить с устройства…' }))
+    expect(click).toHaveBeenCalledTimes(1)
+
+    await user.click(screen.getByRole('button', { name: 'Добавить документ' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Открыть «project_report.docx» · Готов' }))
+    expect(router.state.location.pathname).toBe('/documents/00000000-0000-0000-0000-000000000102')
+  })
+
+  it('returns home from the logo and from a draft lost on reload', async () => {
+    const user = userEvent.setup()
+    const { router } = renderDocumentRoute('/drafts/local-gone')
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    await user.click(within(sidebarList()).getAllByRole('button')[0])
+    expect(router.state.location.pathname).toMatch(/^\/documents\//)
+    await user.click(screen.getByRole('link', { name: 'На главную' }))
+    expect(router.state.location.pathname).toBe('/')
   })
 })
 

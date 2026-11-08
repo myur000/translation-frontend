@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react'
-import { Link, useOutletContext } from 'react-router'
+import { Link, Navigate, useOutletContext } from 'react-router'
 import { ApiClientError } from '../api/client.ts'
 import { NotesPanel } from '../components/notes/NotesPanel.tsx'
 import type { DocumentAction } from '../components/toolbar/DocumentActionsMenu.tsx'
@@ -527,6 +527,11 @@ export function WorkspacePage() {
   } = useOutletContext<AppLayoutContextValue>()
   const { t } = useTranslation()
   const [isScrollSyncEnabled, setIsScrollSyncEnabled] = useState(false)
+
+  // Drafts live only until a reload; their old address leads home.
+  if (!activeDocument && routeDocumentState === 'draft-missing') {
+    return <Navigate to="/" replace />
+  }
 
   if (!activeDocument && routeDocumentState === 'missing') {
     return (

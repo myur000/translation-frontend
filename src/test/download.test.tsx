@@ -98,7 +98,9 @@ function renderWorkspace(
     throw new Error('Unexpected request: ' + url)
   })
   vi.stubGlobal('fetch', fetchMock)
-  const rendered = render(<MemoryRouter><App /></MemoryRouter>)
+  // `/` is the home screen; open the first job's own page.
+  const start = items.length ? `/documents/${items[0].job_id}` : '/'
+  const rendered = render(<MemoryRouter initialEntries={[start]}><App /></MemoryRouter>)
   return { ...rendered, fetchMock, accessToken }
 }
 

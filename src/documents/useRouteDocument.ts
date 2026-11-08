@@ -6,8 +6,12 @@ import type { DocumentItem } from '../types/document.ts'
 import { historyItemsToDocuments } from './documentHistory.ts'
 import { readDocumentMetadata } from './documentMetadataStorage.ts'
 
-/** How `/documents/:jobId` resolves against the loaded document list. */
-export type RouteDocumentState = 'none' | 'found' | 'loading' | 'missing' | 'error'
+/**
+ * How the document route resolves against the loaded document list.
+ * `draft-missing` — a `/drafts/:id` address whose local draft is gone
+ * (drafts do not survive a reload).
+ */
+export type RouteDocumentState = 'none' | 'found' | 'loading' | 'missing' | 'error' | 'draft-missing'
 
 type HistoryState = 'loading' | 'ready' | 'error'
 

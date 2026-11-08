@@ -5,7 +5,7 @@ import {
   type KeyboardEventHandler,
   type PointerEventHandler,
 } from 'react'
-import { NavLink } from 'react-router'
+import { Link, NavLink } from 'react-router'
 import { ApiClientError } from '../../api/client.ts'
 import { DocumentActionsMenu, type DocumentAction } from '../toolbar/DocumentActionsMenu.tsx'
 import { ConfirmDialog } from '../ui/ConfirmDialog.tsx'
@@ -108,8 +108,10 @@ export function Sidebar({
   return (
     <aside className={`${styles.sidebar} ${isCollapsed ? styles.collapsed : ''}`}>
       <div className={styles.brand}>
-        <BrandMark className={styles.brandMark} size={28} />
-        <span className={styles.brandName}>Parallel</span>
+        <Link to="/" className={styles.brandLink} aria-label={t('sidebar.home')} title={t('sidebar.home')}>
+          <BrandMark className={styles.brandMark} size={28} />
+          <span className={styles.brandName}>Parallel</span>
+        </Link>
         <button
           type="button"
           className={styles.collapseButton}
