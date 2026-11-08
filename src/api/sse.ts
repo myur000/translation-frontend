@@ -1,16 +1,16 @@
 export interface ServerSentEvent {
-  /** `message` when the server sent no `event:` field. */
+  /** `message`, если сервер не прислал поле `event:`. */
   event: string
   data: string
   id: string | null
 }
 
 /**
- * Reads a `text/event-stream` body and calls `onEvent` for every dispatched
- * event, following the WHATWG parsing rules: CRLF/LF/CR line endings, one
- * optional space after the colon (`event:ready` and `event: ready` are the
- * same), multi-line `data`, `:` comments (heartbeats) ignored, events
- * without data ignored. Resolves when the server closes the stream.
+ * Читает тело `text/event-stream` и вызывает `onEvent` для каждого отправленного события
+ * по правилам разбора WHATWG: окончания строк CRLF/LF/CR, один необязательный пробел
+ * после двоеточия (`event:ready` и `event: ready` одинаковы), многострочный `data`,
+ * комментарии `:` (heartbeat) и события без данных пропускаются.
+ * Промис завершается, когда сервер закрывает поток.
  */
 export async function readServerSentEvents(
   stream: ReadableStream<Uint8Array>,
@@ -18,7 +18,7 @@ export async function readServerSentEvents(
   signal?: AbortSignal,
 ): Promise<void> {
   const reader = stream.getReader()
-  // `stream: true` keeps multi-byte characters split across chunks intact.
+  // `stream: true` сохраняет многобайтовые символы, разрезанные между чанками.
   const decoder = new TextDecoder()
   const cancel = () => void reader.cancel().catch(() => undefined)
   signal?.addEventListener('abort', cancel, { once: true })
@@ -51,13 +51,13 @@ export async function readServerSentEvents(
       const { value, done } = await reader.read()
       if (done) break
       buffer += decoder.decode(value, { stream: true })
-      // A trailing "\r" may be the first half of "\r\n": keep it for the next chunk.
+      // Завершающий "\r" может быть первой половиной "\r\n": оставляем его до следующего чанка.
       const lines = buffer.split(/\r\n|\n|\r(?!$)/)
       buffer = lines.pop() ?? ''
       lines.forEach(processLine)
     }
-    // A held-back "\r" is a complete line once the stream has ended; any other
-    // unterminated remainder is an unfinished event and is dropped.
+    // Отложенный "\r" после конца потока — законченная строка; любой другой
+    // незавершённый остаток — недописанное событие, и он отбрасывается.
     buffer += decoder.decode()
     if (buffer.endsWith('\r')) processLine(buffer.slice(0, -1))
   } finally {

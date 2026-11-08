@@ -4,10 +4,10 @@ interface BrandMarkProps {
 }
 
 /**
- * Parallel logo: two parallel scrollbars forming the letter P — a solid
- * stem and a hollow track with its thumb as the bowl. Two texts scrolling
- * side by side is what the product does. Decorative; the brand name next to
- * it carries the meaning.
+ * Логотип Parallel: две параллельные полосы прокрутки складываются в букву P —
+ * сплошная ножка и полая дорожка, бегунок которой образует петлю. Два текста,
+ * прокручиваемых рядом, — это и есть то, что делает продукт. Декоративный элемент:
+ * смысл несёт название рядом с ним.
  */
 export function BrandMark({ size = 28, className }: BrandMarkProps) {
   return (

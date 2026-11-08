@@ -11,7 +11,7 @@ const item = (jobId: string, overrides: Partial<DocumentHistoryItemResponse> = {
 
 describe('historyItemsToDocuments', () => {
   it('keeps ids unique when a retried document shares its local id', () => {
-    // The retry (newest) and the original failed job both point to "local-1".
+    // Повтор (самый новый) и исходная упавшая задача обе указывают на "local-1".
     const metadata = {
       'job-new': { name: 'Отчёт.docx', documentId: 'local-1' },
       'job-old': { name: 'Отчёт.docx', documentId: 'local-1' },
@@ -24,7 +24,7 @@ describe('historyItemsToDocuments', () => {
   })
 
   it('does not give a retried job the id of the job it retried', () => {
-    // A history document has its job id as id; retrying it stored that id for the new job.
+    // У документа из истории id — это job id; при повторе этот id сохранился для новой задачи.
     const metadata = { 'job-new': { name: 'Отчёт.docx', documentId: 'job-old' } }
 
     const documents = historyItemsToDocuments([item('job-new'), item('job-old')], metadata)

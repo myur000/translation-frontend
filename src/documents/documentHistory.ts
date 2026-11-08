@@ -23,13 +23,13 @@ export function historyItemToDocument(
 ): DocumentItem {
   return {
     id: metadata?.documentId ?? item.job_id,
-    // The backend name works across devices; the local one covers jobs created
-    // before the backend stored names.
+    // Имя с бэкенда работает на всех устройствах; локальное покрывает задачи,
+    // созданные до того, как бэкенд начал хранить имена.
     name:
       item.file_name ??
       metadata?.name ??
       `document-${item.job_id.slice(0, 8)}.${item.format}`,
-    // Kept as sent by the backend: legacy codes are shown as is.
+    // Оставляем как прислал бэкенд: старые коды показываются как есть.
     sourceLanguage: item.source_lang,
     targetLanguage: item.target_lang,
     pages: 0,
@@ -46,11 +46,11 @@ export function historyItemToDocument(
 }
 
 /**
- * Maps a history page to documents with unique ids. Retrying a failed
- * document keeps the document's id for the new job, and that id can be
- * another job's id (documents restored from history use their job id). A
- * job's own id therefore wins: a stored id is used only when no other job
- * in the list owns it and no newer job (history is newest first) took it.
+ * Превращает страницу истории в документы с уникальными id. Повтор неудачного
+ * документа сохраняет его id для новой задачи, а этот id может совпадать с id
+ * другой задачи (документы из истории используют свой job id). Поэтому
+ * собственный id задачи главнее: сохранённый id берётся, только если он не
+ * принадлежит другой задаче из списка и его не заняла более новая (история идёт от новых к старым).
  */
 export function historyItemsToDocuments(
   items: readonly DocumentHistoryItemResponse[],

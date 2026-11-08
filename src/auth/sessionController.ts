@@ -33,7 +33,7 @@ const defaultRequests: SessionRequests = {
   logoutAll: (accessToken) => logoutAll({ accessToken }),
 }
 
-/** One refresh promise per tab; the coordinator serializes rotating cookies across tabs. */
+/** Один промис продления на вкладку; координатор упорядочивает ротацию cookie между вкладками. */
 export class SessionController implements SessionRecovery {
   private snapshot: SessionSnapshot
   private listeners = new Set<() => void>()
@@ -85,7 +85,7 @@ export class SessionController implements SessionRecovery {
           expiresIn: Math.max(0, (message.session.expiresAt - Date.now()) / 1000),
         }, message.session.email)
         this.accept(session, message.revision)
-      } catch { /* Ignore expired peer tokens; cookie renewal will recover them. */ }
+      } catch { /* Просроченные токены соседних вкладок игнорируем: их восстановит продление по cookie. */ }
     } else if (message.type === 'signed-out') {
       this.generation++
       this.refreshFailure = null
@@ -160,7 +160,7 @@ export class SessionController implements SessionRecovery {
         if (marker?.state === 'refreshing' || marker?.state === 'unavailable') {
           throw new Error('Previous refresh outcome is uncertain; do not rotate again.')
         }
-        // A crashed tab or a lost response must not cause a blind repeat of rotation.
+        // Упавшая вкладка или потерянный ответ не должны приводить к слепому повтору ротации.
         this.coordinator.mark('refreshing')
         const response = await this.requests.refresh()
         if (generation !== this.generation) throw new SessionChangedError()
@@ -170,7 +170,7 @@ export class SessionController implements SessionRecovery {
         this.coordinator.publish({ type: 'session', revision: active.revision, session: next })
         return next
       } catch (error) {
-        // Commit failure markers while the cookie lock is still held.
+        // Фиксируем отметки о сбое, пока блокировка cookie ещё удерживается.
         handledFailure = true
         this.handleRefreshFailure(error, generation)
         throw error
@@ -198,7 +198,7 @@ export class SessionController implements SessionRecovery {
     try {
       const marker = this.coordinator.mark('unavailable')
       this.coordinator.publish({ type: 'unavailable', revision: marker.revision })
-    } catch { /* Storage can be blocked. Local error state still prevents repeats. */ }
+    } catch { /* Хранилище может быть заблокировано. Локальное состояние ошибки всё равно не даёт повторять. */ }
   }
 
   private isDifferentAccount(first: string, second: string) {
@@ -221,7 +221,7 @@ export class SessionController implements SessionRecovery {
   }
 
   onUnauthorized = (rejectedToken: string) => {
-    // A delayed rejection for an old JWT must not sign out a newer session.
+    // Запоздалый отказ для старого JWT не должен разлогинивать более новую сессию.
     const sharedRevision = this.coordinator.read()?.revision
     if (sharedRevision && this.revision && sharedRevision !== this.revision) return
     if (this.snapshot.session?.accessToken === rejectedToken) this.invalidate('expired')
@@ -235,7 +235,7 @@ export class SessionController implements SessionRecovery {
     try {
       const marker = this.coordinator.mark('signed-out')
       this.coordinator.publish({ type: 'signed-out', revision: marker.revision })
-    } catch { /* Local logout still works when storage is unavailable. */ }
+    } catch { /* Локальный выход работает и без доступного хранилища. */ }
   }
 
   logout = async (): Promise<void> => {
@@ -254,7 +254,7 @@ export class SessionController implements SessionRecovery {
   logoutEverywhere = async (): Promise<void> => {
     const session = this.snapshot.session
     if (!session) return
-    // Obtain a valid JWT before taking the cookie lock to avoid recursive locking.
+    // Получаем действующий JWT до захвата блокировки cookie, чтобы не заблокировать себя рекурсивно.
     const token = await this.prepareAccessToken(session.accessToken)
     ++this.generation
     try {

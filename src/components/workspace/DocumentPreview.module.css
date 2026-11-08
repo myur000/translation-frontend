@@ -8,15 +8,15 @@
   background: var(--color-canvas);
 }
 
-/* The column runs under the floating bars; the padding keeps the first and
-   last page reachable above and below them. */
+/* Колонка уходит под плавающие панели; отступы оставляют первую и последнюю
+   страницу доступными над и под ними. */
 .viewport {
   min-height: 0;
   flex: 1;
   overflow: auto;
   padding: calc(var(--chrome-top, 0px) + 44px) 24px calc(var(--chrome-bottom, 0px) + 64px);
   background: var(--color-canvas);
-  /* A thin bar in the palette: a full-height system bar reads as a divider. */
+  /* Тонкая полоса в цветах палитры: системная полоса во всю высоту выглядит как разделитель. */
   scrollbar-color: var(--color-border-strong) transparent;
   scrollbar-width: thin;
   scroll-padding-top: calc(var(--chrome-top, 0px) + 12px);
@@ -68,7 +68,7 @@
   min-width: 100%;
 }
 
-/* Pages need max-content width for zoom; a message must wrap within the panel instead. */
+/* Страницам нужна ширина max-content для масштаба; сообщение же должно переноситься в пределах панели. */
 .pagesMessage {
   width: auto;
 }
@@ -181,7 +181,7 @@
 }
 
 
-/* Inside the floating pill the expand button drops its own frame. */
+/* Внутри плавающей плашки кнопка «развернуть» теряет собственную рамку. */
 .columnTools > button {
   background: transparent;
   border-color: transparent;

@@ -54,8 +54,8 @@ export function DocumentPreview({
   const pageWidth = usePreviewZoom(viewportRef, zoom, onZoomChange)
   const lastNavigationRef = useRef(navigationRevision)
   const [selectionError, setSelectionError] = useState('')
-  // Restore again if fitting the page changes its geometry during mounting.
-  // Zoom-only updates retain the anchor handled by usePreviewZoom instead.
+  // Восстанавливаем ещё раз, если подгонка страницы меняет геометрию при монтировании.
+  // При изменении только масштаба якорь сохраняет usePreviewZoom.
   useLayoutEffect(onViewportRestore, [pageWidth, view, onViewportRestore])
   useLayoutEffect(() => {
     if (lastNavigationRef.current === navigationRevision) return
@@ -127,7 +127,7 @@ export function DocumentPreview({
           </div> : null}
         </div>
       </div>
-      {/* Floating over the continuous column instead of a panel header. */}
+      {/* Поверх непрерывной колонки вместо заголовка панели. */}
       {!hideHeader ? (
         <>
           <span className={styles.columnLabel}>

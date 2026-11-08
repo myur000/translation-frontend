@@ -10,7 +10,7 @@ export interface ProfileAvatarState {
 }
 interface AvatarResource { key: string; url: string | null; status: ProfileAvatarState['status'] }
 
-/** Each authenticated request owns its object URL and releases it on replacement/unmount. */
+/** Каждый авторизованный запрос владеет своим object URL и освобождает его при замене или размонтировании. */
 export function useProfileAvatar(hasAvatar: boolean, revision: number, token: RefObject<string | null>): ProfileAvatarState {
   const [resource, setResource] = useState<AvatarResource>({ key: '', url: null, status: 'idle' })
   const [retryRevision, setRetryRevision] = useState(0)

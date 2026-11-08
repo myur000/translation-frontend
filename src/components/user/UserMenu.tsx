@@ -68,7 +68,7 @@ export function UserMenu({ isCollapsed }: UserMenuProps) {
       await logout()
       void navigate('/login', { replace: true })
     } catch {
-      // AuthProvider explains the failure; do not claim the server session ended.
+      // Причину сбоя объясняет AuthProvider; не утверждаем, что сессия на сервере завершена.
     } finally {
       setLoggingOut(false)
     }

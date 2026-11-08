@@ -81,7 +81,7 @@ function DocumentWorkspace({
 }: DocumentWorkspaceProps) {
   const { t } = useTranslation()
   const { getLabel: getLanguageLabel } = useLanguageCatalog()
-  // Old documents carry two-letter codes; the backend now accepts only NLLB.
+  // У старых документов двухбуквенные коды; бэкенд теперь принимает только NLLB.
   const [sourceLanguage, setSourceLanguage] = useState(() => toCatalogLanguageCode(document.sourceLanguage))
   const [targetLanguage, setTargetLanguage] = useState(() => toCatalogLanguageCode(document.targetLanguage))
   const [currentPage, setCurrentPage] = useState(1)
@@ -91,8 +91,8 @@ function DocumentWorkspace({
   const [isTranslating, setTranslating] = useState(false)
   const [dialog, setDialog] = useState<WorkspaceDialog>(null)
   const [feedbackPrompt, setFeedbackPrompt] = useState<FeedbackPromptMode | null>(null)
-  // Offer a rating when this document finishes while it is open. Adjusting
-  // state during render (not in an effect) avoids an extra paint.
+  // Предлагаем оценку, когда документ завершается, пока он открыт. Корректировка
+  // состояния во время рендера (а не в эффекте) избавляет от лишней отрисовки.
   const [topChromeRef, topChromeHeight] = useElementHeight<HTMLDivElement>()
   const [bottomChromeRef, bottomChromeHeight] = useElementHeight<HTMLDivElement>()
   const [observedStatus, setObservedStatus] = useState(document.status)
@@ -104,7 +104,7 @@ function DocumentWorkspace({
     }
   }
   const [useGlossary, setUseGlossary] = useState(false)
-  // Only a local file can be uploaded with a glossary from the toolbar.
+  // Загрузить с глоссарием из панели можно только локальный файл.
   const canUploadFile = Boolean(document.sourceFile) &&
     (!document.jobId || document.status === 'failed')
   const glossaryTermCount = useGlossaryTermCount(sourceLanguage, targetLanguage, canUploadFile)
@@ -207,7 +207,7 @@ function DocumentWorkspace({
       onResumeTranslationWaiting(document.id)
       return
     }
-    // A failed job can be retried from the source kept on the server.
+    // Неудачную задачу можно повторить по исходнику, который хранится на сервере.
     if (!document.sourceFile && document.jobId && document.status === 'failed') {
       if (sourceLanguage !== toCatalogLanguageCode(document.sourceLanguage)) {
         setNotice(t('retranslate.needsFile'))
@@ -293,7 +293,7 @@ function DocumentWorkspace({
 
   const isUploaded = Boolean(document.jobId)
   const isProcessing = document.status === 'processing'
-  // Deleting lives in the sidebar, next to the document it removes.
+  // Удаление находится в боковой панели, рядом с документом, который оно удаляет.
   const documentActions: DocumentAction[] = isUploaded
     ? [
         {
@@ -352,7 +352,7 @@ function DocumentWorkspace({
       } as CSSProperties}
       onContextMenu={handleContextMenu}
     >
-      {/* The bars float over the reading columns; text scrolls beneath them. */}
+      {/* Панели плавают над колонками чтения; текст прокручивается под ними. */}
       {!isImmersiveMode ? (
         <div ref={topChromeRef} className={styles.topChrome}>
           <TopToolbar
@@ -528,7 +528,7 @@ export function WorkspacePage() {
   const { t } = useTranslation()
   const [isScrollSyncEnabled, setIsScrollSyncEnabled] = useState(false)
 
-  // Drafts live only until a reload; their old address leads home.
+  // Черновики живут только до перезагрузки; их старый адрес ведёт на главную.
   if (!activeDocument && routeDocumentState === 'draft-missing') {
     return <Navigate to="/" replace />
   }

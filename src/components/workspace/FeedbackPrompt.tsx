@@ -10,7 +10,7 @@ import {
 import styles from './FeedbackPrompt.module.css'
 
 const RATINGS = [1, 2, 3, 4, 5] as const
-/** Backend limit for the comment (TranslationFeedback.MAX_COMMENT_LENGTH). */
+/** Лимит бэкенда на длину комментария (TranslationFeedback.MAX_COMMENT_LENGTH). */
 const MAX_COMMENT_LENGTH = 2000
 const THANKS_VISIBLE_MS = 2500
 interface FeedbackPromptProps {
@@ -23,9 +23,9 @@ interface FeedbackPromptProps {
 type Step = 'loading' | 'rate' | 'comment' | 'thanks'
 
 /**
- * Non-modal card in the corner of the workspace. A star saves the rating at
- * once; the comment is an optional second step. Saving replaces the previous
- * rating together with its comment, so the current comment is resent.
+ * Немодальная карточка в углу рабочей области. Звезда сразу сохраняет оценку,
+ * комментарий — необязательный второй шаг. Сохранение заменяет предыдущую оценку
+ * вместе с комментарием, поэтому текущий комментарий отправляется заново.
  */
 export function FeedbackPrompt({ jobId, documentName, mode, onClose }: FeedbackPromptProps) {
   const { t } = useTranslation()
@@ -52,7 +52,7 @@ export function FeedbackPrompt({ jobId, documentName, mode, onClose }: FeedbackP
     getDocumentFeedback(jobId, { accessToken: token, signal: controller.signal }).then(
       (response) => {
         if (controller.signal.aborted) return
-        // Already rated: offering it again unasked would be noise.
+        // Оценка уже есть: снова предлагать без запроса — лишний шум.
         if (mode === 'auto') return onCloseRef.current()
         setRating(response.rating)
         setComment(response.comment ?? '')

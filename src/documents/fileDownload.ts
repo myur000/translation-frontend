@@ -14,7 +14,7 @@ function safeFileName(value: string | null): string | null {
     .replace(/^\.+|[.\s]+$/g, '')
     .trim()
   if (!clean) return null
-  // Keep the extension intact when limiting excessively long server filenames.
+  // Сохраняем расширение, когда укорачиваем слишком длинные имена файлов с сервера.
   if (Array.from(clean).length <= 200) return clean
   const extension = clean.match(/\.[a-z0-9]{1,10}$/i)?.[0] ?? ''
   return Array.from(clean.slice(0, clean.length - extension.length)).slice(0, 200 - extension.length).join('') + extension
@@ -33,7 +33,7 @@ export function translationDownloadFileName(
   return safeFileName(base + '_' + targetLanguage + extension) ?? 'translation'
 }
 
-/** Give the browser time to start saving before releasing the Blob URL. */
+/** Даём браузеру начать сохранение, прежде чем освободить Blob URL. */
 export function saveDownloadedFile(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')

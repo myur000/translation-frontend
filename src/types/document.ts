@@ -3,8 +3,8 @@ import type { TranslationStatus } from '../api/contracts/documents.ts'
 export type DocumentStatus = 'ready' | 'processing' | 'draft' | 'failed'
 export type TranslationWaitingIssue = 'stalled' | 'unreachable'
 /**
- * NLLB-200 code (`eng_Latn`). Documents created before the switch keep their
- * legacy two-letter codes (`en`), so any string from the backend is accepted.
+ * Код NLLB-200 (`eng_Latn`). Документы, созданные до перехода, хранят старые
+ * двухбуквенные коды (`en`), поэтому принимается любая строка с бэкенда.
  */
 export type LanguageCode = string
 
@@ -23,11 +23,11 @@ export interface DocumentItem {
   format?: 'pdf' | 'docx' | 'doc'
   errorMessage?: string
   createdAt?: string
-  /** Billing pages charged for the job. */
+  /** Учётные страницы, списанные за задачу. */
   billedUnits?: number
-  /** Terms passed to the translator; `null` when the glossary was not requested. */
+  /** Термины, переданные переводчику; `null`, если глоссарий не запрашивали. */
   glossaryTermCount?: number | null
-  /** Cost of a draft before upload; absent while unknown or unavailable. */
+  /** Стоимость черновика до загрузки; отсутствует, пока неизвестна или недоступна. */
   estimate?: DocumentEstimate
 }
 

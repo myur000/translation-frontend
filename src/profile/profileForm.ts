@@ -39,7 +39,7 @@ export function mapProfileFieldErrors(errors: Record<string, string>): Partial<R
   return result
 }
 
-/** PUT replaces every text field; preserve hidden fields from the latest loaded profile. */
+/** PUT заменяет все текстовые поля; скрытые поля сохраняем из последнего загруженного профиля. */
 export function toProfileNameRequest(profile: ProfileResponse, name: string): UpdateProfileRequest {
   return {
     display_name: name.trim() || null,

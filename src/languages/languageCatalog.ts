@@ -7,14 +7,14 @@ export type LanguageLabelLocale = 'ru' | 'en'
 export interface LanguageCatalogState {
   status: LanguageCatalogStatus
   languages: readonly LanguageResponse[]
-  /** NLLB code → Russian name from the backend. */
+  /** Код NLLB → русское название с бэкенда. */
   names: ReadonlyMap<string, string>
 }
 
 export const DEFAULT_SOURCE_LANGUAGE = 'eng_Latn'
 export const DEFAULT_TARGET_LANGUAGE = 'rus_Cyrl'
 
-/** Shown first in the picker and available even if the catalog fails to load. */
+/** Показываются первыми в списке и доступны, даже если каталог не загрузился. */
 export const POPULAR_LANGUAGES: readonly string[] = [
   'rus_Cyrl',
   'eng_Latn',
@@ -26,7 +26,7 @@ export const POPULAR_LANGUAGES: readonly string[] = [
   'jpn_Jpan',
 ]
 
-/** Documents uploaded before the NLLB switch still carry these codes. */
+/** Документы, загруженные до перехода на NLLB, всё ещё хранят эти коды. */
 const LEGACY_CODES: Readonly<Record<string, string>> = {
   en: 'eng_Latn',
   ru: 'rus_Cyrl',
@@ -34,8 +34,8 @@ const LEGACY_CODES: Readonly<Record<string, string>> = {
 }
 
 /**
- * Languages present in the catalog in more than one script. English labels
- * for them get the script name, e.g. "Chinese (Simplified Han)".
+ * Языки, которые есть в каталоге более чем в одной письменности. Английские
+ * названия для них получают имя письменности, например «Chinese (Simplified Han)».
  */
 const MULTI_SCRIPT_LANGUAGES = new Set([
   'ace', 'arb', 'bjn', 'kas', 'knc', 'min', 'taq', 'zho',
@@ -69,7 +69,7 @@ export function getLanguageCatalogState() {
   return state
 }
 
-/** Loads the catalog once per page; a failed load can be retried. */
+/** Загружает каталог один раз на страницу; неудачную загрузку можно повторить. */
 export function loadLanguageCatalog(): Promise<void> {
   if (state.status === 'ready') return Promise.resolve()
   if (pending) return pending
@@ -97,12 +97,12 @@ export function resetLanguageCatalogForTests() {
   state = EMPTY_STATE
 }
 
-/** Maps a legacy two-letter code to its NLLB code; other codes are returned as is. */
+/** Переводит старый двухбуквенный код в код NLLB; остальные коды возвращаются как есть. */
 export function toCatalogLanguageCode(code: string) {
   return LEGACY_CODES[code] ?? code
 }
 
-/** BCP 47 tag for the HTML `lang` attribute: `eng_Latn` → `en-Latn`. */
+/** Тег BCP 47 для HTML-атрибута `lang`: `eng_Latn` → `en-Latn`. */
 export function languageTag(code: string) {
   const match = NLLB_CODE.exec(code)
   const candidate = match ? `${match[1]}-${match[2]}` : code
@@ -113,7 +113,7 @@ export function languageTag(code: string) {
   }
 }
 
-/** Compact label for lists: `eng_Latn` → `EN`, `yue_Hant` → `YUE`. */
+/** Короткая подпись для списков: `eng_Latn` → `EN`, `yue_Hant` → `YUE`. */
 export function shortLanguageCode(code: string) {
   return (languageTag(code) ?? code).split('-')[0].toUpperCase()
 }
@@ -163,9 +163,9 @@ function intlLanguageName(code: string, locale: LanguageLabelLocale) {
 }
 
 /**
- * Human-readable language name. Russian uses the backend catalog, which is
- * the source of truth; English comes from Intl. Unknown codes (old documents,
- * catalog not loaded, no Intl data) degrade to the Russian name or the code.
+ * Понятное человеку название языка. Для русского берётся каталог бэкенда — он
+ * источник истины; английское даёт Intl. Неизвестные коды (старые документы,
+ * каталог не загружен, нет данных Intl) деградируют до русского названия или самого кода.
  */
 export function formatLanguageName(
   code: string,

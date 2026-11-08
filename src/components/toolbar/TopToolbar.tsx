@@ -15,9 +15,9 @@ interface TopToolbarProps {
   canDownload: boolean
   canTranslate: boolean
   documentActions: DocumentAction[]
-  /** Short facts under the file name: cost, glossary, pages. */
+  /** Короткие сведения под именем файла: стоимость, глоссарий, страницы. */
   details: string[]
-  /** Terms available for the pair; the glossary option shows only when > 0. */
+  /** Сколько терминов есть для пары; опция глоссария видна только при > 0. */
   glossaryTermCount: number | null
   useGlossary: boolean
   onUseGlossaryChange: (useGlossary: boolean) => void
@@ -29,11 +29,11 @@ interface TopToolbarProps {
 }
 
 /**
- * What the toolbar offers depends on where the document is:
- * - `edit` — a draft or a failed job: choose languages and translate;
- * - `progress` — the job runs: languages are fixed, progress is shown;
- * - `done` — the result exists: downloading is the main action.
- * Other languages for an uploaded document are in the "⋯" menu.
+ * Что предлагает панель, зависит от состояния документа:
+ * - `edit` — черновик или неудачная задача: выбор языков и перевод;
+ * - `progress` — задача выполняется: языки зафиксированы, показан прогресс;
+ * - `done` — результат готов: главное действие — скачать.
+ * Другие языки для загруженного документа — в меню «⋯».
  */
 type ToolbarMode = 'edit' | 'progress' | 'done'
 

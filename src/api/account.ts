@@ -27,7 +27,7 @@ export function parseAccountUsage(value: unknown): AccountUsageResponse {
       !units(value.remaining_units) || value.remaining_units > value.limit_units) {
     throw new Error('Invalid finite usage')
   }
-  // Use the server's remaining_units: occupied units can exceed a newly reduced limit.
+  // Берём remaining_units с сервера: занятые единицы могут превышать только что уменьшенный лимит.
   return value as unknown as AccountUsageResponse
 }
 

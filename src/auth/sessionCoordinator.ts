@@ -40,7 +40,7 @@ function isMessage(value: unknown): value is SessionMessage {
   return message.type === 'signed-out' || message.type === 'unavailable' || message.type === 'request'
 }
 
-/** Only non-secret coordination markers are persisted. JWTs travel in memory. */
+/** Сохраняются только несекретные отметки координации. JWT передаются в памяти. */
 export class BrowserSessionCoordinator implements SessionCoordination {
   private channel: BroadcastChannel | null = null
   private listener: ((message: SessionMessage) => void) | null = null
@@ -61,7 +61,7 @@ export class BrowserSessionCoordinator implements SessionCoordination {
 
   mark(state: SessionMarkerState): SessionMarker {
     const marker = { revision: crypto.randomUUID(), state }
-    // If storage is blocked, fail BEFORE starting cookie rotation.
+    // Если хранилище заблокировано, падаем ДО начала ротации cookie.
     localStorage.setItem(AUTH_COORDINATION_KEY, JSON.stringify(marker))
     return marker
   }

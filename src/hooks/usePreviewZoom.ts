@@ -19,9 +19,9 @@ export function usePreviewZoom(
   useLayoutEffect(() => {
     changeRef.current = onZoomChange
     const gesture = gestureRef.current
-    // An external change (buttons, keyboard or the synchronized panel) wins
-    // over a gesture queued for the next frame. Acknowledging our own change
-    // must retain fractional deltas, otherwise small pinches do nothing.
+    // Внешнее изменение (кнопки, клавиатура или синхронная панель) побеждает
+    // жест, отложенный до следующего кадра. При подтверждении собственного изменения
+    // нужно сохранять дробные приращения, иначе мелкие щипки ничего не делают.
     if (gesture.requestedZoom !== zoom) {
       if (gesture.frame !== null) window.cancelAnimationFrame(gesture.frame)
       gesture.frame = null

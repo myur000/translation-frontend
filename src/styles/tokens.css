@@ -1,11 +1,11 @@
 /*
- * Parallel palette (taken from the brand swatches):
- *   Ink   #091423 — text, dark surfaces
- *   Navy  #1E3A52 — primary actions, active states
- *   Steel #4A6F8C — secondary text and icons
- *   Mist  #8FB1C9 — borders, accents on dark
- *   Ice   #CADCEA — soft fills, selection
- * Text pairs meet WCAG AA (4.5:1) on their intended surfaces.
+ * Палитра Parallel (взята из образцов бренда):
+ *   Ink   #091423 — текст, тёмные поверхности
+ *   Navy  #1E3A52 — основные действия, активные состояния
+ *   Steel #4A6F8C — второстепенный текст и иконки
+ *   Mist  #8FB1C9 — рамки, акценты на тёмном
+ *   Ice   #CADCEA — мягкие заливки, выделение
+ * Текстовые пары соответствуют WCAG AA (4.5:1) на своих поверхностях.
  */
 :root {
   color-scheme: light;
@@ -18,7 +18,7 @@
   --color-bg: #eef3f7;
   --color-surface: #ffffff;
   --color-surface-subtle: #f5f8fb;
-  /* Behind document pages, so the white paper stands out. */
+  /* Фон за страницами документа, чтобы белая бумага выделялась. */
   --color-canvas: #e1e9f0;
   --color-text: var(--palette-ink);
   --color-text-muted: var(--palette-steel);
@@ -50,7 +50,7 @@
   --color-danger-surface: #fcf1f1;
   --color-danger-border: #f0c7c7;
 
-  /* The sidebar stays dark in both themes: it frames the documents. */
+  /* Боковая панель тёмная в обеих темах: она обрамляет документы. */
   --sidebar-bg: var(--palette-ink);
   --sidebar-hover: #12233a;
   --sidebar-active: var(--palette-navy);

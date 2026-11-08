@@ -18,7 +18,7 @@ interface LanguagePair {
   target: string
 }
 
-/** The pair chosen last time is a convenience; the defaults are fine without it. */
+/** Пара, выбранная в прошлый раз, — удобство; без неё подойдут значения по умолчанию. */
 function readLanguages(): LanguagePair {
   try {
     const value = JSON.parse(localStorage.getItem(LANGUAGES_KEY) ?? 'null') as Partial<LanguagePair> | null
@@ -26,7 +26,7 @@ function readLanguages(): LanguagePair {
       return { source: value.source, target: value.target }
     }
   } catch {
-    // Unavailable or malformed storage: fall back to the defaults.
+    // Хранилище недоступно или данные испорчены: берём значения по умолчанию.
   }
   return { source: DEFAULT_SOURCE_LANGUAGE, target: DEFAULT_TARGET_LANGUAGE }
 }
@@ -35,13 +35,13 @@ function rememberLanguages(pair: LanguagePair) {
   try {
     localStorage.setItem(LANGUAGES_KEY, JSON.stringify(pair))
   } catch {
-    // Private mode: the pair is simply not remembered.
+    // Приватный режим: пара просто не запоминается.
   }
 }
 
 /**
- * Entry screen: drop a document or pick one from the device, with the
- * language pair chosen up front. Recent documents are one click away in "+".
+ * Главный экран: перетащите документ или выберите его на устройстве, заранее указав
+ * языковую пару. Недавние документы — в один клик в меню «+».
  */
 export function HomePage() {
   const { documents, prepareDocument, selectDocument } = useOutletContext<AppLayoutContextValue>()
@@ -57,7 +57,7 @@ export function HomePage() {
     setLanguages(next)
     rememberLanguages(next)
   }
-  // Choosing the other side's language swaps the pair instead of making it invalid.
+  // Выбор языка с другой стороны меняет пару местами, а не делает её некорректной.
   const changeSource = (source: string) => updateLanguages(source === languages.target
     ? { source, target: languages.source }
     : { ...languages, source })
@@ -79,7 +79,7 @@ export function HomePage() {
   }
   const handleDragLeave = (event: DragEvent) => {
     if (!hasFiles(event)) return
-    // Leaving a child element also fires dragleave; count the depth.
+    // Уход с дочернего элемента тоже вызывает dragleave, поэтому считаем глубину.
     dragDepth.current = Math.max(0, dragDepth.current - 1)
     if (dragDepth.current === 0) setDragging(false)
   }

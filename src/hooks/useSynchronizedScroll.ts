@@ -48,8 +48,8 @@ export function useSynchronizedScroll(isEnabled: boolean, layoutKey: string) {
 
     viewport.scrollTop = top
     viewport.scrollLeft = left
-    // Programmatic scroll events must not become new user input or feed back
-    // into the other panel. Read the actual position after browser clamping.
+    // Программные события прокрутки не должны становиться новым вводом пользователя
+    // или возвращаться в другую панель. Читаем фактическую позицию после ограничения браузером.
     expectedScrollPositionsRef.current.set(viewport, {
       top: viewport.scrollTop,
       left: viewport.scrollLeft,
@@ -87,7 +87,7 @@ export function useSynchronizedScroll(isEnabled: boolean, layoutKey: string) {
       if (!isEnabled) return
 
       const otherPanel = panel === 'original' ? 'translation' : 'original'
-      // Keep a logical position even when the other panel is unmounted.
+      // Сохраняем логическую позицию, даже когда другая панель размонтирована.
       bookmarksRef.current[otherPanel] = bookmark
       if (target) applyBookmark(target, bookmark)
     },

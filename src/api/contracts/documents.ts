@@ -8,15 +8,15 @@ export interface DocumentUploadRequest {
   file: File
   source_lang: string
   target_lang: string
-  /** Apply the owner's terms for this language pair. */
+  /** Применить термины владельца для этой языковой пары. */
   use_glossary?: boolean
 }
 
 export interface DocumentUploadResponse {
   job_id: UUID
-  /** Billing pages charged for this document. */
+  /** Учётные страницы, списанные за этот документ. */
   billed_units: number
-  /** `null` — glossary not requested; `0` — requested, no terms for the pair. */
+  /** `null` — глоссарий не запрашивали; `0` — запросили, но терминов для пары нет. */
   glossary_term_count: number | null
 }
 
@@ -27,11 +27,11 @@ export interface RetranslationRequest {
 
 export interface DocumentEstimateResponse {
   format: DocumentFileFormat
-  /** Characters with spaces that count toward billing pages. */
+  /** Символы с пробелами, из которых считаются учётные страницы. */
   characters: number
   billed_units: number
   unlimited: boolean
-  /** `null` for unlimited plans. */
+  /** `null` для безлимитных тарифов. */
   remaining_units: number | null
   enough_quota: boolean
 }
@@ -42,7 +42,7 @@ export interface DocumentStatusResponse {
   progress: number
   error_code: TranslationErrorCode | null
   error_message: string | null
-  /** Cleaned user file name; `null` for jobs created before names were stored. */
+  /** Очищенное имя файла пользователя; `null` у задач, созданных до того, как имена начали сохранять. */
   file_name: string | null
   glossary_term_count: number | null
 }
@@ -60,7 +60,7 @@ export interface DocumentFeedbackResponse {
   updated_at: ISO8601DateTime
 }
 
-/** `data` of the `job` event in GET /api/documents/events. */
+/** `data` события `job` в GET /api/documents/events. */
 export interface DocumentJobEvent {
   job_id: UUID
   status: TranslationStatus

@@ -23,7 +23,7 @@ function getReturnPath(state: unknown) {
 function getLoginErrorMessage(error: unknown, t: T) {
   if (error instanceof ApiClientError) {
     if (error.status === 401) return t('error.invalidCredentials')
-    // An administrator blocked the account: the password was correct.
+    // Администратор заблокировал аккаунт: пароль при этом был верным.
     if (error.status === 403) return t('error.accountBlocked')
     if (error.status === 429) {
       return error.retryAfterSeconds

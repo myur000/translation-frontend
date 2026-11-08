@@ -18,7 +18,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [accessNotice, setAccessNotice] = useState('')
 
   useEffect(() => {
-    // Migrate an existing valid access token once, then keep all JWTs in memory.
+    // Однократно переносим существующий действующий access-токен, дальше все JWT живут только в памяти.
     clearAuthSession()
     const disconnect = controller.connect()
     const removeRecovery = apiClient.setSessionRecovery(controller)

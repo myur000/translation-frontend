@@ -6,7 +6,7 @@ import styles from './DocumentActionsMenu.module.css'
 export interface DocumentAction {
   id: string
   label: string
-  /** Shown as a tooltip when the action is disabled. */
+  /** Подсказка, которая показывается, когда действие недоступно. */
   disabledReason?: string
   danger?: boolean
   onSelect: () => void
@@ -14,20 +14,20 @@ export interface DocumentAction {
 
 interface DocumentActionsMenuProps {
   actions: DocumentAction[]
-  /** Accessible name of the trigger; defaults to "Document actions". */
+  /** Доступное имя кнопки; по умолчанию «Действия с документом». */
   label?: string
-  /** Extra classes for the root, e.g. to show the trigger only on hover. */
+  /** Дополнительные классы корня, например чтобы показывать кнопку только при наведении. */
   className?: string
-  /** `quiet` — borderless trigger for dense lists. */
+  /** `quiet` — кнопка без рамки для плотных списков. */
   variant?: 'default' | 'quiet'
   /**
-   * Render the menu at the page level with fixed positioning. Needed inside
-   * scrolling containers (the sidebar list), which would clip it.
+   * Отрисовывать меню на уровне страницы с фиксированным позиционированием.
+   * Нужно внутри прокручиваемых контейнеров (список в боковой панели), которые бы его обрезали.
    */
   portal?: boolean
-  /** Trigger icon: "⋯" for document actions, "+" for adding. */
+  /** Иконка кнопки: «⋯» для действий с документом, «+» для добавления. */
   icon?: 'more' | 'plus'
-  /** Which trigger edge the menu lines up with. */
+  /** По какому краю кнопки выравнивается меню. */
   align?: 'start' | 'end'
 }
 
@@ -46,7 +46,7 @@ function fixedMenuPosition(trigger: DOMRect, itemCount: number, align: 'start' |
   }
 }
 
-/** "⋯" menu for less frequent document actions (WAI-ARIA menu button). */
+/** Меню «⋯» для редких действий с документом (кнопка меню по WAI-ARIA). */
 export function DocumentActionsMenu({
   actions,
   label,
@@ -83,7 +83,7 @@ export function DocumentActionsMenu({
   }
 
   const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    // Disabled items stay out of arrow navigation but keep their tooltip.
+    // Недоступные пункты пропускаются при навигации стрелками, но сохраняют подсказку.
     const enabled = itemRefs.current.filter((item): item is HTMLButtonElement =>
       Boolean(item && item.getAttribute('aria-disabled') !== 'true'))
     const index = enabled.indexOf(window.document.activeElement as HTMLButtonElement)
@@ -111,7 +111,7 @@ export function DocumentActionsMenu({
         aria-label={name}
         title={name}
         onClick={(event) => {
-          // Inside a list item the click must not also select the item.
+          // Внутри элемента списка клик не должен заодно выбирать этот элемент.
           event.stopPropagation()
           if (!isOpen && portal) {
             setMenuStyle(fixedMenuPosition(event.currentTarget.getBoundingClientRect(), actions.length, align))

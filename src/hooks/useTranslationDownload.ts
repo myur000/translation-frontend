@@ -54,7 +54,7 @@ export function useTranslationDownload(document: DocumentItem) {
         showNotice(t('workspace.downloadEmpty'))
         return
       }
-      // A misconfigured proxy must not save an HTML page or JSON error as a book.
+      // Неверно настроенный прокси не должен сохранить HTML-страницу или JSON-ошибку как книгу.
       const mimeType = result.contentType?.split(';')[0].trim().toLowerCase()
       if (mimeType === 'text/html' || mimeType === 'application/json' || mimeType?.endsWith('+json')) {
         showNotice(t('workspace.downloadInvalidResponse'))

@@ -3,7 +3,7 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import type { Plugin } from 'vite'
 
-// Keep fonts/decoders on our origin; document viewing never needs a public CDN.
+// Шрифты и декодеры раздаём со своего домена: для просмотра документов публичный CDN не нужен.
 export function pdfAssets(): Plugin {
   const require = createRequire(import.meta.url)
   const root = dirname(require.resolve('pdfjs-dist/package.json'))

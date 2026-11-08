@@ -10,7 +10,7 @@
   width: min(720px, 100%);
 }
 
-/* A book-like serif for the greeting; the interface stays sans-serif. */
+/* Книжный шрифт с засечками для приветствия; интерфейс остаётся без засечек. */
 .title {
   display: flex;
   align-items: center;
@@ -50,7 +50,7 @@
   border-style: dashed;
 }
 
-/* The label opens the file picker natively; the input stays reachable by keyboard. */
+/* Label открывает выбор файла средствами браузера; input остаётся доступным с клавиатуры. */
 .dropzone {
   min-height: 150px;
   display: flex;

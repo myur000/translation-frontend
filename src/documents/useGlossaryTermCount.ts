@@ -8,8 +8,8 @@ interface Count {
 }
 
 /**
- * Number of the user's terms for a language pair, so the glossary option is
- * offered only when it would change something. `null` while unknown.
+ * Количество терминов пользователя для языковой пары, чтобы опцию глоссария
+ * предлагать только тогда, когда она что-то изменит. `null`, пока неизвестно.
  */
 export function useGlossaryTermCount(
   sourceLanguage: string,
@@ -32,7 +32,7 @@ export function useGlossaryTermCount(
         if (!controller.signal.aborted) setCount({ key, value: response.total_elements })
       },
       () => {
-        // Optional hint: without it the glossary option simply stays hidden.
+        // Необязательная подсказка: без неё опция глоссария просто остаётся скрытой.
         if (!controller.signal.aborted) setCount({ key, value: 0 })
       },
     )

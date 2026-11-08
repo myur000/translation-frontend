@@ -1,4 +1,4 @@
-// Percentage points per normalized pixel. Keep trackpad micro-deltas intact.
+// Процентные пункты на нормализованный пиксель. Микроприращения тачпада сохраняем как есть.
 export const GESTURE_ZOOM_SENSITIVITY = 0.1
 export const MAX_GESTURE_ZOOM_STEP = 5
 export const GESTURE_IDLE_MS = 180

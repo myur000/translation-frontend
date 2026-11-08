@@ -5,19 +5,19 @@ import { API_ENDPOINTS } from '../api/endpoints.ts'
 import { readServerSentEvents } from '../api/sse.ts'
 
 /**
- * - `connecting` — opening or reopening the stream;
- * - `live` — `ready` received, events arrive;
- * - `unavailable` — the server has no stream (404) or refuses another
- *   one (429); status polling stays the only source until reload.
+ * - `connecting` — поток открывается или переоткрывается;
+ * - `live` — получено `ready`, события приходят;
+ * - `unavailable` — у сервера нет потока (404) или он отказывает в ещё одном (429);
+ *   до перезагрузки единственным источником остаётся опрос статуса.
  */
 export type DocumentEventsState = 'idle' | 'connecting' | 'live' | 'unavailable'
 
 interface Options {
   accessToken: string | null
-  /** Keep a stream only while there is something to watch: the account has a limit of 5. */
+  /** Держим поток, только пока есть что отслеживать: у аккаунта лимит в 5 потоков. */
   enabled: boolean
   onJob: (event: DocumentJobEvent) => void
-  /** After `ready` and `resync`: events may have been missed, re-read the statuses. */
+  /** После `ready` и `resync` события могли потеряться — перечитываем статусы. */
   onResync: () => void
 }
 
@@ -46,11 +46,10 @@ const wait = (ms: number, signal: AbortSignal) => new Promise<void>((resolve) =>
 })
 
 /**
- * Document status updates over Server-Sent Events (GET /documents/events).
- * EventSource cannot send the Authorization header, so the stream is read
- * through fetch. The server closes it when the access token expires (and
- * about once a minute in production); that is normal and the stream is
- * reopened with the current token.
+ * Обновления статусов документов через Server-Sent Events (GET /documents/events).
+ * EventSource не умеет передавать заголовок Authorization, поэтому поток читается
+ * через fetch. Сервер закрывает его, когда истекает access-токен (и примерно раз
+ * в минуту в продакшене); это нормально, и поток переоткрывается с текущим токеном.
  */
 export function useDocumentEvents({ accessToken, enabled, onJob, onResync }: Options) {
   const [state, setState] = useState<DocumentEventsState>('idle')
@@ -91,7 +90,7 @@ export function useDocumentEvents({ accessToken, enabled, onJob, onResync }: Opt
               if (job) latest.current.onJob(job)
             }
           }, signal)
-          // Closed by the server: reopen promptly.
+          // Закрыт сервером: быстро переоткрываем.
           if (!signal.aborted) setState('connecting')
           await wait(RECONNECT_DELAY_MS, signal)
         } catch (error) {
@@ -101,8 +100,8 @@ export function useDocumentEvents({ accessToken, enabled, onJob, onResync }: Opt
               setUnavailable(true)
               return
             }
-            // 401 after the client's own refresh: the session is over and
-            // the auth layer is already signing out.
+            // 401 после собственного продления клиента: сессия закончилась,
+            // и слой авторизации уже выполняет выход.
             if (error.status === 401 || error.status === 403) return
           }
           failures += 1

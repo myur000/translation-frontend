@@ -8,8 +8,8 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), pdfAssets()],
-    // Prebundle lazy viewer engines up front: first opening DOCX must not cause
-    // a Vite dependency-discovery reload and discard locally selected files.
+    // Заранее собираем ленивые движки просмотра: первое открытие DOCX не должно вызывать
+    // перезагрузку Vite из-за обнаружения зависимостей и терять выбранные локально файлы.
     optimizeDeps: { include: ['pdfjs-dist', 'mammoth', 'dompurify'] },
     server: {
       port: 3000,

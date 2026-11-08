@@ -27,7 +27,7 @@ export function ProfileForm({ profile }: { profile: ProfileResponse }) {
   const dirty = name !== baseline
   const disabled = isSaving || isMutating
 
-  // Refresh a clean form, but never overwrite a draft with a background response.
+  // Обновляем нетронутую форму, но никогда не затираем черновик фоновым ответом.
   if (sourceProfile !== profile) {
     setSourceProfile(profile)
     if (!dirty && !isSaving) {

@@ -5,8 +5,8 @@ import { readBlob } from './readBlob.ts'
 export function sanitizeDocumentHtml(html: string) {
   const template = document.createElement('template')
   template.innerHTML = html
-  // DOMPurify allows some image data URIs independently of ALLOWED_URI_REGEXP.
-  // Apply our raster-only policy in inert markup, then sanitize as the last step.
+  // DOMPurify пропускает некоторые data URI изображений независимо от ALLOWED_URI_REGEXP.
+  // Сначала применяем свою политику «только растр» к инертной разметке, санитизация — последним шагом.
   for (const image of template.content.querySelectorAll('img')) {
     if (!/^data:image\/(?:png|jpeg|gif|webp);base64,[a-z0-9+/=\s]+$/i.test(image.getAttribute('src') ?? '')) image.removeAttribute('src')
   }

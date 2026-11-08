@@ -18,8 +18,8 @@ export function register(
   request: RegisterRequest,
   options: ApiCallOptions = {},
 ) {
-  // 202 without a body for both new and already registered emails: the
-  // backend does not reveal whether the address is taken.
+  // 202 без тела и для нового, и для уже зарегистрированного email:
+  // бэкенд не раскрывает, занят ли адрес.
   return apiClient.request<void>(API_ENDPOINTS.auth.register, {
     method: 'POST',
     json: request,

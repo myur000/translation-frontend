@@ -74,7 +74,7 @@ function PdfPage({ pdf, number, width, zoom, ratio, naturalWidth, sizes, viewpor
         textRef.current.replaceChildren()
         textLayer = new Layer({ textContentSource: page.streamTextContent(),
           container: textRef.current, viewport: page.getViewport({ scale }) })
-        // A text-layer failure must not hide an otherwise rendered PDF page.
+        // Сбой текстового слоя не должен скрывать в остальном отрисованную страницу PDF.
         await textLayer.render().catch(() => {})
       } catch {
         if (!cancelled) setErrorKey(key)

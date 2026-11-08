@@ -1,15 +1,15 @@
 import { useCallback, useState } from 'react'
 
 /**
- * Height of an element that may change size (a toolbar that wraps) or
- * disappear (fullscreen). Returns a callback ref and the current height in
- * pixels; 0 while the element is not mounted.
+ * Высота элемента, который может менять размер (переносящаяся панель) или
+ * исчезать (полноэкранный режим). Возвращает callback-ref и текущую высоту
+ * в пикселях; 0, пока элемент не смонтирован.
  */
 export function useElementHeight<T extends HTMLElement>() {
   const [height, setHeight] = useState(0)
 
-  // React 19: when a callback ref returns a cleanup, React calls that cleanup
-  // on detach instead of calling the ref with null.
+  // React 19: если callback-ref возвращает функцию очистки, при отключении React
+  // вызывает её, а не сам ref с null.
   const ref = useCallback((element: T | null) => {
     if (!element) return
     setHeight(element.getBoundingClientRect().height)

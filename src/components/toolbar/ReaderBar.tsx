@@ -16,7 +16,7 @@ interface ReaderBarProps {
   onToggleDualPanelFullscreen: () => void
 }
 
-/** Reading controls under the documents, as in a PDF reader. */
+/** Элементы управления чтением под документами, как в PDF-читалке. */
 export function ReaderBar(props: ReaderBarProps) {
   const { t } = useTranslation()
   const { currentPage, pageCount } = props

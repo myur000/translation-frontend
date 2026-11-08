@@ -1,6 +1,6 @@
 .sidebar {
-  /* Dark in both themes. Re-pointing the shared tokens makes nested
-     components (user menu, badges, links) follow without own overrides. */
+  /* Тёмная в обеих темах. Переопределение общих токенов заставляет вложенные
+     компоненты (меню пользователя, бейджи, ссылки) следовать без своих правил. */
   --color-bg: var(--sidebar-hover);
   --color-surface: #12233a;
   --color-surface-subtle: var(--sidebar-hover);
@@ -157,7 +157,7 @@
   position: relative;
 }
 
-/* Shown on hover or keyboard focus, and kept while its menu is open. */
+/* Показывается при наведении или фокусе с клавиатуры и остаётся, пока открыто меню. */
 .rowActions {
   position: absolute;
   top: 50%;
@@ -202,7 +202,7 @@
   background: var(--sidebar-active);
 }
 
-/* Accent bar on the active document, so the selection reads without color alone. */
+/* Полоса-акцент у активного документа, чтобы выбор читался не только цветом. */
 .active::before {
   position: absolute;
   top: 10px;
@@ -236,7 +236,7 @@
 
 .documentInfo {
   min-width: 0;
-  /* Room for the "⋯" button so it never covers the name. */
+  /* Место под кнопку «⋯», чтобы она никогда не закрывала название. */
   padding-right: 24px;
   display: flex;
   flex-direction: column;

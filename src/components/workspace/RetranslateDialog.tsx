@@ -38,7 +38,7 @@ function errorMessage(error: unknown, t: T) {
   return error.details?.message || t('retranslate.failed')
 }
 
-/** First popular language that is neither the source nor the current target. */
+/** Первый популярный язык, который не совпадает ни с оригиналом, ни с текущим языком перевода. */
 function suggestTarget(source: string, current: string) {
   return POPULAR_LANGUAGES.find((code) => code !== source && code !== current) ?? current
 }
@@ -54,8 +54,8 @@ export function RetranslateDialog({ document, onSubmit, onClose }: RetranslateDi
   const [useGlossary, setUseGlossary] = useState(false)
   const [isBusy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // One key per distinct request: retrying the same request after a lost
-  // response reuses it, a changed request must not (the backend answers 422).
+  // Один ключ на каждый отличающийся запрос: повтор того же запроса после потерянного
+  // ответа использует его снова, изменённый запрос — нет (бэкенд ответит 422).
   const keys = useRef(new Map<string, string>())
   const termCount = useGlossaryTermCount(sourceLanguage, targetLanguage)
   const isSameLanguage = targetLanguage === sourceLanguage

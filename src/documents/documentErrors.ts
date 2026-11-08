@@ -1,9 +1,9 @@
 import { ApiClientError } from '../api/client.ts'
 
 /**
- * The backend answers 429 both for an exhausted quota and for rate limiting
- * and has no machine-readable code to tell them apart, so the quota case is
- * recognised by its message (UsageLimitExceededException).
+ * Бэкенд отвечает 429 и при исчерпанной квоте, и при ограничении частоты запросов,
+ * а машиночитаемого кода, чтобы их различить, нет, поэтому квоту узнаём
+ * по тексту сообщения (UsageLimitExceededException).
  */
 const QUOTA_EXCEEDED_MESSAGE = 'Лимит использования функции на текущий период исчерпан'
 

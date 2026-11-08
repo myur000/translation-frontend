@@ -1,4 +1,4 @@
-/** `auto` — offered after a translation finished; `manual` — asked for from the menu. */
+/** `auto` — предложено после завершения перевода; `manual` — вызвано из меню. */
 export type FeedbackPromptMode = 'auto' | 'manual'
 
 const DISMISSED_KEY = 'parallel.feedback-prompt.dismissed.v1'
@@ -13,7 +13,7 @@ function readDismissed(): string[] {
   }
 }
 
-/** The automatic prompt is offered once per job; "Not now" is remembered. */
+/** Автоматическое предложение показывается один раз на задачу; «Не сейчас» запоминается. */
 export function wasFeedbackPromptDismissed(jobId: string) {
   return readDismissed().includes(jobId)
 }
@@ -23,6 +23,6 @@ export function rememberFeedbackPromptDismissed(jobId: string) {
     const next = [jobId, ...readDismissed().filter((item) => item !== jobId)].slice(0, MAX_REMEMBERED)
     localStorage.setItem(DISMISSED_KEY, JSON.stringify(next))
   } catch {
-    // Storage may be unavailable (private mode); the prompt then simply may reappear.
+    // Хранилище может быть недоступно (приватный режим); тогда предложение просто может появиться снова.
   }
 }

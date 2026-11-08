@@ -46,7 +46,7 @@
   gap: 36px;
   padding: clamp(40px, 6vw, 88px);
   overflow: hidden;
-  /* Brand panel: the same in both themes, like the palette reference. */
+  /* Панель бренда: одинаковая в обеих темах, как в референсе палитры. */
   color: var(--palette-ice);
   background:
     radial-gradient(120% 90% at 50% 30%, #536e89 0%, var(--palette-navy) 48%, var(--palette-ink) 100%);

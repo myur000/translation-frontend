@@ -7,7 +7,7 @@ import { abortable } from '../api/abortable.ts'
 import { useProfileAvatar } from './useProfileAvatar.ts'
 import { ProfileContext, type ProfileContextValue, type ProfileLoadState } from './ProfileContext.ts'
 
-/** The authenticated layout is keyed by owner. Profile data never goes to storage. */
+/** Авторизованная раскладка имеет ключ по владельцу. Данные профиля в хранилище не попадают. */
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth()
   const owner = session?.email ?? null
@@ -93,7 +93,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     await runWrite((accessToken, signal) => file
       ? uploadAvatar(file, { accessToken, signal })
       : deleteAvatar({ accessToken, signal }), () => {
-      // 204 confirms the mutation; do not fabricate names or timestamps.
+      // 204 подтверждает изменение; не выдумываем имена и отметки времени.
       setProfile((current) => current ? { ...current, has_avatar: file !== null } : current)
       setAvatarRevision((current) => current + 1)
     }, options)

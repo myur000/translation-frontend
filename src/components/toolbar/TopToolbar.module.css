@@ -1,7 +1,7 @@
 .toolbar {
   min-height: var(--toolbar-height);
-  /* Wraps by the space it actually has (sidebar and notes take part of the
-     window), so groups never overlap at any width. */
+  /* Переносится по реально доступному месту (часть окна занимают боковая панель
+     и заметки), поэтому группы не наезжают друг на друга ни при какой ширине. */
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -179,7 +179,7 @@
   transition: width 300ms ease;
 }
 
-/* Queued: no percentage yet, so the bar moves instead of showing 0%. */
+/* В очереди: процента ещё нет, поэтому полоса движется, а не показывает 0%. */
 .progressIndeterminate > span {
   width: 35%;
   animation: progress-slide 1.4s ease-in-out infinite;

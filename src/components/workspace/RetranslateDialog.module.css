@@ -1,7 +1,7 @@
 .dialog {
   width: min(440px, calc(100vw - 32px));
   padding: 24px;
-  /* The language list opens below its trigger and must not be clipped. */
+  /* Список языков открывается под кнопкой и не должен обрезаться. */
   overflow: visible;
   color: var(--color-text);
   background: var(--color-surface);

@@ -8,7 +8,7 @@ const initial = <T,>(): AccountResource<T> => ({ data: null, loading: true, fail
 const REQUEST_TIMEOUT_MS = 10_000
 const FOCUS_REFRESH_INTERVAL_MS = 30_000
 
-/** Mounted inside the authenticated, user-keyed layout; never persist account data. */
+/** Монтируется внутри авторизованной раскладки с ключом по пользователю; данные аккаунта никуда не сохраняются. */
 export function AccountProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth()
   const owner = session?.email ?? null
@@ -32,7 +32,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     const timeout = window.setTimeout(() => {
       controller.abort()
       if (disposed) return
-      // One successful endpoint must stay visible even when the other hangs.
+      // Успешный ответ одного эндпоинта остаётся на экране, даже если второй завис.
       setUsage((current) => current.loading ? { ...current, loading: false, failed: true } : current)
       setSubscription((current) => current.loading ? { ...current, loading: false, failed: true } : current)
     }, REQUEST_TIMEOUT_MS)

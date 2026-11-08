@@ -9,7 +9,7 @@ import { saveDownloadedFile, translationDownloadFileName } from '../documents/fi
 import { installBrowserSessionMock } from './browserSessionMock.ts'
 import { accountFixture } from './accountFixtures.ts'
 
-// Keep download tests independent of automatic preview requests/rendering.
+// Тесты скачивания не зависят от автоматических запросов и отрисовки превью.
 vi.mock('../hooks/useDocumentAssets.ts', () => ({ useDocumentAssets: () => ({
   original: { status: 'message', message: 'viewer.originalMissing' },
   translation: { status: 'message', message: 'viewer.translationPending' },
@@ -98,7 +98,7 @@ function renderWorkspace(
     throw new Error('Unexpected request: ' + url)
   })
   vi.stubGlobal('fetch', fetchMock)
-  // `/` is the home screen; open the first job's own page.
+  // `/` — главный экран; открываем собственную страницу первой задачи.
   const start = items.length ? `/documents/${items[0].job_id}` : '/'
   const rendered = render(<MemoryRouter initialEntries={[start]}><App /></MemoryRouter>)
   return { ...rendered, fetchMock, accessToken }
@@ -191,8 +191,8 @@ describe('translation download UI', () => {
     expect(files.createUrl).toHaveBeenCalledTimes(1)
   })
 
-  // Downloading is the main action only once the result exists; before that
-  // the toolbar offers translation or shows progress instead.
+  // Скачивание становится главным действием только когда результат есть; до этого
+  // панель предлагает перевод или показывает прогресс.
   it.each(['PENDING', 'PROCESSING', 'FAILED'])('offers no download for %s jobs', async (status) => {
     const handler = vi.fn(async () => fileResponse())
     renderWorkspace(handler, [historyItem(jobId, status)])

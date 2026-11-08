@@ -1,17 +1,17 @@
 let localDocumentSequence = 0
 
-/** Id of a local draft that has no job yet; unique within the page. */
+/** Id локального черновика без задачи; уникален в пределах страницы. */
 export function createLocalDocumentId() {
   localDocumentSequence += 1
   return `local-${Date.now()}-${localDocumentSequence}`
 }
 
-/** Address of a translation job; the "translation ready" email links here. */
+/** Адрес задачи перевода; сюда ведёт письмо «перевод готов». */
 export const documentPath = (jobId: string) => `/documents/${encodeURIComponent(jobId)}`
 
-/** Address of a local draft; it lives only until the page is reloaded. */
+/** Адрес локального черновика; живёт только до перезагрузки страницы. */
 export const draftPath = (draftId: string) => `/drafts/${encodeURIComponent(draftId)}`
 
-/** Where a document opens: its job once uploaded, otherwise its draft. */
+/** Где открывается документ: после загрузки — его задача, иначе — черновик. */
 export const pathForDocument = (document: { id: string; jobId?: string }) =>
   document.jobId ? documentPath(document.jobId) : draftPath(document.id)

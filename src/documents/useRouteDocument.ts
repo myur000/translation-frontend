@@ -7,9 +7,9 @@ import { historyItemsToDocuments } from './documentHistory.ts'
 import { readDocumentMetadata } from './documentMetadataStorage.ts'
 
 /**
- * How the document route resolves against the loaded document list.
- * `draft-missing` — a `/drafts/:id` address whose local draft is gone
- * (drafts do not survive a reload).
+ * Как маршрут документа сопоставляется с загруженным списком документов.
+ * `draft-missing` — адрес `/drafts/:id`, локального черновика которого уже нет
+ * (черновики не переживают перезагрузку).
  */
 export type RouteDocumentState = 'none' | 'found' | 'loading' | 'missing' | 'error' | 'draft-missing'
 
@@ -20,12 +20,12 @@ interface Options {
   documents: readonly DocumentItem[]
   historyState: HistoryState
   session: { accessToken: string; email: string } | null
-  /** Called once with a document found beyond the first history page. */
+  /** Вызывается один раз с документом, найденным за пределами первой страницы истории. */
   onFound: (document: DocumentItem) => void
 }
 
 const HISTORY_PAGE_SIZE = 100
-/** Upper bound for the deep search: 20 pages × 100 jobs. */
+/** Верхняя граница глубокого поиска: 20 страниц × 100 задач. */
 const MAX_HISTORY_PAGES = 20
 
 interface Lookup {
@@ -34,10 +34,10 @@ interface Lookup {
 }
 
 /**
- * Resolves a document link (e.g. from the "translation ready" email). The
- * first history page is already in `documents`; an older job is confirmed via
- * its status and then located in later history pages, because the status
- * response does not carry languages or format.
+ * Разрешает ссылку на документ (например, из письма «перевод готов»).
+ * Первая страница истории уже есть в `documents`; более старая задача подтверждается
+ * по статусу и затем ищется на следующих страницах истории, потому что ответ
+ * статуса не содержит языков и формата.
  */
 export function useRouteDocument({
   jobId,
@@ -47,7 +47,7 @@ export function useRouteDocument({
   onFound,
 }: Options): RouteDocumentState {
   const [lookup, setLookup] = useState<Lookup | null>(null)
-  // A new callback identity must not restart an in-flight search.
+  // Новая ссылка на колбэк не должна перезапускать уже идущий поиск.
   const onFoundRef = useRef(onFound)
   useEffect(() => {
     onFoundRef.current = onFound
@@ -85,7 +85,7 @@ export function useRouteDocument({
         finish('missing')
       } catch (error) {
         if (controller.signal.aborted) return
-        // 404: unknown, someone else's or deleted by the owner.
+        // 404: неизвестна, чужая или удалена владельцем.
         finish(error instanceof ApiClientError && error.status === 404 ? 'missing' : 'error')
       }
     })()

@@ -254,10 +254,9 @@ export class ApiClient {
   }
 
   /**
-   * Opens a long-lived streaming response such as Server-Sent Events. The
-   * opening request gets the usual token preparation and one retry after 401;
-   * the stream itself cannot be replayed, so a closed stream is reopened by
-   * the caller.
+   * Открывает долгоживущий потоковый ответ, например Server-Sent Events.
+   * Открывающий запрос проходит обычную подготовку токена и один повтор после 401;
+   * сам поток повторить нельзя, поэтому закрытый поток заново открывает вызывающий код.
    */
   async requestStream(
     path: string,
@@ -293,13 +292,13 @@ export class ApiClient {
     if (token !== undefined) headers.set('Authorization', createBearerHeaders(token).Authorization)
     const response = await this.fetch(createUrl(this.baseUrl, path), { ...init, headers })
     if (response.status !== 401 || !recovery || !token || init.signal?.aborted) return { response, token }
-    // Streams cannot be replayed. JSON, multipart, Blob and download requests can.
+    // Потоки повторить нельзя. JSON, multipart, Blob и запросы на скачивание — можно.
     if (typeof ReadableStream !== 'undefined' && init.body instanceof ReadableStream) return { response, token }
     await response.body?.cancel()
     const refreshedToken = await recovery.refreshAccessToken(token)
     init.signal?.throwIfAborted()
     headers.set('Authorization', createBearerHeaders(refreshedToken).Authorization)
-    // Exactly one retry; a second 401 is terminal and never starts another refresh.
+    // Ровно один повтор; второй 401 окончательный и не запускает новое продление.
     return {
       response: await this.fetch(createUrl(this.baseUrl, path), { ...init, headers }),
       token: refreshedToken,

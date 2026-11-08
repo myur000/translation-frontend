@@ -25,7 +25,7 @@ function rememberDismissal(email: string) {
   try {
     sessionStorage.setItem(getDismissedBannerKey(email), 'true')
   } catch {
-    // The banner can still be dismissed in memory when storage is unavailable.
+    // Без хранилища баннер всё равно можно скрыть — до перезагрузки страницы.
   }
 }
 

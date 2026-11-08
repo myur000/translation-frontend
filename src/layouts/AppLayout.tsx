@@ -55,7 +55,7 @@ export type HistoryLoadState = 'loading' | 'ready' | 'error'
 
 export interface AppLayoutContextValue {
   activeDocument: DocumentItem | null
-  /** Resolution of `/documents/:jobId`; `none` on the plain workspace route. */
+  /** Результат разрешения `/documents/:jobId`; `none` на обычном маршруте рабочей области. */
   routeDocumentState: RouteDocumentState
   documents: DocumentItem[]
   historyState: HistoryLoadState
@@ -74,25 +74,25 @@ export interface AppLayoutContextValue {
     options?: { useGlossary?: boolean },
   ) => Promise<DocumentUploadResponse>
   /**
-   * Translates an uploaded document into another language from the source
-   * kept by the backend; resolves with the new job, which becomes active.
+   * Переводит загруженный документ на другой язык по исходному файлу на бэкенде;
+   * возвращает новую задачу, которая становится активной.
    */
   retranslateDocument: (
     documentId: string,
     request: { targetLanguage: LanguageCode; useGlossary: boolean; idempotencyKey: string },
   ) => Promise<DocumentUploadResponse>
-  /** Deletes the job on the backend (drafts only locally) and drops it from the list. */
+  /** Удаляет задачу на бэкенде (черновики — только локально) и убирает её из списка. */
   deleteDocument: (documentId: string) => Promise<void>
   /**
-   * Adds a local draft from a chosen file and opens it. Returns an error
-   * message for an unsupported or too large file, otherwise `null`.
+   * Добавляет локальный черновик из выбранного файла и открывает его. Возвращает текст
+   * ошибки для неподдерживаемого или слишком большого файла, иначе `null`.
    */
   prepareDocument: (file: File, languages?: { source: LanguageCode; target: LanguageCode }) => string | null
 }
 export type ExpandedPanel = 'original' | 'translation' | null
 
 const MAX_DOCUMENT_SIZE = 20 * 1024 * 1024
-/** With a live event stream, polling is only a safety net for missed events. */
+/** При живом потоке событий опрос — лишь страховка на случай пропущенных событий. */
 const POLLING_WITH_EVENTS_MS = 30_000
 const POLLING_WITHOUT_EVENTS_MS = 2_500
 const SUPPORTED_EXTENSIONS = new Set(['pdf', 'doc', 'docx'])
@@ -115,14 +115,14 @@ function AppLayoutContent() {
   const [isDualPanelFullscreen, setDualPanelFullscreen] = useState(false)
   const [fullscreenLocationKey, setFullscreenLocationKey] = useState(location.key)
   const sidebar = useResizableSidebar()
-  // The address is the single source of the open document: `/` is the home
-  // screen, uploaded jobs and local drafts each have their own path.
+  // Адрес — единственный источник открытого документа: `/` — главный экран,
+  // у загруженных задач и локальных черновиков свои пути.
   const routeJobId = useMatch('/documents/:jobId')?.params.jobId ?? null
   const routeDraftId = useMatch('/drafts/:draftId')?.params.draftId ?? null
   const isWorkspaceRoute = routeJobId !== null || routeDraftId !== null
 
-  // AppLayout survives navigation. React retries this render before committing
-  // children, so stale fullscreen state never reaches the new page.
+  // AppLayout переживает навигацию. React повторяет этот рендер до фиксации
+  // дочерних элементов, поэтому устаревший полноэкранный режим не попадает на новую страницу.
   if (fullscreenLocationKey !== location.key) {
     setFullscreenLocationKey(location.key)
     setExpandedPanel(null)
@@ -203,7 +203,7 @@ function AppLayoutContent() {
 
   const handleStatusUpdates = useCallback(
     (updates: TranslationStatusUpdate[]) => {
-      // Refresh once per completed/failed job; do not refresh on every progress tick.
+      // Обновляем один раз на каждую завершённую или упавшую задачу, а не на каждый шаг прогресса.
       const completed = updates.filter(({ response }) =>
         (response.status === 'DONE' || response.status === 'FAILED') &&
         !observedTerminalJobs.current.has(response.job_id))
@@ -286,7 +286,7 @@ function AppLayoutContent() {
     const partial: DocumentStatusResponse = {
       ...event, error_code: null, error_message: null, file_name: null, glossary_term_count: null,
     }
-    // The event carries no error text; read the full status once the job ends.
+    // В событии нет текста ошибки; полный статус читаем, когда задача закончилась.
     if ((event.status === 'DONE' || event.status === 'FAILED') && accessToken) {
       getTranslationStatus(event.job_id, { accessToken }).then(apply, () => apply(partial))
     } else {
@@ -360,7 +360,7 @@ function AppLayoutContent() {
   const handleSidebarUpload = (file: File) =>
     prepareDocument(file) ?? t('workspace.fileReady', { name: file.name })
 
-  /** Optional hint: unverified accounts (403) and failures simply show no estimate. */
+  /** Необязательная подсказка: неподтверждённые аккаунты (403) и сбои просто остаются без оценки. */
   const loadEstimate = async (documentId: string, file: File, accessToken: string) => {
     try {
       const response = await estimateDocument(file, { accessToken })
@@ -373,7 +373,7 @@ function AppLayoutContent() {
       setDocuments((current) => current.map((item) =>
         item.id === documentId && !item.jobId ? { ...item, estimate } : item))
     } catch {
-      // The upload validates the file again and reports real errors.
+      // Загрузка проверит файл ещё раз и сообщит о настоящих ошибках.
     }
   }
 
@@ -439,7 +439,7 @@ function AppLayoutContent() {
       )
 
       reloadAccount()
-      // Give the job its own address: a reload or a shared link reopens it.
+      // У задачи свой адрес: перезагрузка или отправленная ссылка снова её откроют.
       if (activeDocument?.id === documentId) {
         void navigate(documentPath(response.job_id), { replace: true })
       }
@@ -466,7 +466,7 @@ function AppLayoutContent() {
         { target_lang: targetLanguage, use_glossary: useGlossary || undefined },
         { accessToken: session.accessToken, idempotencyKey },
       )
-      // A repeated key returns the same job: never list it twice.
+      // Повторный ключ возвращает ту же задачу: никогда не показываем её дважды.
       const translated: DocumentItem = {
         id: response.job_id,
         name: document.name,
@@ -506,7 +506,7 @@ function AppLayoutContent() {
       try {
         await deleteDocumentRequest(document.jobId, { accessToken: session.accessToken })
       } catch (error) {
-        // 404: already deleted (another tab) or never ours — the list is stale either way.
+        // 404: уже удалена (в другой вкладке) или никогда не была нашей — список в любом случае устарел.
         if (!(error instanceof ApiClientError && error.status === 404)) throw error
       }
     }

@@ -14,9 +14,9 @@ import styles from './LanguagePicker.module.css'
 
 interface LanguagePickerProps {
   value: string
-  /** Accessible name of the control, e.g. "Source language". */
+  /** Доступное имя элемента, например «Язык оригинала». */
   label: string
-  /** Short visible prefix, e.g. "From". */
+  /** Короткий видимый префикс, например «Из». */
   prefix?: string
   disabled?: boolean
   onChange: (code: string) => void
@@ -31,13 +31,13 @@ interface PickerOption {
 
 type PopoverAlign = 'start' | 'end'
 
-/** Keep in sync with `.popover` width in LanguagePicker.module.css. */
+/** Держать в соответствии с шириной `.popover` в LanguagePicker.module.css. */
 const POPOVER_WIDTH = 300
 const VIEWPORT_GUTTER = 16
 
 /**
- * Opens towards the side with room: a picker near the right edge would
- * otherwise overflow the viewport and scroll the whole workspace sideways.
+ * Открывается в ту сторону, где есть место: иначе список у правого края
+ * вылез бы за окно и сдвинул всю рабочую область вбок.
  */
 function popoverAlignFor(trigger: DOMRect, viewportWidth: number): PopoverAlign {
   const fitsRight = trigger.left + POPOVER_WIDTH <= viewportWidth - VIEWPORT_GUTTER
@@ -122,8 +122,8 @@ export function LanguagePicker({
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [isOpen])
 
-  // Focus synchronously on open so fast typing never lands on the trigger.
-  // preventScroll: focusing must not scroll overflow containers around us.
+  // Фокус ставим синхронно при открытии, чтобы быстрый ввод не попал в кнопку.
+  // preventScroll: фокусировка не должна прокручивать окружающие контейнеры.
   useLayoutEffect(() => {
     if (isOpen) searchRef.current?.focus({ preventScroll: true })
   }, [isOpen])

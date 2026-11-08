@@ -27,7 +27,7 @@ interface UseTranslationStatusPollingOptions {
   intervalMs?: number
   stallTimeoutMs?: number
   requestTimeoutMs?: number
-  /** Changing it re-reads all statuses immediately (e.g. after an SSE `resync`). */
+  /** Его изменение сразу перечитывает все статусы (например, после SSE `resync`). */
   refreshKey?: number
 }
 interface Observation {
@@ -39,7 +39,7 @@ interface Observation {
 }
 const signature = (status: TranslationStatus, progress: number) => `${status}:${progress}`
 
-// Bound each status check even if an underlying promise fails to honor abort.
+// Ограничиваем каждую проверку статуса, даже если вложенный промис не учитывает abort.
 async function requestStatus(jobId: string, token: string, parent: AbortSignal, timeoutMs: number) {
   const controller = new AbortController()
   const cancel = () => controller.abort()
@@ -125,7 +125,7 @@ export function useTranslationStatusPolling({
         const results = await Promise.allSettled(currentJobs.map(async (job) => {
           const response = await requestStatus(job.jobId, accessToken, controller.signal, requestTimeoutMs)
           if (controller.signal.aborted) return null
-          // Do not apply late responses to a different/replaced/paused job.
+          // Не применяем запоздавшие ответы к другой, заменённой или приостановленной задаче.
           const observation = observationsRef.current.get(job.documentId)
           if (!observation || observation.jobId !== job.jobId || observation.paused) return null
           if (response.job_id !== job.jobId || !['PENDING', 'PROCESSING', 'DONE', 'FAILED'].includes(response.status) ||

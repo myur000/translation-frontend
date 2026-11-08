@@ -1,6 +1,6 @@
 /**
- * jsdom has no modal <dialog> support. Install a minimal showModal/close
- * for a test block; the returned function restores the originals.
+ * В jsdom нет модального <dialog>. Ставит минимальные showModal/close
+ * на блок тестов; возвращённая функция восстанавливает оригиналы.
  */
 export function installDialogPolyfill() {
   const prototype = HTMLDialogElement.prototype

@@ -44,7 +44,7 @@ await context.route((url) => url.pathname.startsWith('/api/'), async (route) => 
     if (request.method() === 'PUT') {
       assert.ok(request.headers()['content-type'].startsWith('multipart/form-data; boundary='))
       assert.ok(request.postDataBuffer().includes(Buffer.from('name="file"')))
-      // Backend normalizes bytes; the fixture represents the returned canonical image.
+      // Бэкенд нормализует байты; фикстура изображает уже приведённое изображение из ответа.
       stored = { ...stored, has_avatar: true }
       return route.fulfill({ status: 204, body: '' })
     }
@@ -119,7 +119,7 @@ try {
   assert.equal(stored.email, 'profile@example.com')
   assert.ok((await page.getByRole('button', { name: 'Открыть меню пользователя' }).textContent()).includes('Кирилл'))
   await mkdir('test-results', { recursive: true })
-  // Generate only an isolated test image, never upload to the real backend.
+  // Генерируем только изолированное тестовое изображение и никогда не загружаем его на настоящий бэкенд.
   const imageData = await page.evaluate(() => {
     const canvas = document.createElement('canvas')
     canvas.width = canvas.height = 80

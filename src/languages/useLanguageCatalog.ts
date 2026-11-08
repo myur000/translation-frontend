@@ -8,8 +8,8 @@ import {
 } from './languageCatalog.ts'
 
 /**
- * Language catalog shared by every picker on the page. Loading is explicit
- * (`load`), so screens that only show labels do not request it.
+ * Каталог языков, общий для всех списков на странице. Загрузка явная (`load`),
+ * поэтому экраны, которые только показывают подписи, его не запрашивают.
  */
 export function useLanguageCatalog() {
   const catalog = useSyncExternalStore(

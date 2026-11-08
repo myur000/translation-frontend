@@ -8,7 +8,7 @@ import { resetLanguageCatalogForTests } from '../languages/languageCatalog.ts'
 import { installBrowserSessionMock } from './browserSessionMock.ts'
 import { installDialogPolyfill } from './dialogPolyfill.ts'
 
-// These tests exercise layout/upload/navigation, not the PDF rendering engine.
+// Эти тесты проверяют раскладку, загрузку и навигацию, а не движок отрисовки PDF.
 vi.mock('../viewer/pdfEngine.ts', () => ({ openPdf: async () => { throw new Error('Invalid test PDF') } }))
 
 afterEach(() => {
@@ -172,7 +172,7 @@ function seedDocumentMetadata() {
   )
 }
 
-/** `/` is the home screen; workspace tests open the first history document. */
+/** `/` — главный экран; тесты рабочей области открывают первый документ из истории. */
 const FIRST_DOCUMENT = '/documents/00000000-0000-0000-0000-000000000101'
 
 function renderApp(path = FIRST_DOCUMENT, emailVerified = true) {
@@ -188,7 +188,7 @@ function renderApp(path = FIRST_DOCUMENT, emailVerified = true) {
   )
 }
 
-/** Adds a local draft: only drafts (and failed jobs) offer language pickers. */
+/** Добавляет локальный черновик: выбор языков есть только у черновиков (и неудачных задач). */
 async function addDraft(user: ReturnType<typeof userEvent.setup>, name = 'draft.pdf') {
   await screen.findByRole('button', { name: /^english_course_book\.pdf/ })
   const input = document.querySelector<HTMLInputElement>('input[type="file"]')
@@ -197,7 +197,7 @@ async function addDraft(user: ReturnType<typeof userEvent.setup>, name = 'draft.
 
 const sidebarList = () => screen.getByRole('navigation', { name: 'Мои книги' })
 
-/** Opens the "⋯" document menu in the toolbar. */
+/** Открывает меню документа «⋯» в панели. */
 async function openActions(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: 'Действия с документом' }))
   return screen.getByRole('menu', { name: 'Действия с документом' })
@@ -222,8 +222,8 @@ function mockBookViewportGeometry() {
 
 async function findWorkspaceRegion(name: string) {
   await screen.findByRole('region', { name })
-  // History mounts the workspace asynchronously. DOM availability alone does
-  // not guarantee that passive keyboard listeners have been committed.
+  // История монтирует рабочую область асинхронно. Одного наличия в DOM мало,
+  // чтобы пассивные обработчики клавиатуры уже были зафиксированы.
   await act(async () => {})
   return screen.getByRole('region', { name })
 }
@@ -289,7 +289,7 @@ describe('workspace interactions', () => {
     expect(original.scrollWidth - original.clientWidth).toBe(0)
     expect(original.scrollLeft).toBe(0)
     fireEvent.scroll(original)
-    // Vertical reading must not erase a horizontal bookmark while the page fits.
+    // Вертикальное чтение не должно стирать горизонтальную закладку, пока страница помещается.
     original.scrollTop = 400
     fireEvent.scroll(original)
 
@@ -424,7 +424,7 @@ describe('workspace interactions', () => {
     expect(screen.getByRole('region', { name: 'Оригинал' })).toBeTruthy()
     expect(screen.getByRole('region', { name: 'Перевод' })).toBeTruthy()
 
-    // Fullscreen can be enabled again after returning to the workspace.
+    // Полноэкранный режим снова включается после возврата в рабочую область.
     fireEvent.keyDown(window, { key: 'f' })
     expect(screen.queryByText('Мои книги')).toBeNull()
     fireEvent.keyDown(window, { key: 'Escape' })
@@ -717,7 +717,7 @@ describe('workspace interactions', () => {
       await screen.findByRole('button', { name: /^research_notes\.doc/i }),
     )
 
-    // research_notes.doc predates NLLB codes: legacy `de`/`ru` map to the catalog.
+    // research_notes.doc старше кодов NLLB: старые `de`/`ru` сопоставляются с каталогом.
     expect(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }).getAttribute('lang')).toBe('de-Latn')
     expect(screen.getByRole('region', { name: 'Прокрутка панели «Перевод»' }).getAttribute('lang')).toBe('ru-Cyrl')
     expect(screen.getByText(/Языки перевода/).parentElement?.textContent).toMatch(/Немецкий.*Русский/)
@@ -842,7 +842,7 @@ describe('workspace interactions', () => {
     const user = userEvent.setup()
     renderApp()
     await findWorkspaceRegion('Оригинал')
-    // Typing into a field must not switch views.
+    // Ввод в поле не должен переключать виды.
     const field = document.createElement('input')
     document.body.append(field)
     fireEvent.keyDown(field, { key: 'f', code: 'KeyF' })
@@ -954,7 +954,7 @@ describe('workspace interactions', () => {
     )
     const listbox = screen.getByRole('listbox', { name: 'Язык перевода' })
     expect(await within(listbox).findByText('Все языки · 5')).toBeTruthy()
-    // Popular languages are repeated in the full alphabetical list.
+    // Популярные языки повторяются в полном алфавитном списке.
     expect(within(listbox).getAllByRole('option', { name: 'Китайский (упрощённый)' })).toHaveLength(2)
 
     const search = screen.getByRole('combobox', { name: 'Найти язык' })
@@ -1206,7 +1206,7 @@ describe('workspace interactions', () => {
         'Готов',
       )
     })
-    // A finished translation makes downloading the main action.
+    // Готовый перевод делает скачивание главным действием.
     expect(screen.getByRole('button', { name: 'Скачать' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Перевести' })).toBeNull()
     expect(
@@ -1253,7 +1253,7 @@ const apiErrorBody = (status: number, message: string) => ({
 
 type ApiOverride = (init?: RequestInit) => Response
 
-/** Default API plus per-URL overrides; returns the router to inspect the URL. */
+/** API по умолчанию плюс подмены по URL; возвращает роутер, чтобы проверить адрес. */
 function renderDocumentRoute(path: string, overrides: Record<string, ApiOverride> = {}) {
   seedAuthenticatedSession()
   seedDocumentMetadata()
@@ -1336,7 +1336,7 @@ describe('document route', () => {
 describe('document actions', () => {
   let restoreDialog: () => void
   beforeEach(() => { restoreDialog = installDialogPolyfill() })
-  // Unmount open dialogs before their methods disappear.
+  // Размонтируем открытые диалоги до того, как исчезнут их методы.
   afterEach(() => {
     cleanup()
     restoreDialog()
@@ -1452,7 +1452,7 @@ describe('document actions', () => {
     renderApp()
     await addDraft(user)
 
-    // A draft has nothing to translate again or rate yet.
+    // Черновик ещё нечего переводить заново или оценивать.
     expect(screen.queryByRole('button', { name: 'Действия с документом' })).toBeNull()
     await user.click(within(await openBookActions(user, 'draft.pdf'))
       .getByRole('menuitem', { name: 'Убрать черновик' }))
@@ -1533,7 +1533,7 @@ describe('cost, glossary and rating', () => {
         items: [{ ...historyItems[0], status: 'PROCESSING', progress: 90 }],
         page: 0, size: 100, total_elements: 1, total_pages: 1, first: true, last: true,
       }),
-      // The first status check reports the job as finished.
+      // Первая проверка статуса сообщает, что задача завершена.
       [`/api/documents/${firstJob}/status`]: () => jsonResponse({
         job_id: firstJob, status: 'DONE', progress: 100, error_code: null, error_message: null,
         file_name: null, glossary_term_count: null,
@@ -1605,7 +1605,7 @@ describe('document status events', () => {
     file_name: 'Книга.pdf', glossary_term_count: null,
   })
 
-  /** An open text/event-stream the test writes to. */
+  /** Открытый поток text/event-stream, в который пишет тест. */
   function eventStream() {
     const encoder = new TextEncoder()
     let controller!: ReadableStreamDefaultController<Uint8Array>
@@ -1619,7 +1619,7 @@ describe('document status events', () => {
 
   it('applies status events from the stream', async () => {
     const stream = eventStream()
-    // The server state the status endpoint reports; events announce its changes.
+    // Состояние сервера, которое возвращает эндпоинт статуса; события сообщают о его изменениях.
     let server: [string, number] = ['PROCESSING', 10]
     renderDocumentRoute(`/documents/${job}`, {
       '/api/documents/history?page=0&size=100': processingHistory,
@@ -1694,7 +1694,7 @@ describe('home screen', () => {
     const { router } = renderDocumentRoute('/')
     await screen.findByRole('heading', { name: 'Что полистаем сегодня?' })
 
-    // Drop bypasses the input's accept filter, as a real drag does.
+    // Перетаскивание обходит фильтр accept у input, как и настоящее перетаскивание.
     fireEvent.drop(screen.getByRole('heading', { name: 'Что полистаем сегодня?' }), {
       dataTransfer: { files: [new File(['x'], 'notes.txt', { type: 'text/plain' })], types: ['Files'] },
     })

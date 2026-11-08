@@ -25,6 +25,6 @@ export function ProtectedRoute() {
     return <Navigate to="/login" replace state={returnState} />
   }
 
-  // Switching accounts in another tab must not retain the previous user's workspace.
+  // Смена аккаунта в другой вкладке не должна оставлять рабочую область предыдущего пользователя.
   return <Outlet key={session?.email} />
 }

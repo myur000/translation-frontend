@@ -19,7 +19,7 @@ function readFileName(contentDisposition: string | null) {
     try {
       return decodeURIComponent(encodedMatch[1].trim())
     } catch {
-      // Invalid extended names should fall back to the ordinary filename.
+      // При некорректном расширенном имени возвращаемся к обычному filename.
     }
   }
 

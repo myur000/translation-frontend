@@ -26,7 +26,7 @@ interface SidebarProps {
   activeDocumentId?: string
   onSelectDocument: (documentId: string) => void
   onUploadDocument: (file: File) => string
-  /** Deletes the job on the backend (drafts only locally). */
+  /** Удаляет задачу на бэкенде (черновики — только локально). */
   onDeleteDocument: (documentId: string) => Promise<void>
   width: number
   isCollapsed: boolean

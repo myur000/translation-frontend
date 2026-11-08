@@ -28,13 +28,13 @@ export function uploadDocument(
       accessToken: options.accessToken,
       body: formData,
       signal: options.signal,
-      // The workspace explains 403 (unverified email) next to the action.
+      // Рабочая область сама объясняет 403 (email не подтверждён) рядом с действием.
       notifyAccessErrors: false,
     },
   )
 }
 
-/** Billing pages a file would cost; nothing is stored or charged. */
+/** Сколько учётных страниц будет стоить файл; ничего не сохраняется и не списывается. */
 export function estimateDocument(file: File, options: AuthenticatedApiCallOptions) {
   const formData = new FormData()
   formData.append('file', file)
@@ -46,16 +46,16 @@ export function estimateDocument(file: File, options: AuthenticatedApiCallOption
       accessToken: options.accessToken,
       body: formData,
       signal: options.signal,
-      // Unverified accounts get 403 here; the estimate is optional.
+      // Неподтверждённые аккаунты получают здесь 403; оценка стоимости необязательна.
       notifyAccessErrors: false,
     },
   )
 }
 
 /**
- * Translates an already uploaded document into another language using the
- * source file kept by the backend. The idempotency key makes a retried
- * request (lost response, double click) return the same job.
+ * Переводит уже загруженный документ на другой язык по исходному файлу,
+ * который хранит бэкенд. Ключ идемпотентности возвращает ту же задачу
+ * при повторе запроса (потерянный ответ, двойной клик).
  */
 export function retranslateDocument(
   jobId: string,
@@ -75,7 +75,7 @@ export function retranslateDocument(
   )
 }
 
-/** Deletes a finished document and its files; repeating it is harmless. */
+/** Удаляет завершённый документ и его файлы; повторный вызов безвреден. */
 export function deleteDocument(jobId: string, options: AuthenticatedApiCallOptions) {
   return apiClient.request<void>(API_ENDPOINTS.documents.document(jobId), {
     method: 'DELETE',
@@ -92,7 +92,7 @@ export function getDocumentFeedback(jobId: string, options: AuthenticatedApiCall
   )
 }
 
-/** Saves or replaces the owner's rating; only DONE documents accept it. */
+/** Сохраняет или заменяет оценку владельца; принимается только для документов в статусе DONE. */
 export function saveDocumentFeedback(
   jobId: string,
   request: DocumentFeedbackRequest,

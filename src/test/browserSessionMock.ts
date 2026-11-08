@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
 import { accountFixture } from './accountFixtures.ts'
 
-/** Browser capabilities and anonymous bootstrap for pre-existing component tests. */
+/** Возможности браузера и анонимный старт для существовавших ранее тестов компонентов. */
 export function installBrowserSessionMock({ mockAccount = true } = {}) {
   let queue: Promise<unknown> = Promise.resolve()
   const locks = {
