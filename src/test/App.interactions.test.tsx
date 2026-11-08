@@ -203,6 +203,12 @@ async function openActions(user: ReturnType<typeof userEvent.setup>) {
   return screen.getByRole('menu', { name: 'Действия с документом' })
 }
 
+/** Открывает меню «+» нижней панели документа. */
+async function openTools(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'Инструменты' }))
+  return screen.getByRole('menu', { name: 'Инструменты' })
+}
+
 function mockBookViewportGeometry() {
   const size = { width: 600, height: 400 }
   for (const property of ['scrollHeight', 'clientHeight', 'scrollWidth', 'clientWidth'] as const) {
@@ -1358,7 +1364,7 @@ describe('document actions', () => {
       }),
     })
 
-    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Перевести на другой язык…' }))
+    await user.click(within(await openTools(user)).getByRole('menuitem', { name: 'Перевести на другой язык…' }))
     const dialog = screen.getByRole('dialog', { name: 'Перевести на другой язык' })
     expect(within(dialog).getByRole('button', { name: 'Язык перевода: Немецкий' })).toBeTruthy()
     await user.click(await within(dialog).findByRole('checkbox', { name: 'Применить мой глоссарий · терминов: 3' }))
@@ -1380,7 +1386,7 @@ describe('document actions', () => {
         jsonResponse(apiErrorBody(410, 'Исходный файл удалён'), 410),
     })
 
-    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Перевести на другой язык…' }))
+    await user.click(within(await openTools(user)).getByRole('menuitem', { name: 'Перевести на другой язык…' }))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Перевести' }))
 
     expect((await within(screen.getByRole('dialog')).findByRole('alert')).textContent)
@@ -1447,16 +1453,52 @@ describe('document actions', () => {
     expect(JSON.parse(String(init?.body))).toEqual({ target_lang: 'rus_Cyrl' })
   })
 
-  it('removes a draft from the sidebar and offers no document menu for it', async () => {
+  it('offers a draft nothing but removal and removes it from the sidebar', async () => {
     const user = userEvent.setup()
     renderApp()
     await addDraft(user)
 
-    // Черновик ещё нечего переводить заново или оценивать.
-    expect(screen.queryByRole('button', { name: 'Действия с документом' })).toBeNull()
+    // Черновик ещё нечего переводить заново, оценивать или закреплять.
+    expect(within(await openActions(user)).getAllByRole('menuitem').map((item) => item.textContent))
+      .toEqual(['Убрать черновик'])
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('button', { name: 'Инструменты' })).toBeNull()
     await user.click(within(await openBookActions(user, 'draft.pdf'))
       .getByRole('menuitem', { name: 'Убрать черновик' }))
     expect(screen.queryByRole('button', { name: /^draft\.pdf/ })).toBeNull()
+  })
+
+  it('deletes the open document from its own menu after confirmation', async () => {
+    const user = userEvent.setup()
+    const { router, fetchMock } = renderDocumentRoute(`/documents/${firstJob}`, {
+      [`/api/documents/${firstJob}`]: () => new Response(null, { status: 204 }),
+    })
+
+    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Удалить документ…' }))
+    await user.click(within(screen.getByRole('alertdialog', { name: 'Удалить «english_course_book.pdf»?' }))
+      .getByRole('button', { name: 'Удалить' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/documents/00000000-0000-0000-0000-000000000102'))
+    expect(callsTo(fetchMock, `/api/documents/${firstJob}`, 'DELETE')).toHaveLength(1)
+  })
+
+  it('pins a document to its own sidebar section and unpins it', async () => {
+    const user = userEvent.setup()
+    renderDocumentRoute(`/documents/${firstJob}`)
+
+    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Закрепить' }))
+
+    const pinned = screen.getByRole('navigation', { name: 'Закреплённые' })
+    expect(within(pinned).getByRole('button', { name: /^english_course_book\.pdf/ })).toBeTruthy()
+    expect(within(sidebarList()).queryByRole('button', { name: /^english_course_book\.pdf/ })).toBeNull()
+    expect(screen.getByRole('img', { name: 'Закреплён' })).toBeTruthy()
+    expect(JSON.parse(localStorage.getItem('parallel.pinned-documents.v1.reader@example.com') ?? '[]'))
+      .toEqual([firstJob])
+
+    await user.click(within(await openBookActions(user, 'english_course_book.pdf'))
+      .getByRole('menuitem', { name: 'Открепить' }))
+    expect(screen.queryByRole('navigation', { name: 'Закреплённые' })).toBeNull()
+    expect(within(sidebarList()).getByRole('button', { name: /^english_course_book\.pdf/ })).toBeTruthy()
   })
 
   it('disables deleting a document that is being translated', async () => {
@@ -1512,7 +1554,12 @@ describe('cost, glossary and rating', () => {
     await screen.findAllByText('english_course_book.pdf')
     await uploadDraft(user, document.body)
 
-    await user.click(await screen.findByRole('checkbox', { name: 'Глоссарий · 4' }))
+    const glossary = within(await openTools(user))
+      .getByRole('menuitemcheckbox', { name: 'Применить мой глоссарий · терминов: 4' })
+    expect(glossary.getAttribute('aria-checked')).toBe('false')
+    await user.click(glossary)
+    expect(within(await openTools(user)).getByRole('menuitemcheckbox').getAttribute('aria-checked')).toBe('true')
+    await user.keyboard('{Escape}')
     await user.click(screen.getByRole('button', { name: 'Перевести' }))
 
     expect(await screen.findByText(/списано 2 стр\. · глоссарий: 4/)).toBeTruthy()
@@ -1572,6 +1619,25 @@ describe('cost, glossary and rating', () => {
     await waitFor(() => expect(saved).toEqual({ rating: 4, comment: 'Термины не те' }))
     expect(await within(prompt).findByText('Спасибо за отзыв!')).toBeTruthy()
     expect(callsTo(fetchMock, `/api/documents/${firstJob}/feedback`, 'PUT')).toHaveLength(2)
+  })
+
+  it('rates a document from its sidebar menu and opens it first', async () => {
+    const user = userEvent.setup()
+    const secondJob = '00000000-0000-0000-0000-000000000102'
+    const { router } = renderDocumentRoute(`/documents/${firstJob}`, {
+      [`/api/documents/${secondJob}/feedback`]: () => jsonResponse(apiErrorBody(404, 'Перевод ещё не оценён'), 404),
+    })
+    const secondName = 'project_report.docx'
+
+    await user.click(await screen.findByRole('button', { name: `Действия: ${secondName}` }))
+    await user.click(within(screen.getByRole('menu', { name: `Действия: ${secondName}` }))
+      .getByRole('menuitem', { name: 'Оценить перевод…' }))
+
+    const prompt = await screen.findByRole('dialog', { name: 'Как вам перевод?' })
+    expect(within(prompt).getByText(secondName)).toBeTruthy()
+    expect(router.state.location.pathname).toBe(`/documents/${secondJob}`)
+    // Отметка о запросе оценки снимается, чтобы «Назад» не открывал оценку повторно.
+    await waitFor(() => expect(router.state.location.state).toBeNull())
   })
 
   it('shows an existing rating and keeps its comment when the rating changes', async () => {

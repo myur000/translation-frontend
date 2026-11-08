@@ -6,9 +6,10 @@ import {
   type PointerEventHandler,
 } from 'react'
 import { Link, NavLink } from 'react-router'
-import { ApiClientError } from '../../api/client.ts'
-import { DocumentActionsMenu, type DocumentAction } from '../toolbar/DocumentActionsMenu.tsx'
-import { ConfirmDialog } from '../ui/ConfirmDialog.tsx'
+import { DocumentActionsMenu } from '../toolbar/DocumentActionsMenu.tsx'
+import { DeleteDocumentDialog } from '../workspace/DeleteDocumentDialog.tsx'
+import { documentMenuActions } from '../../documents/documentMenuActions.ts'
+import { usePinnedDocuments } from '../../documents/pinnedDocuments.ts'
 import {
   SIDEBAR_MAX_WIDTH,
   SIDEBAR_MIN_WIDTH,
@@ -28,6 +29,8 @@ interface SidebarProps {
   onUploadDocument: (file: File) => string
   /** Удаляет задачу на бэкенде (черновики — только локально). */
   onDeleteDocument: (documentId: string) => Promise<void>
+  /** Открывает документ и сразу предлагает оценить перевод. */
+  onRateDocument: (documentId: string) => void
   width: number
   isCollapsed: boolean
   isResizing: boolean
@@ -45,6 +48,7 @@ export function Sidebar({
   onSelectDocument,
   onUploadDocument,
   onDeleteDocument,
+  onRateDocument,
   width,
   isCollapsed,
   isResizing,
@@ -59,42 +63,60 @@ export function Sidebar({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploadMessage, setUploadMessage] = useState('')
   const [pendingDelete, setPendingDelete] = useState<DocumentItem | null>(null)
-  const [isDeleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const { pinnedJobIds, isPinned, setPinned } = usePinnedDocuments()
+  // Закреплённые идут отдельным разделом в порядке закрепления; остальные — как пришли.
+  const pinned = pinnedJobIds.flatMap((jobId) => documents.filter((document) => document.jobId === jobId))
+  const unpinned = documents.filter((document) => !isPinned(document.jobId))
 
-  const confirmDelete = async () => {
-    if (!pendingDelete) return
-    setDeleting(true)
-    setDeleteError(null)
-    try {
-      await onDeleteDocument(pendingDelete.id)
-      setPendingDelete(null)
-    } catch (error) {
-      setDeleteError(error instanceof ApiClientError && error.status === 409
-        ? t('delete.processing')
-        : t('delete.failed'))
-    } finally {
-      setDeleting(false)
-    }
+  const actionsFor = (document: DocumentItem) => documentMenuActions({
+    document,
+    t,
+    isPinned: isPinned(document.jobId),
+    onTogglePin: () => { if (document.jobId) setPinned(document.jobId, !isPinned(document.jobId)) },
+    onRate: () => onRateDocument(document.id),
+    onDelete: () => document.jobId ? setPendingDelete(document) : void onDeleteDocument(document.id),
+  })
+
+  const renderDocument = (document: DocumentItem) => {
+    const isActive = document.id === activeDocumentId
+    return (
+      <div key={document.id} className={styles.documentRow}>
+        <button
+          type="button"
+          className={`${styles.documentItem} ${isActive ? styles.active : ''}`}
+          aria-pressed={isActive}
+          onClick={() => onSelectDocument(document.id)}
+          title={document.name}
+        >
+          <span className={styles.fileIcon} aria-hidden="true">
+            {document.name.split('.').at(-1)?.toUpperCase()}
+          </span>
+          <span className={styles.documentInfo}>
+            <span className={styles.documentName}>{document.name}</span>
+            <span
+              className={styles.documentMeta}
+              title={document.errorMessage}
+            >
+              {t(documentStatusLabel(document))}
+              {document.progress !== undefined ? ` · ${document.progress}%` : ''}
+              {document.jobId
+                ? ` · ${shortLanguageCode(document.sourceLanguage)} → ${shortLanguageCode(document.targetLanguage)}`
+                : ''}
+            </span>
+          </span>
+        </button>
+        {!isCollapsed ? (
+          <DocumentActionsMenu
+            className={styles.rowActions}
+            variant="quiet"
+            portal
+            label={t('sidebar.documentActions', { name: document.name })}
+            actions={actionsFor(document)}
+          />
+        ) : null}
+      </div>
+    )
   }
-
-  const actionsFor = (document: DocumentItem): DocumentAction[] => document.jobId
-    ? [{
-        id: 'delete',
-        label: t('documentActions.delete'),
-        danger: true,
-        disabledReason: document.status === 'processing' ? t('documentActions.processing') : undefined,
-        onSelect: () => {
-          setDeleteError(null)
-          setPendingDelete(document)
-        },
-      }]
-    : [{
-        id: 'remove-draft',
-        label: t('documentActions.removeDraft'),
-        danger: true,
-        onSelect: () => void onDeleteDocument(document.id),
-      }]
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const [file] = event.currentTarget.files ?? []
@@ -147,62 +169,31 @@ export function Sidebar({
         </p>
       </div>
 
-      <div className={styles.sectionHeader}>
-        <span>{t('sidebar.myBooks')}</span>
-        <span className={styles.count}>{documents.length}</span>
+      <div className={styles.documentList}>
+        {pinned.length ? (
+          <>
+            <div className={styles.sectionHeader}>
+              <span>{t('sidebar.pinned')}</span>
+              <span className={styles.count}>{pinned.length}</span>
+            </div>
+            <nav className={styles.documentGroup} aria-label={t('sidebar.pinned')}>
+              {pinned.map(renderDocument)}
+            </nav>
+          </>
+        ) : null}
+        <div className={styles.sectionHeader}>
+          <span>{t('sidebar.myBooks')}</span>
+          <span className={styles.count}>{unpinned.length}</span>
+        </div>
+        <nav className={styles.documentGroup} aria-label={t('sidebar.myBooks')}>
+          {unpinned.map(renderDocument)}
+        </nav>
       </div>
 
-      <nav className={styles.documentList} aria-label={t('sidebar.myBooks')}>
-        {documents.map((document) => {
-          const isActive = document.id === activeDocumentId
-          return (
-            <div key={document.id} className={styles.documentRow}>
-              <button
-                type="button"
-                className={`${styles.documentItem} ${isActive ? styles.active : ''}`}
-                aria-pressed={isActive}
-                onClick={() => onSelectDocument(document.id)}
-                title={document.name}
-              >
-                <span className={styles.fileIcon} aria-hidden="true">
-                  {document.name.split('.').at(-1)?.toUpperCase()}
-                </span>
-                <span className={styles.documentInfo}>
-                  <span className={styles.documentName}>{document.name}</span>
-                  <span
-                    className={styles.documentMeta}
-                    title={document.errorMessage}
-                  >
-                    {t(documentStatusLabel(document))}
-                    {document.progress !== undefined ? ` · ${document.progress}%` : ''}
-                    {document.jobId
-                      ? ` · ${shortLanguageCode(document.sourceLanguage)} → ${shortLanguageCode(document.targetLanguage)}`
-                      : ''}
-                  </span>
-                </span>
-              </button>
-              {!isCollapsed ? (
-                <DocumentActionsMenu
-                  className={styles.rowActions}
-                  variant="quiet"
-                  portal
-                  label={t('sidebar.documentActions', { name: document.name })}
-                  actions={actionsFor(document)}
-                />
-              ) : null}
-            </div>
-          )
-        })}
-      </nav>
-
       {pendingDelete ? (
-        <ConfirmDialog
-          title={t('delete.title', { name: pendingDelete.name })}
-          description={t('delete.description')}
-          confirmLabel={t('delete.confirm')}
-          busy={isDeleting}
-          error={deleteError}
-          onConfirm={() => void confirmDelete()}
+        <DeleteDocumentDialog
+          document={pendingDelete}
+          onDelete={onDeleteDocument}
           onClose={() => setPendingDelete(null)}
         />
       ) : null}

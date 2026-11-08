@@ -1,89 +1,88 @@
-.toolbar {
-  min-height: var(--toolbar-height);
-  /* Переносится по реально доступному месту (часть окна занимают боковая панель
-     и заметки), поэтому группы не наезжают друг на друга ни при какой ширине. */
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 20px;
-  padding: 10px 18px;
+/* Плавающие блоки как поле ввода в чате: белая карточка с мягкой тенью. */
+.dock,
+.notes {
   background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 16px;
+  box-shadow: 0 6px 24px rgb(9 20 35 / 10%), 0 1px 3px rgb(9 20 35 / 6%);
+  /* Слой под блоками прозрачен для кликов; сами блоки их принимают. */
+  pointer-events: auto;
 }
 
-.fileBlock {
-  min-width: 160px;
-  flex: 1 1 200px;
-  display: flex;
-  flex-direction: column;
-}
-
-.fileName {
-  overflow: hidden;
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fileMeta {
-  color: var(--color-text-muted);
-  font-size: 12px;
-}
-
-.controls {
+.dock {
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-left: auto;
+  gap: 6px;
+  padding: 7px 8px;
+}
+
+.tools {
+  flex: none;
+}
+
+.tools button[aria-haspopup] {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.languages {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .languagePair {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 0 4px;
+  padding: 0 8px;
   color: var(--color-text);
   font-size: 13px;
   font-weight: 550;
   white-space: nowrap;
 }
 
-.languagePair svg {
-  width: 15px;
-  height: 15px;
-  color: var(--color-text-soft);
+.separator {
+  width: 1px;
+  height: 20px;
+  flex: none;
+  margin: 0 2px;
+  background: var(--color-border);
 }
 
-.languagePair svg,
-.swapButton svg,
-.primaryButton svg {
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.5;
-}
-
-.glossaryToggle {
-  display: inline-flex;
+.pages {
+  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   color: var(--color-text-muted);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pages span {
+  min-width: 82px;
+  text-align: center;
   white-space: nowrap;
-  cursor: pointer;
 }
 
-.glossaryToggle input {
-  margin: 0;
-  accent-color: var(--color-primary);
+.view {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.swapButton {
+.primary {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  padding-left: 6px;
+}
+
+.iconButton {
   width: 30px;
   height: 30px;
   display: grid;
@@ -95,25 +94,47 @@
   border-radius: var(--radius-sm);
 }
 
-.swapButton svg {
-  width: 15px;
-  height: 15px;
-}
-
-.swapButton:hover {
+.iconButton:hover:not(:disabled) {
   color: var(--color-text);
   background: var(--color-bg);
   border-color: var(--color-border);
 }
 
+.iconButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.languagePair svg,
+.iconButton svg,
+.primaryButton svg,
+.notes svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.languagePair svg,
+.iconButton svg,
+.primaryButton svg {
+  width: 15px;
+  height: 15px;
+}
+
+.languagePair svg {
+  color: var(--color-text-soft);
+}
+
 .primaryButton,
 .secondaryButton {
-  height: 34px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   gap: 7px;
   padding: 0 16px;
-  border-radius: var(--radius-md);
+  border-radius: 11px;
   font-weight: 600;
   white-space: nowrap;
   transition: background-color 120ms ease, border-color 120ms ease;
@@ -125,14 +146,18 @@
   border: 1px solid var(--color-primary);
 }
 
-.primaryButton svg {
-  width: 15px;
-  height: 15px;
-}
-
 .primaryButton:hover:not(:disabled) {
   background: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
+}
+
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.primaryButton[aria-busy='true'] {
+  cursor: wait;
 }
 
 .secondaryButton {
@@ -145,21 +170,12 @@
   background: var(--color-surface-subtle);
 }
 
-.primaryButton:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.primaryButton[aria-busy='true'] {
-  cursor: wait;
-}
-
 .progress {
-  min-width: 190px;
+  min-width: 180px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 4px;
+  padding: 0 6px;
 }
 
 .progressTrack {
@@ -195,6 +211,31 @@
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.notes {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  flex: none;
+  place-items: center;
+  color: var(--color-text);
+}
+
+.notes svg {
+  width: 22px;
+  height: 22px;
+}
+
+.notes:hover {
+  background: var(--color-surface-subtle);
+}
+
+.notesActive,
+.notesActive:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-border);
 }
 
 .visuallyHidden {

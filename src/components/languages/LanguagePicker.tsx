@@ -19,6 +19,8 @@ interface LanguagePickerProps {
   /** Короткий видимый префикс, например «Из». */
   prefix?: string
   disabled?: boolean
+  /** Куда открывается список: вниз по умолчанию, вверх — из нижней панели. */
+  placement?: 'bottom' | 'top'
   onChange: (code: string) => void
 }
 
@@ -54,6 +56,7 @@ export function LanguagePicker({
   label,
   prefix,
   disabled = false,
+  placement = 'bottom',
   onChange,
 }: LanguagePickerProps) {
   const { t } = useTranslation()
@@ -236,7 +239,7 @@ export function LanguagePicker({
 
       {isOpen ? (
         <div
-          className={`${styles.popover} ${align === 'end' ? styles.popoverEnd : ''}`}
+          className={`${styles.popover} ${align === 'end' ? styles.popoverEnd : ''} ${placement === 'top' ? styles.popoverTop : ''}`}
           data-align={align}
         >
           <div className={styles.searchRow}>

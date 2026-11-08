@@ -153,6 +153,16 @@
   padding: 0 8px;
 }
 
+/* Заголовки разделов прокручиваются вместе со списком, поэтому без своих отступов слева. */
+.documentList .sectionHeader {
+  padding: 10px 10px 6px;
+}
+
+.documentGroup {
+  display: flex;
+  flex-direction: column;
+}
+
 .documentRow {
   position: relative;
 }
@@ -375,6 +385,15 @@
     flex: 0 0 auto;
     max-height: 84px;
     overflow-x: auto;
+  }
+
+  /* В горизонтальной ленте разделы не нужны: книги идут подряд. */
+  .documentList .sectionHeader {
+    display: none;
+  }
+
+  .documentGroup {
+    display: contents;
   }
 
   .documentItem {

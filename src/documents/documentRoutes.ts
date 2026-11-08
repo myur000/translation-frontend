@@ -15,3 +15,10 @@ export const draftPath = (draftId: string) => `/drafts/${encodeURIComponent(draf
 /** Где открывается документ: после загрузки — его задача, иначе — черновик. */
 export const pathForDocument = (document: { id: string; jobId?: string }) =>
   document.jobId ? documentPath(document.jobId) : draftPath(document.id)
+
+/** Состояние перехода, которое просит открытую страницу документа сразу предложить оценку. */
+export const FEEDBACK_PROMPT_STATE = { openFeedback: true } as const
+
+export function wantsFeedbackPrompt(state: unknown) {
+  return typeof state === 'object' && state !== null && (state as { openFeedback?: unknown }).openFeedback === true
+}

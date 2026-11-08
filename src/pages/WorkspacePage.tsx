@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react'
-import { Link, Navigate, useOutletContext } from 'react-router'
+import { Link, Navigate, useLocation, useNavigate, useOutletContext } from 'react-router'
 import { ApiClientError } from '../api/client.ts'
 import { NotesPanel } from '../components/notes/NotesPanel.tsx'
 import type { DocumentAction } from '../components/toolbar/DocumentActionsMenu.tsx'
@@ -11,8 +11,12 @@ import {
   type FeedbackPromptMode,
 } from '../documents/feedbackPromptStorage.ts'
 import { useGlossaryTermCount } from '../documents/useGlossaryTermCount.ts'
-import { ReaderBar } from '../components/toolbar/ReaderBar.tsx'
-import { TopToolbar } from '../components/toolbar/TopToolbar.tsx'
+import { DocumentHeader } from '../components/toolbar/DocumentHeader.tsx'
+import { NotesToggle, WorkspaceDock } from '../components/toolbar/WorkspaceDock.tsx'
+import { DeleteDocumentDialog } from '../components/workspace/DeleteDocumentDialog.tsx'
+import { documentMenuActions } from '../documents/documentMenuActions.ts'
+import { usePinnedDocuments } from '../documents/pinnedDocuments.ts'
+import { wantsFeedbackPrompt } from '../documents/documentRoutes.ts'
 import { OriginalPanel } from '../components/workspace/OriginalPanel.tsx'
 import { TranslationPanel } from '../components/workspace/TranslationPanel.tsx'
 import {
@@ -62,9 +66,10 @@ interface DocumentWorkspaceProps {
   onAttachOriginal: AppLayoutContextValue['attachOriginal']
   onResumeTranslationWaiting: AppLayoutContextValue['resumeTranslationWaiting']
   onRetranslate: AppLayoutContextValue['retranslateDocument']
+  onDelete: AppLayoutContextValue['deleteDocument']
 }
 
-type WorkspaceDialog = 'retranslate' | null
+type WorkspaceDialog = 'retranslate' | 'delete' | null
 
 function DocumentWorkspace({
   document,
@@ -78,8 +83,12 @@ function DocumentWorkspace({
   onAttachOriginal,
   onResumeTranslationWaiting,
   onRetranslate,
+  onDelete,
 }: DocumentWorkspaceProps) {
   const { t } = useTranslation()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { isPinned, setPinned } = usePinnedDocuments()
   const { getLabel: getLanguageLabel } = useLanguageCatalog()
   // У старых документов двухбуквенные коды; бэкенд теперь принимает только NLLB.
   const [sourceLanguage, setSourceLanguage] = useState(() => toCatalogLanguageCode(document.sourceLanguage))
@@ -91,10 +100,22 @@ function DocumentWorkspace({
   const [isTranslating, setTranslating] = useState(false)
   const [dialog, setDialog] = useState<WorkspaceDialog>(null)
   const [feedbackPrompt, setFeedbackPrompt] = useState<FeedbackPromptMode | null>(null)
-  // Предлагаем оценку, когда документ завершается, пока он открыт. Корректировка
-  // состояния во время рендера (а не в эффекте) избавляет от лишней отрисовки.
   const [topChromeRef, topChromeHeight] = useElementHeight<HTMLDivElement>()
   const [bottomChromeRef, bottomChromeHeight] = useElementHeight<HTMLDivElement>()
+  // Оценку можно попросить из боковой панели: она открывает документ с отметкой в адресе.
+  const [handledFeedbackRequest, setHandledFeedbackRequest] = useState<string | null>(null)
+  if (wantsFeedbackPrompt(location.state) && handledFeedbackRequest !== location.key) {
+    setHandledFeedbackRequest(location.key)
+    if (document.status === 'ready' && document.jobId) setFeedbackPrompt('manual')
+  }
+  useEffect(() => {
+    // Отметку снимаем, чтобы «Назад» и перезагрузка не открывали оценку снова.
+    if (wantsFeedbackPrompt(location.state)) {
+      void navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [location.pathname, location.state, navigate])
+  // Предлагаем оценку, когда документ завершается, пока он открыт. Корректировка
+  // состояния во время рендера (а не в эффекте) избавляет от лишней отрисовки.
   const [observedStatus, setObservedStatus] = useState(document.status)
   if (observedStatus !== document.status) {
     setObservedStatus(document.status)
@@ -274,6 +295,7 @@ function DocumentWorkspace({
   }
 
   const details: string[] = []
+  if (pageCount !== null) details.push(t('toolbar.fileMeta', { pages: pageCount }))
   if (!document.jobId && document.estimate) {
     details.push(t('estimate.cost', { units: document.estimate.billedUnits }))
   } else if (document.billedUnits) {
@@ -291,22 +313,33 @@ function DocumentWorkspace({
       })
     : ''
 
-  const isUploaded = Boolean(document.jobId)
-  const isProcessing = document.status === 'processing'
-  // Удаление находится в боковой панели, рядом с документом, который оно удаляет.
-  const documentActions: DocumentAction[] = isUploaded
-    ? [
-        {
-          id: 'retranslate',
-          label: t('documentActions.retranslate'),
-          disabledReason: isProcessing ? t('documentActions.processing') : undefined,
-          onSelect: () => setDialog('retranslate'),
-        },
-        ...(document.status === 'ready'
-          ? [{ id: 'rate', label: t('documentActions.rate'), onSelect: () => setFeedbackPrompt('manual') }]
-          : []),
-      ]
-    : []
+  const canTranslate = Boolean(document.waitingIssue) || !document.jobId || document.status === 'failed'
+  const headerActions = documentMenuActions({
+    document,
+    t,
+    isPinned: isPinned(document.jobId),
+    onTogglePin: () => { if (document.jobId) setPinned(document.jobId, !isPinned(document.jobId)) },
+    onRate: () => setFeedbackPrompt('manual'),
+    onDelete: () => document.jobId ? setDialog('delete') : void onDelete(document.id),
+  })
+  // Меню «+» нижней панели: всё, что меняет сам перевод.
+  const tools: DocumentAction[] = []
+  if (canUploadFile && canTranslate && glossaryTermCount) {
+    tools.push({
+      id: 'glossary',
+      label: t('glossary.apply', { count: glossaryTermCount }),
+      checked: useGlossary,
+      onSelect: () => setUseGlossary((value) => !value),
+    })
+  }
+  if (document.jobId) {
+    tools.push({
+      id: 'retranslate',
+      label: t('documentActions.retranslate'),
+      disabledReason: document.status === 'processing' ? t('documentActions.processing') : undefined,
+      onSelect: () => setDialog('retranslate'),
+    })
+  }
 
   const handleDownload = () => {
     setNotice('')
@@ -355,29 +388,11 @@ function DocumentWorkspace({
       {/* Панели плавают над колонками чтения; текст прокручивается под ними. */}
       {!isImmersiveMode ? (
         <div ref={topChromeRef} className={styles.topChrome}>
-          <TopToolbar
+          <DocumentHeader
             document={document}
-            sourceLanguage={sourceLanguage}
-            targetLanguage={targetLanguage}
-            pageCount={pageCount}
-            isTranslating={isTranslating}
-            isDownloading={translationDownload.isDownloading}
-            canDownload={translationDownload.canDownload}
-            canTranslate={
-              Boolean(document.waitingIssue) ||
-              !document.jobId ||
-              document.status === 'failed'
-            }
-            documentActions={documentActions}
             details={details}
-            glossaryTermCount={canUploadFile ? glossaryTermCount : null}
-            useGlossary={useGlossary}
-            onUseGlossaryChange={setUseGlossary}
-            onSourceLanguageChange={handleSourceLanguageChange}
-            onTargetLanguageChange={handleTargetLanguageChange}
-            onSwapLanguages={handleSwapLanguages}
-            onTranslate={() => void handleTranslate()}
-            onDownload={handleDownload}
+            isPinned={isPinned(document.jobId)}
+            actions={headerActions}
           />
           {visibleNotice || quotaWarning || document.status === 'failed' ? (
             <div
@@ -475,18 +490,33 @@ function DocumentWorkspace({
 
       {!isImmersiveMode ? (
         <div ref={bottomChromeRef} className={styles.bottomChrome}>
-          <ReaderBar
+          <span className={styles.dockSpacer} aria-hidden="true" />
+          <WorkspaceDock
+            document={document}
+            sourceLanguage={sourceLanguage}
+            targetLanguage={targetLanguage}
+            onSourceLanguageChange={handleSourceLanguageChange}
+            onTargetLanguageChange={handleTargetLanguageChange}
+            onSwapLanguages={handleSwapLanguages}
+            tools={tools}
             currentPage={displayedPage}
             pageCount={pageCount}
-            notesOpen={notesVisible}
-            isScrollSyncEnabled={isScrollSyncEnabled}
-            isDualPanelFullscreen={isDualPanelFullscreen}
             onPreviousPage={() => navigatePage(-1)}
             onNextPage={() => navigatePage(1)}
-            onToggleNotes={handleToggleNotes}
+            isScrollSyncEnabled={isScrollSyncEnabled}
             onToggleScrollSync={handleToggleScrollSync}
+            isDualPanelFullscreen={isDualPanelFullscreen}
             onToggleDualPanelFullscreen={handleDualPanelFullscreenToggle}
+            isTranslating={isTranslating}
+            canTranslate={canTranslate}
+            onTranslate={() => void handleTranslate()}
+            isDownloading={translationDownload.isDownloading}
+            canDownload={translationDownload.canDownload}
+            onDownload={handleDownload}
           />
+          <div className={styles.notesSlot}>
+            <NotesToggle isOpen={notesVisible} onToggle={handleToggleNotes} />
+          </div>
         </div>
       ) : null}
 
@@ -496,6 +526,9 @@ function DocumentWorkspace({
           onSubmit={(request) => onRetranslate(document.id, request)}
           onClose={() => setDialog(null)}
         />
+      ) : null}
+      {dialog === 'delete' ? (
+        <DeleteDocumentDialog document={document} onDelete={onDelete} onClose={() => setDialog(null)} />
       ) : null}
       {feedbackPrompt && document.jobId && !isImmersiveMode ? (
         <FeedbackPrompt
@@ -524,6 +557,7 @@ export function WorkspacePage() {
     attachOriginal,
     resumeTranslationWaiting,
     retranslateDocument,
+    deleteDocument,
   } = useOutletContext<AppLayoutContextValue>()
   const { t } = useTranslation()
   const [isScrollSyncEnabled, setIsScrollSyncEnabled] = useState(false)
@@ -594,6 +628,7 @@ export function WorkspacePage() {
       onAttachOriginal={attachOriginal}
       onResumeTranslationWaiting={resumeTranslationWaiting}
       onRetranslate={retranslateDocument}
+      onDelete={deleteDocument}
     />
   )
 }

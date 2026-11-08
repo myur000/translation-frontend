@@ -9,6 +9,8 @@ export interface DocumentAction {
   /** Подсказка, которая показывается, когда действие недоступно. */
   disabledReason?: string
   danger?: boolean
+  /** Переключатель вместо команды: пункт показывает галочку (menuitemcheckbox). */
+  checked?: boolean
   onSelect: () => void
 }
 
@@ -153,8 +155,9 @@ export function DocumentActionsMenu({
                 itemRefs.current[index] = element
               }}
               type="button"
-              role="menuitem"
+              role={action.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
               className={action.danger ? styles.danger : undefined}
+              aria-checked={action.checked}
               aria-disabled={Boolean(action.disabledReason)}
               title={action.disabledReason}
               onClick={() => {
@@ -163,6 +166,11 @@ export function DocumentActionsMenu({
                 action.onSelect()
               }}
             >
+              {action.checked !== undefined ? (
+                <svg viewBox="0 0 16 16" aria-hidden="true" className={styles.check} data-checked={action.checked || undefined}>
+                  <path d="m3.5 8.5 3 3 6-7" />
+                </svg>
+              ) : null}
               {action.label}
             </button>
           ))}

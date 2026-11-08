@@ -28,6 +28,7 @@ import {
   createLocalDocumentId,
   documentPath,
   draftPath,
+  FEEDBACK_PROMPT_STATE,
   pathForDocument,
 } from '../documents/documentRoutes.ts'
 import {
@@ -332,6 +333,11 @@ function AppLayoutContent() {
     void navigate(document ? pathForDocument(document) : '/')
   }
 
+  const handleRateDocument = (documentId: string) => {
+    const document = documents.find((item) => item.id === documentId)
+    if (document) void navigate(pathForDocument(document), { state: FEEDBACK_PROMPT_STATE })
+  }
+
   const handleRetryHistory = () => {
     setHistoryState('loading')
     setHistoryRevision((revision) => revision + 1)
@@ -532,6 +538,7 @@ function AppLayoutContent() {
             onSelectDocument={handleSelectDocument}
             onUploadDocument={handleSidebarUpload}
             onDeleteDocument={deleteDocument}
+            onRateDocument={handleRateDocument}
             width={sidebar.expandedWidth}
             isCollapsed={sidebar.isCollapsed}
             isResizing={sidebar.isResizing}

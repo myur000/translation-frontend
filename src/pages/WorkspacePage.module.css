@@ -57,27 +57,47 @@
   z-index: 10;
   right: 0;
   left: 0;
-  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+}
+
+/* Сверху — тонкая матовая полоса: сквозь неё видно уходящие под неё страницы. */
+.topChrome {
+  top: 0;
+  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
   -webkit-backdrop-filter: saturate(1.4) blur(14px);
   backdrop-filter: saturate(1.4) blur(14px);
 }
 
-.topChrome {
-  top: 0;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.bottomChrome {
-  bottom: 0;
-  border-top: 1px solid var(--color-border);
-}
-
-/* Без поддержки размытия полупрозрачная панель сделала бы текст под ней нечитаемым. */
+/* Без поддержки размытия полупрозрачная полоса сделала бы текст под ней нечитаемым. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .topChrome,
-  .bottomChrome {
+  .topChrome {
     background: var(--color-surface);
   }
+}
+
+/* Снизу — прозрачный слой: панель по центру, заметки отдельным блоком вплотную
+   справа от неё. Слева от панели — пустышка шириной с блок заметок, чтобы сама
+   панель оставалась по центру; на узком экране пустышка сжимается первой.
+   Сам слой клики не перехватывает, чтобы страницы по бокам оставались доступны;
+   блоки включают их обратно. */
+.bottomChrome {
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 16px 16px;
+  pointer-events: none;
+}
+
+.dockSpacer {
+  min-width: 0;
+  flex: 0 1 52px;
+}
+
+.notesSlot {
+  display: flex;
+  flex: none;
 }
 
 .notice {
@@ -254,6 +274,14 @@
   .topChrome,
   .bottomChrome {
     position: static;
+  }
+
+  .bottomChrome {
+    padding: 12px;
+  }
+
+  .dockSpacer {
+    display: none;
   }
 
   .workArea {
