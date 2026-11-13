@@ -1,0 +1,449 @@
+.panel {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.header {
+  min-height: 58px;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.header span {
+  display: block;
+  margin-top: 1px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.header > button {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  color: var(--color-text-soft);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 20px;
+}
+
+.header > button:hover {
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.body {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.listTools {
+  display: grid;
+  gap: 10px;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  padding: 3px;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 8px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tabs button[aria-selected='true'] {
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: 0 1px 2px rgb(14 27 43 / 10%);
+}
+
+.body input {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 13px;
+}
+
+.body input:focus-visible {
+  border-color: var(--color-primary-border);
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 0;
+}
+
+.primary,
+.secondary {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.primary {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.secondary {
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--color-surface-subtle);
+}
+
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.55;
+}
+
+.count {
+  min-width: 18px;
+  padding: 0 5px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-subtle);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.problem {
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.problemBox {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  width: 100%;
+  display: grid;
+  gap: 3px;
+  padding: 10px 11px;
+  color: inherit;
+  text-align: left;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.item:hover {
+  border-color: var(--color-primary-border);
+  background: var(--color-surface-subtle);
+}
+
+.item strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.item small {
+  color: var(--color-text-soft);
+  font-size: 11px;
+}
+
+.back {
+  justify-self: start;
+  padding: 3px 8px 3px 4px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.back:hover {
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+}
+
+.noteHeader {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.noteHeader h3 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.noteActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.noteActions > * {
+  min-height: 30px;
+  font-size: 12px;
+}
+
+/* Текст заметки в узкой панели — мельче, чем на странице. */
+.body :global(.wikilink),
+.body :global(.note-tag) {
+  font-size: inherit;
+}
+
+.quotes h4,
+.composer h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: var(--color-text-soft);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.quotes ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quoteCard,
+.quotePreview {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.quoteCard blockquote,
+.quotePreview blockquote {
+  margin: 0;
+  padding-left: 10px;
+  color: var(--color-text);
+  border-left: 3px solid var(--color-primary-border);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.paired {
+  margin: 0;
+  padding-left: 13px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.quoteMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  color: var(--color-text-soft);
+  font-size: 11px;
+}
+
+.quoteMeta button:not(.removeQuote),
+.quoteMeta a {
+  padding: 0;
+  color: var(--color-primary);
+  background: none;
+  border: 0;
+  font-size: 11px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.removeQuote {
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  color: var(--color-text-soft);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.removeQuote:hover {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+}
+
+.deleted {
+  font-style: italic;
+}
+
+.composer {
+  display: grid;
+  gap: 16px;
+}
+
+.composerSection {
+  display: grid;
+  gap: 8px;
+}
+
+.candidates {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidates button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  color: var(--color-text);
+  text-align: left;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.candidates button:hover:not(:disabled) {
+  border-color: var(--color-primary-border);
+  background: var(--color-primary-soft);
+}
+
+.candidates span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.candidates small {
+  flex: 0 0 auto;
+  color: var(--color-text-soft);
+  font-size: 11px;
+}
+
+/* Длинная цитата свёрнута: сам абзац доступен в книге по «Показать в книге». */
+.quoteCollapsed blockquote {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+.quoteCollapsed .paired {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.expand {
+  justify-self: start;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: none;
+  border: 0;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.expand:hover {
+  color: var(--color-text);
+}

@@ -1,7 +1,12 @@
-import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react'
+import { lazy, Suspense, useEffect, useState, type CSSProperties, type MouseEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useOutletContext } from 'react-router'
 import { ApiClientError } from '../api/client.ts'
-import { NotesPanel } from '../components/notes/NotesPanel.tsx'
+import type { NoteQuoteResponse } from '../api/contracts/notes.ts'
+import type { ShowQuoteResult } from '../components/notes/PanelNoteView.tsx'
+import { QuoteSelectionButton } from '../components/notes/QuoteSelectionButton.tsx'
+import { useQuoteSelection } from '../hooks/useQuoteSelection.ts'
+import { findQuoteElement, revealQuoteElement } from '../notes/quoteHighlight.ts'
+import type { QuoteSelection } from '../notes/quoteLocator.ts'
 import type { DocumentAction } from '../components/toolbar/DocumentActionsMenu.tsx'
 import { createIdempotencyKey } from '../api/idempotency.ts'
 import { RetranslateDialog } from '../components/workspace/RetranslateDialog.tsx'
@@ -14,7 +19,9 @@ import { useGlossaryTermCount } from '../documents/useGlossaryTermCount.ts'
 import { DocumentHeader } from '../components/toolbar/DocumentHeader.tsx'
 import { NotesToggle, WorkspaceDock } from '../components/toolbar/WorkspaceDock.tsx'
 import { DeleteDocumentDialog } from '../components/workspace/DeleteDocumentDialog.tsx'
+import { CancelTranslationDialog } from '../components/workspace/CancelTranslationDialog.tsx'
 import { documentMenuActions } from '../documents/documentMenuActions.ts'
+import { canCancelTranslation, endedWithoutResult } from '../documents/translationStatus.ts'
 import { usePinnedDocuments } from '../documents/pinnedDocuments.ts'
 import { wantsFeedbackPrompt } from '../documents/documentRoutes.ts'
 import { OriginalPanel } from '../components/workspace/OriginalPanel.tsx'
@@ -36,6 +43,7 @@ import type {
   AppLayoutContextValue,
   ExpandedPanel,
 } from '../layouts/AppLayout.tsx'
+import type { TranslationKey } from '../i18n/translations.ts'
 import { useTranslation } from '../i18n/useTranslation.ts'
 import { toCatalogLanguageCode } from '../languages/languageCatalog.ts'
 import { useLanguageCatalog } from '../languages/useLanguageCatalog.ts'
@@ -67,9 +75,11 @@ interface DocumentWorkspaceProps {
   onResumeTranslationWaiting: AppLayoutContextValue['resumeTranslationWaiting']
   onRetranslate: AppLayoutContextValue['retranslateDocument']
   onDelete: AppLayoutContextValue['deleteDocument']
+  onCancelTranslation: AppLayoutContextValue['cancelTranslation']
 }
 
-type WorkspaceDialog = 'retranslate' | 'delete' | null
+/** `choose-language` — тот же перевод на другой язык, но со сразу раскрытым списком языков. */
+type WorkspaceDialog = 'retranslate' | 'choose-language' | 'delete' | 'cancel' | null
 
 function DocumentWorkspace({
   document,
@@ -84,6 +94,7 @@ function DocumentWorkspace({
   onResumeTranslationWaiting,
   onRetranslate,
   onDelete,
+  onCancelTranslation,
 }: DocumentWorkspaceProps) {
   const { t } = useTranslation()
   const location = useLocation()
@@ -119,6 +130,9 @@ function DocumentWorkspace({
   const [observedStatus, setObservedStatus] = useState(document.status)
   if (observedStatus !== document.status) {
     setObservedStatus(document.status)
+    // «Отправлен на перевод, статус обновится» устаревает, как только задача закончилась,
+    // и не должен заслонять итог: ошибку, отмену или возврат страниц.
+    if (observedStatus === 'processing') setNotice('')
     if (observedStatus === 'processing' && document.status === 'ready' && document.jobId &&
         !wasFeedbackPromptDismissed(document.jobId)) {
       setFeedbackPrompt('auto')
@@ -127,7 +141,7 @@ function DocumentWorkspace({
   const [useGlossary, setUseGlossary] = useState(false)
   // Загрузить с глоссарием из панели можно только локальный файл.
   const canUploadFile = Boolean(document.sourceFile) &&
-    (!document.jobId || document.status === 'failed')
+    (!document.jobId || endedWithoutResult(document))
   const glossaryTermCount = useGlossaryTermCount(sourceLanguage, targetLanguage, canUploadFile)
   const notesPanel = useResizableNotesPanel()
   const synchronizedScroll = useSynchronizedScroll(
@@ -151,6 +165,19 @@ function DocumentWorkspace({
     setNavigationRevision((value) => value + 1)
   }
   const notesVisible = notesOpen
+  // Цитировать можно только готовый перевод: backend принимает цитаты из документов DONE.
+  const canQuote = Boolean(document.jobId) && document.status === 'ready'
+  const quoteSelection = useQuoteSelection(synchronizedScroll.originalRef, synchronizedScroll.translationRef, canQuote)
+  const [pendingQuote, setPendingQuote] = useState<QuoteSelection | null>(null)
+  const showQuote = (quote: NoteQuoteResponse): ShowQuoteResult => {
+    // Колонка скрыта, когда другая развёрнута на весь экран: её ref пуст.
+    const viewport = quote.side === 'SOURCE' ? synchronizedScroll.originalRef.current : synchronizedScroll.translationRef.current
+    if (!viewport) return 'hidden'
+    const element = findQuoteElement(viewport, quote.paragraph_index, quote.quote)
+    if (!element) return 'notFound'
+    revealQuoteElement(element)
+    return 'shown'
+  }
   const isImmersiveMode = isDualPanelFullscreen || expandedPanel !== null
 
   useEffect(() => {
@@ -158,7 +185,13 @@ function DocumentWorkspace({
     const viewport = expandedPanel === 'translation'
       ? synchronizedScroll.translationRef.current
       : synchronizedScroll.originalRef.current
-    viewport?.focus({ preventScroll: true })
+    if (!viewport) return
+    // Фокус переносится в колонку, чтобы стрелки и PageUp/PageDown сразу листали книгу.
+    // После нажатия F браузер считает такой фокус клавиатурным и обводит всю колонку;
+    // метка data-quiet-focus гасит кольцо до первой потери фокуса (стиль в DocumentPreview.module.css).
+    viewport.setAttribute('data-quiet-focus', '')
+    viewport.addEventListener('blur', () => viewport.removeAttribute('data-quiet-focus'), { once: true })
+    viewport.focus({ preventScroll: true })
   }, [isImmersiveMode, expandedPanel, synchronizedScroll.originalRef, synchronizedScroll.translationRef])
 
   useEffect(() => {
@@ -228,8 +261,8 @@ function DocumentWorkspace({
       onResumeTranslationWaiting(document.id)
       return
     }
-    // Неудачную задачу можно повторить по исходнику, который хранится на сервере.
-    if (!document.sourceFile && document.jobId && document.status === 'failed') {
+    // Неудачную или отменённую задачу можно повторить по исходнику, который хранится на сервере.
+    if (!document.sourceFile && document.jobId && endedWithoutResult(document)) {
       if (sourceLanguage !== toCatalogLanguageCode(document.sourceLanguage)) {
         setNotice(t('retranslate.needsFile'))
         return
@@ -298,7 +331,8 @@ function DocumentWorkspace({
   if (pageCount !== null) details.push(t('toolbar.fileMeta', { pages: pageCount }))
   if (!document.jobId && document.estimate) {
     details.push(t('estimate.cost', { units: document.estimate.billedUnits }))
-  } else if (document.billedUnits) {
+  } else if (document.billedUnits && document.quotaRefund !== 'REFUNDED') {
+    // Возвращённые после отмены страницы не считаются списанными.
     details.push(t('document.billed', { units: document.billedUnits }))
   }
   if (document.jobId && document.glossaryTermCount != null) {
@@ -313,13 +347,19 @@ function DocumentWorkspace({
       })
     : ''
 
-  const canTranslate = Boolean(document.waitingIssue) || !document.jobId || document.status === 'failed'
+  const statusNotice = document.status === 'failed'
+    ? document.errorMessage || t('workspace.translationFailed')
+    : document.status === 'canceled' ? t(canceledNoticeKey(document.quotaRefund)) : ''
+
+  const canTranslate = Boolean(document.waitingIssue) || !document.jobId || endedWithoutResult(document)
   const headerActions = documentMenuActions({
     document,
     t,
     isPinned: isPinned(document.jobId),
     onTogglePin: () => { if (document.jobId) setPinned(document.jobId, !isPinned(document.jobId)) },
     onRate: () => setFeedbackPrompt('manual'),
+    onRetranslate: () => setDialog('retranslate'),
+    onCancelTranslation: () => setDialog('cancel'),
     onDelete: () => document.jobId ? setDialog('delete') : void onDelete(document.id),
   })
   // Меню «+» нижней панели: всё, что меняет сам перевод.
@@ -336,6 +376,7 @@ function DocumentWorkspace({
     tools.push({
       id: 'retranslate',
       label: t('documentActions.retranslate'),
+      icon: 'language',
       disabledReason: document.status === 'processing' ? t('documentActions.processing') : undefined,
       onSelect: () => setDialog('retranslate'),
     })
@@ -394,12 +435,12 @@ function DocumentWorkspace({
             isPinned={isPinned(document.jobId)}
             actions={headerActions}
           />
-          {visibleNotice || quotaWarning || document.status === 'failed' ? (
+          {visibleNotice || quotaWarning || statusNotice ? (
             <div
               className={`${styles.notice} ${quotaWarning && !visibleNotice ? styles.noticeWarning : ''}`}
               role={isNoticeError || (document.status === 'failed' && !visibleNotice) ? 'alert' : 'status'}
             >
-              {visibleNotice || quotaWarning || document.errorMessage || t('workspace.translationFailed')}
+              {visibleNotice || quotaWarning || statusNotice}
               {visibleNotice ? (
                 <button
                   type="button"
@@ -483,7 +524,15 @@ function DocumentWorkspace({
               onDoubleClick={notesPanel.resetWidth}
               title={t('sidebar.resizeHint')}
             />
-            <NotesPanel onClose={() => setNotesOpen(false)} />
+            <Suspense fallback={<p className={styles.notesLoading} role="status">{t('notes.loading')}</p>}>
+            <WorkspaceNotesPanel
+              document={document}
+              pendingQuote={pendingQuote}
+              onQuoteFinished={() => { setPendingQuote(null); quoteSelection.clear() }}
+              onShowQuote={showQuote}
+              onClose={() => { setNotesOpen(false); setPendingQuote(null) }}
+            />
+            </Suspense>
           </div>
         ) : null}
       </div>
@@ -498,6 +547,7 @@ function DocumentWorkspace({
             onSourceLanguageChange={handleSourceLanguageChange}
             onTargetLanguageChange={handleTargetLanguageChange}
             onSwapLanguages={handleSwapLanguages}
+            onChooseLanguage={() => setDialog('choose-language')}
             tools={tools}
             currentPage={displayedPage}
             pageCount={pageCount}
@@ -510,6 +560,7 @@ function DocumentWorkspace({
             isTranslating={isTranslating}
             canTranslate={canTranslate}
             onTranslate={() => void handleTranslate()}
+            onCancelTranslation={canCancelTranslation(document) ? () => setDialog('cancel') : undefined}
             isDownloading={translationDownload.isDownloading}
             canDownload={translationDownload.canDownload}
             onDownload={handleDownload}
@@ -520,15 +571,23 @@ function DocumentWorkspace({
         </div>
       ) : null}
 
-      {dialog === 'retranslate' ? (
+      {dialog === 'retranslate' || dialog === 'choose-language' ? (
         <RetranslateDialog
           document={document}
+          openLanguageList={dialog === 'choose-language'}
           onSubmit={(request) => onRetranslate(document.id, request)}
           onClose={() => setDialog(null)}
         />
       ) : null}
       {dialog === 'delete' ? (
         <DeleteDocumentDialog document={document} onDelete={onDelete} onClose={() => setDialog(null)} />
+      ) : null}
+      {dialog === 'cancel' ? (
+        <CancelTranslationDialog
+          document={document}
+          onCancelTranslation={onCancelTranslation}
+          onClose={() => setDialog(null)}
+        />
       ) : null}
       {feedbackPrompt && document.jobId && !isImmersiveMode ? (
         <FeedbackPrompt
@@ -539,9 +598,32 @@ function DocumentWorkspace({
           onClose={() => setFeedbackPrompt(null)}
         />
       ) : null}
+      {/* Пока цитата оформляется в панели, кнопка над старым выделением только мешает. */}
+      {quoteSelection.selection && !pendingQuote ? (
+        <QuoteSelectionButton
+          selection={quoteSelection.selection}
+          onQuote={() => {
+            const { rect: _rect, ...selection } = quoteSelection.selection!
+            setPendingQuote(selection)
+            setNotesOpen(true)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
+
+/** Что стало со страницами отменённого перевода; до ответа сервера — просто «отменён». */
+function canceledNoticeKey(quotaRefund: DocumentItem['quotaRefund']): TranslationKey {
+  if (quotaRefund === 'REFUNDED') return 'workspace.canceledRefunded'
+  if (quotaRefund === 'PENDING') return 'workspace.canceledRefundPending'
+  if (quotaRefund === 'NONE') return 'workspace.canceledNoRefund'
+  return 'workspace.canceled'
+}
+
+// Панель заметок с парсером Markdown нужна, только когда её открыли: грузится отдельно.
+const WorkspaceNotesPanel = lazy(() => import('../components/notes/WorkspaceNotesPanel.tsx')
+  .then((module) => ({ default: module.WorkspaceNotesPanel })))
 
 export function WorkspacePage() {
   const {
@@ -558,6 +640,7 @@ export function WorkspacePage() {
     resumeTranslationWaiting,
     retranslateDocument,
     deleteDocument,
+    cancelTranslation,
   } = useOutletContext<AppLayoutContextValue>()
   const { t } = useTranslation()
   const [isScrollSyncEnabled, setIsScrollSyncEnabled] = useState(false)
@@ -629,6 +712,7 @@ export function WorkspacePage() {
       onResumeTranslationWaiting={resumeTranslationWaiting}
       onRetranslate={retranslateDocument}
       onDelete={deleteDocument}
+      onCancelTranslation={cancelTranslation}
     />
   )
 }

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router'
 import { AuthProvider } from './auth/AuthProvider.tsx'
 import { ProtectedRoute } from './auth/ProtectedRoute.tsx'
@@ -16,6 +17,10 @@ import { PlansPage } from './pages/PlansPage.tsx'
 import { ProfilePage } from './pages/ProfilePage.tsx'
 import { WorkspacePage } from './pages/WorkspacePage.tsx'
 import { PreferencesProvider } from './preferences/PreferencesProvider.tsx'
+
+// Раздел заметок со своим парсером Markdown грузится при первом открытии,
+// а не вместе с основным кодом: большинство сессий начинается с книг.
+const NotesPage = lazy(() => import('./pages/NotesPage.tsx').then((module) => ({ default: module.NotesPage })))
 
 function App() {
   return (
@@ -36,6 +41,9 @@ function App() {
               <Route path="/documents/:jobId" element={<WorkspacePage />} />
               <Route path="/drafts/:draftId" element={<WorkspacePage />} />
               <Route path="/history" element={<HistoryPage />} />
+              <Route path="/notes" element={<Suspense><NotesPage /></Suspense>} />
+              <Route path="/notes/new" element={<Suspense><NotesPage isNew /></Suspense>} />
+              <Route path="/notes/:noteId" element={<Suspense><NotesPage /></Suspense>} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/plans" element={<PlansPage />} />
               <Route path="/profile" element={<ProfilePage />} />

@@ -7,6 +7,11 @@ interface ConfirmDialogProps {
   title: string
   description: string
   confirmLabel: string
+  /**
+   * Подпись кнопки закрытия; по умолчанию «Отмена». Нужна, когда само действие —
+   * отмена чего-то: «Отмена» рядом с «Отменить перевод» читается двусмысленно.
+   */
+  dismissLabel?: string
   busy: boolean
   error: string | null
   onConfirm: () => void
@@ -36,7 +41,7 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
       <p id={id + '-description'}>{props.description}</p>
       {props.error ? <p className={styles.error} role="alert">{props.error}</p> : null}
       <div className={styles.actions}>
-        <button ref={cancel} type="button" disabled={props.busy} onClick={props.onClose}>{t('common.cancel')}</button>
+        <button ref={cancel} type="button" disabled={props.busy} onClick={props.onClose}>{props.dismissLabel ?? t('common.cancel')}</button>
         <button type="button" className={styles.confirm} disabled={props.busy} onClick={props.onConfirm}>
           {props.confirmLabel}
         </button>

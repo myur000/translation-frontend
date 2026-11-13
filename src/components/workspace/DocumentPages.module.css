@@ -14,3 +14,24 @@
 .textLayer span { --font-height: 0; --scale-x: 1; --rotate: 0deg; font-size: calc(var(--text-scale-factor) * var(--font-height)); transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(calc(1 / var(--min-font-size))); }
 .textLayer :global(.markedContent) { display: contents; }
 .textLayer ::selection { background: var(--color-selection); }
+
+/* Оригинал текстом с сервера: ручные переносы внутри абзаца приходят как \n. */
+.plainText p { margin: 0 0 1em; white-space: pre-line; }
+.plainText .formatNote { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.plainText .formatNote p { margin: 0; white-space: normal; }
+.truncatedNote { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e4e7ec; color: #667085; font-size: 12px; }
+
+/* Фрагмент, к которому перешли из заметки («Показать в книге»). */
+.paper :global([data-quote-highlight]) {
+  border-radius: 3px;
+  animation: quote-highlight 2.4s ease-out;
+}
+
+@keyframes quote-highlight {
+  0%, 55% { background-color: rgb(250 204 21 / 45%); box-shadow: 0 0 0 4px rgb(250 204 21 / 45%); }
+  100% { background-color: transparent; box-shadow: 0 0 0 4px transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper :global([data-quote-highlight]) { animation: none; background-color: rgb(250 204 21 / 35%); }
+}

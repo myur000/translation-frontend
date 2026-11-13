@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
-import type { DocumentStatusResponse, TranslationStatus } from '../api/contracts/documents.ts'
+import type { DocumentStatusResponse, QuotaRefund, TranslationStatus } from '../api/contracts/documents.ts'
 import { getTranslationStatus } from '../api/translations.ts'
 import { TRANSLATION_REQUEST_TIMEOUT_MS, TRANSLATION_STALL_TIMEOUT_MS } from '../config/translationPolling.ts'
+import { isTranslationStatus } from '../documents/translationStatus.ts'
 import type { TranslationWaitingIssue } from '../types/document.ts'
 
 export interface PollingTranslationJob {
@@ -9,6 +10,8 @@ export interface PollingTranslationJob {
   jobId: string
   status: TranslationStatus
   progress: number
+  /** У отменённой задачи следим за уточнением возврата страниц (`PENDING` → `REFUNDED`/`NONE`). */
+  quotaRefund?: QuotaRefund | null
 }
 export interface TranslationStatusUpdate {
   documentId: string
@@ -37,7 +40,8 @@ interface Observation {
   respondedAt: number | null
   paused: boolean
 }
-const signature = (status: TranslationStatus, progress: number) => `${status}:${progress}`
+const signature = (status: TranslationStatus, progress: number, quotaRefund?: QuotaRefund | null) =>
+  `${status}:${progress}:${quotaRefund ?? ''}`
 
 // Ограничиваем каждую проверку статуса, даже если вложенный промис не учитывает abort.
 async function requestStatus(jobId: string, token: string, parent: AbortSignal, timeoutMs: number) {
@@ -83,7 +87,7 @@ export function useTranslationStatusPolling({
     }
     for (const job of jobs) {
       const previous = observationsRef.current.get(job.documentId)
-      const value = signature(job.status, job.progress)
+      const value = signature(job.status, job.progress, job.quotaRefund)
       if (!previous || previous.jobId !== job.jobId) {
         observationsRef.current.set(job.documentId, {
           jobId: job.jobId, signature: value, changedAt: Date.now(),
@@ -128,10 +132,10 @@ export function useTranslationStatusPolling({
           // Не применяем запоздавшие ответы к другой, заменённой или приостановленной задаче.
           const observation = observationsRef.current.get(job.documentId)
           if (!observation || observation.jobId !== job.jobId || observation.paused) return null
-          if (response.job_id !== job.jobId || !['PENDING', 'PROCESSING', 'DONE', 'FAILED'].includes(response.status) ||
+          if (response.job_id !== job.jobId || !isTranslationStatus(response.status) ||
               !Number.isFinite(response.progress)) return null
           observation.respondedAt = Date.now()
-          const value = signature(response.status, Math.min(100, Math.max(0, response.progress)))
+          const value = signature(response.status, Math.min(100, Math.max(0, response.progress)), response.quota_refund)
           if (observation.signature !== value) {
             observation.signature = value
             observation.changedAt = Date.now()

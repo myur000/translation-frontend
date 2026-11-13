@@ -23,6 +23,17 @@
   scroll-padding-bottom: calc(var(--chrome-bottom, 0px) + 12px);
 }
 
+/* Кольцо при переходе по Tab рисуется внутри колонки: снаружи его обрезает overflow панели. */
+.viewport:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+/* Программный фокус при входе в полноэкранный режим — без кольца (см. WorkspacePage). */
+.viewport[data-quiet-focus]:focus {
+  outline: none;
+}
+
 .columnLabel,
 .columnTools {
   position: absolute;
@@ -40,18 +51,25 @@
   top: calc(var(--chrome-top, 0px) + 10px);
   left: 14px;
   max-width: calc(100% - 28px);
+  /* Блок, а не flex: во flex у текста « · Язык» срезается начальный пробел. */
+  display: block;
   overflow: hidden;
-  padding: 3px 10px;
+  padding: 2px 8px;
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
   pointer-events: none;
+  /* Спокойная подпись без рамки, как в макете; лёгкая подложка того же цвета,
+     что фон колонки, держит текст читаемым над уходящими под неё страницами. */
+  background: color-mix(in srgb, var(--color-canvas) 78%, transparent);
+  border-color: transparent;
+  border-radius: var(--radius-sm);
 }
 
 .columnLabel strong {
-  color: var(--color-text);
-  font-weight: 650;
+  color: inherit;
+  font-weight: 500;
 }
 
 .columnTools {
@@ -187,3 +205,8 @@
   border-color: transparent;
   border-radius: 999px;
 }
+
+/* Вариант для пояснения над текстом оригинала: лист белый в обеих темах, поэтому цвета свои. */
+.chooseFileCompact { position: relative; flex: 0 0 auto; padding: 4px 10px; color: #1e3a52; background: #fff; border-color: #d0d5dd; font-size: 11px; font-weight: 600; }
+.chooseFileCompact:hover { background: #f2f6f9; }
+.selectionError { flex-basis: 100%; color: #b42318; font-size: 12px; }

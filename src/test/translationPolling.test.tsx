@@ -7,7 +7,7 @@ const api = vi.hoisted(() => ({ status: vi.fn() }))
 vi.mock('../api/translations.ts', () => ({ getTranslationStatus: api.status }))
 const job: PollingTranslationJob = { documentId: 'book-1', jobId: 'job-1', status: 'PENDING', progress: 0 }
 const response = (id = job.jobId, status: TranslationStatus = 'PENDING', progress = 0): DocumentStatusResponse =>
-  ({ job_id: id, status, progress, error_code: null, error_message: null, file_name: null, glossary_term_count: null })
+  ({ job_id: id, status, progress, error_code: null, error_message: null, file_name: null, glossary_term_count: null, quota_refund: null })
 const advance = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
 
 beforeEach(() => {

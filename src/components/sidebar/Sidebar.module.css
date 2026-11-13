@@ -15,6 +15,9 @@
   --color-primary-border: rgb(143 177 201 / 30%);
   --color-on-primary: var(--palette-ink);
   --color-focus-ring: rgb(143 177 201 / 30%);
+  /* Единый размер плитки в свёрнутой панели: логотип, «+», документы, история и аватар
+     занимают одинаковый квадрат, поэтому колонка читается ровным рядом. */
+  --rail-tile: 44px;
 
   position: relative;
   height: 100vh;
@@ -64,8 +67,8 @@
 }
 
 .collapseButton {
-  width: 26px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
@@ -74,7 +77,16 @@
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  font-size: 20px;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease, opacity 120ms ease;
+}
+
+.collapseButton svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.6;
 }
 
 .collapseButton:hover {
@@ -327,13 +339,50 @@
 }
 
 .collapsed .brand {
+  position: relative;
   justify-content: center;
-  gap: 4px;
-  padding: 0 6px;
+  padding: 0;
 }
 
 .collapsed .brandLink {
   flex: none;
+  transition: opacity 120ms ease;
+}
+
+.collapsed .brandMark {
+  width: var(--rail-tile);
+  height: var(--rail-tile);
+}
+
+/* Кнопка лежит поверх логотипа и проявляется при наведении на шапку (или фокусе
+   с клавиатуры): логотип остаётся главным знаком колонки, а разворот всегда под рукой. */
+.collapsed .collapseButton {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--rail-tile);
+  height: var(--rail-tile);
+  opacity: 0;
+  background: var(--color-bg);
+  border-color: var(--color-border);
+  border-radius: var(--radius-md);
+  transform: translate(-50%, -50%);
+}
+
+.collapsed .collapseButton svg {
+  width: 22px;
+  height: 22px;
+}
+
+.collapsed .brand:hover .collapseButton,
+.collapsed .collapseButton:focus-visible {
+  color: var(--color-text);
+  opacity: 1;
+}
+
+.collapsed .brand:hover .brandLink,
+.collapsed .brand:has(.collapseButton:focus-visible) .brandLink {
+  opacity: 0;
 }
 
 .collapsed .brandName,
@@ -346,24 +395,56 @@
 }
 
 .collapsed .primaryAction {
-  padding: 16px;
+  padding: 8px 0 14px;
 }
 
 .collapsed .uploadButton {
-  width: 40px;
-  min-height: 40px;
+  width: var(--rail-tile);
+  min-height: var(--rail-tile);
   margin: 0 auto;
   padding: 0;
+  font-size: 18px;
+}
+
+.collapsed .documentGroup {
+  align-items: center;
+  gap: 6px;
 }
 
 .collapsed .documentItem {
+  width: var(--rail-tile);
+  height: var(--rail-tile);
+  align-items: center;
   justify-content: center;
-  padding: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+/* Полоса уходит к краю панели: внутри узкой плитки она теснила бы значок файла. */
+.collapsed .active::before {
+  top: 12px;
+  bottom: 12px;
+  left: calc((var(--rail-tile) - var(--sidebar-current-width, 72px)) / 2);
+}
+
+.collapsed .fileIcon {
+  width: 28px;
+  height: 32px;
+  font-size: 7px;
+}
+
+.collapsed .footer {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
 }
 
 .collapsed .footerLink {
+  width: var(--rail-tile);
+  height: var(--rail-tile);
   justify-content: center;
-  padding: 9px;
+  padding: 0;
+  font-size: 18px;
 }
 
 @media (max-width: 840px) {
@@ -449,7 +530,37 @@
   }
 
   .collapsed .footerLink {
+    width: auto;
+    height: auto;
     justify-content: flex-start;
     padding: 9px 10px;
+    font-size: inherit;
+  }
+
+  .collapsed .brandMark {
+    width: 28px;
+    height: 28px;
+  }
+
+  .collapsed .uploadButton {
+    min-height: 40px;
+    font-size: inherit;
+  }
+
+  .collapsed .documentItem {
+    width: 100%;
+    height: auto;
+    align-items: stretch;
+  }
+
+  .collapsed .fileIcon {
+    width: 32px;
+    height: 38px;
+    font-size: 8.5px;
+  }
+
+  .collapsed .footer {
+    justify-items: stretch;
+    gap: 4px;
   }
 }

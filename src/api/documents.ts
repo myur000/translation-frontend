@@ -5,6 +5,7 @@ import type {
   DocumentFeedbackResponse,
   DocumentHistoryQuery,
   DocumentHistoryResponse,
+  DocumentStatusResponse,
   DocumentUploadRequest,
   DocumentUploadResponse,
   RetranslationRequest,
@@ -73,6 +74,19 @@ export function retranslateDocument(
       notifyAccessErrors: false,
     },
   )
+}
+
+/**
+ * Отменяет перевод в статусе `PENDING` или `PROCESSING`; ответ устроен как статус задачи
+ * (`CANCELED` и `quota_refund`). Повторная отмена безопасна и возвращает текущее состояние;
+ * у завершённой задачи — `409 DOCUMENT_ALREADY_FINISHED`.
+ */
+export function cancelDocumentTranslation(jobId: string, options: AuthenticatedApiCallOptions) {
+  return apiClient.request<DocumentStatusResponse>(API_ENDPOINTS.documents.cancel(jobId), {
+    method: 'POST',
+    accessToken: options.accessToken,
+    signal: options.signal,
+  })
 }
 
 /** Удаляет завершённый документ и его файлы; повторный вызов безвреден. */

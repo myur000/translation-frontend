@@ -3,6 +3,7 @@ import { ApiClientError, apiClient } from '../api/client.ts'
 import type { DocumentJobEvent } from '../api/contracts/documents.ts'
 import { API_ENDPOINTS } from '../api/endpoints.ts'
 import { readServerSentEvents } from '../api/sse.ts'
+import { isTranslationStatus } from '../documents/translationStatus.ts'
 
 /**
  * - `connecting` — поток открывается или переоткрывается;
@@ -23,14 +24,12 @@ interface Options {
 
 const RECONNECT_DELAY_MS = 500
 const MAX_BACKOFF_MS = 30_000
-const STATUSES = new Set(['PENDING', 'PROCESSING', 'DONE', 'FAILED'])
-
 function parseJobEvent(data: string): DocumentJobEvent | null {
   try {
     const value = JSON.parse(data) as Partial<DocumentJobEvent>
-    return typeof value.job_id === 'string' && STATUSES.has(String(value.status)) &&
+    return typeof value.job_id === 'string' && isTranslationStatus(value.status) &&
       typeof value.progress === 'number' && Number.isFinite(value.progress)
-      ? { job_id: value.job_id, status: value.status!, progress: value.progress }
+      ? { job_id: value.job_id, status: value.status, progress: value.progress }
       : null
   } catch {
     return null

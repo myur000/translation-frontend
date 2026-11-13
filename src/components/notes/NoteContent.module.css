@@ -1,0 +1,78 @@
+.markdown {
+  min-width: 0;
+  color: var(--color-text);
+  font-size: 15px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+
+.markdown :is(p, ul, ol, blockquote, pre, table) { margin: 0 0 14px; }
+.markdown :is(h1, h2, h3, h4, h5, h6) { margin: 24px 0 10px; line-height: 1.25; letter-spacing: -0.01em; }
+.markdown h1 { font-size: 26px; }
+.markdown h2 { font-size: 21px; }
+.markdown h3 { font-size: 17px; }
+.markdown :is(h4, h5, h6) { font-size: 15px; }
+.markdown :is(ul, ol) { padding-left: 22px; }
+.markdown li + li { margin-top: 4px; }
+.markdown hr { margin: 22px 0; border: 0; border-top: 1px solid var(--color-border); }
+
+.markdown blockquote {
+  padding: 2px 0 2px 14px;
+  color: var(--color-text-muted);
+  border-left: 3px solid var(--color-border-strong);
+}
+
+.markdown code {
+  padding: 1px 5px;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+}
+
+.markdown pre {
+  overflow-x: auto;
+  padding: 12px 14px;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.markdown pre code { padding: 0; background: none; border: 0; }
+
+.markdown table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.markdown :is(th, td) { padding: 6px 10px; border: 1px solid var(--color-border); text-align: left; }
+
+.markdown a { color: var(--color-primary); text-underline-offset: 3px; }
+
+/* Ссылка на заметку — как в Obsidian: без подчёркивания, акцентным цветом. */
+.markdown :global(.wikilink) {
+  color: var(--color-primary);
+  font-weight: 550;
+  text-decoration: none;
+}
+
+.markdown a:global(.wikilink):hover { text-decoration: underline; }
+
+/* Заготовка: заметки ещё нет — бледнее и с пунктиром. */
+.markdown :global(.wikilink-missing) {
+  opacity: 0.6;
+  text-decoration: underline dashed;
+  text-decoration-thickness: 1px;
+}
+
+.markdown :global(.note-tag) {
+  display: inline-block;
+  padding: 0 7px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-radius: 999px;
+  font-size: 0.86em;
+  font-weight: 600;
+  line-height: 1.6;
+  text-decoration: none;
+}

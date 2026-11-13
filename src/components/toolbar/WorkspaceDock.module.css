@@ -35,15 +35,38 @@
   gap: 2px;
 }
 
+/* Плашка пары языков — того же вида, что кнопки выбора языка у черновика. */
 .languagePair {
+  height: 30px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 8px;
+  gap: 7px;
+  padding: 0 8px 0 10px;
   color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
   font-size: 13px;
-  font-weight: 550;
   white-space: nowrap;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.languagePair:hover:not(:disabled) {
+  background: var(--color-surface-subtle);
+}
+
+.languagePair:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.languagePair .chevron {
+  width: 14px;
+  height: 14px;
+}
+
+.languagePair:disabled .chevron {
+  display: none;
 }
 
 .separator {
@@ -78,6 +101,7 @@
 .primary {
   display: flex;
   align-items: center;
+  gap: 10px;
   margin-left: auto;
   padding-left: 6px;
 }

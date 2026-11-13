@@ -1,8 +1,6 @@
-import type {
-  DocumentHistoryItemResponse,
-  TranslationStatus,
-} from '../api/contracts/documents.ts'
-import type { DocumentItem, DocumentStatus } from '../types/document.ts'
+import type { DocumentHistoryItemResponse } from '../api/contracts/documents.ts'
+import type { DocumentItem } from '../types/document.ts'
+import { toDocumentStatus } from './translationStatus.ts'
 
 export interface StoredDocumentMetadata {
   name: string
@@ -10,12 +8,6 @@ export interface StoredDocumentMetadata {
 }
 
 export type DocumentMetadataByJobId = Record<string, StoredDocumentMetadata>
-
-function toDocumentStatus(status: TranslationStatus): DocumentStatus {
-  if (status === 'DONE') return 'ready'
-  if (status === 'FAILED') return 'failed'
-  return 'processing'
-}
 
 export function historyItemToDocument(
   item: DocumentHistoryItemResponse,
@@ -42,6 +34,7 @@ export function historyItemToDocument(
     createdAt: item.created_at,
     billedUnits: item.billed_units,
     glossaryTermCount: item.glossary_term_count,
+    quotaRefund: item.quota_refund ?? undefined,
   }
 }
 

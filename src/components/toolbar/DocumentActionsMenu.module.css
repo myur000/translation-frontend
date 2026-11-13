@@ -109,3 +109,19 @@
   visibility: visible;
   color: var(--color-primary);
 }
+
+.icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+/* Иконка чуть тише подписи; у опасного пункта — его цвет. */
+.menu button:not(.danger) .icon {
+  color: var(--color-text-muted);
+}

@@ -21,6 +21,8 @@ interface LanguagePickerProps {
   disabled?: boolean
   /** Куда открывается список: вниз по умолчанию, вверх — из нижней панели. */
   placement?: 'bottom' | 'top'
+  /** Раскрыть список сразу при появлении: окно, открытое ради выбора языка. */
+  autoOpen?: boolean
   onChange: (code: string) => void
 }
 
@@ -32,10 +34,19 @@ interface PickerOption {
 }
 
 type PopoverAlign = 'start' | 'end'
+type PopoverSide = 'bottom' | 'top'
 
 /** Держать в соответствии с шириной `.popover` в LanguagePicker.module.css. */
 const POPOVER_WIDTH = 300
+/** Держать в соответствии с отступом `.popover` от кнопки. */
+const POPOVER_GAP = 6
 const VIEWPORT_GUTTER = 16
+/** Наибольшая высота списка: около восьми строк, дальше — прокрутка. */
+const LIST_MAX_HEIGHT = 280
+/** Меньше этого список бесполезен: лучше упереться в край, чем показать две строки. */
+const LIST_MIN_HEIGHT = 120
+/** Высота строки поиска до первого замера, когда окно ещё не отрисовано. */
+const FALLBACK_CHROME_HEIGHT = 41
 
 /**
  * Открывается в ту сторону, где есть место: иначе список у правого края
@@ -45,6 +56,29 @@ function popoverAlignFor(trigger: DOMRect, viewportWidth: number): PopoverAlign 
   const fitsRight = trigger.left + POPOVER_WIDTH <= viewportWidth - VIEWPORT_GUTTER
   const fitsLeft = trigger.right - POPOVER_WIDTH >= VIEWPORT_GUTTER
   return !fitsRight && fitsLeft ? 'end' : 'start'
+}
+
+/**
+ * Выбирает сторону по вертикали и высоту списка так, чтобы окно целиком
+ * помещалось в экран. Предпочтительная сторона сохраняется, пока на ней
+ * хватает места для полного списка; иначе — та, где места больше.
+ * `chromeHeight` — всё в окне, кроме списка: строка поиска, статус, ошибка.
+ */
+function popoverFitFor(
+  trigger: DOMRect,
+  viewportHeight: number,
+  preferred: PopoverSide,
+  chromeHeight: number,
+): { side: PopoverSide; listMaxHeight: number } {
+  const room: Record<PopoverSide, number> = {
+    bottom: viewportHeight - trigger.bottom - POPOVER_GAP - VIEWPORT_GUTTER - chromeHeight,
+    top: trigger.top - POPOVER_GAP - VIEWPORT_GUTTER - chromeHeight,
+  }
+  const other: PopoverSide = preferred === 'bottom' ? 'top' : 'bottom'
+  const side =
+    room[preferred] >= LIST_MAX_HEIGHT || room[preferred] >= room[other] ? preferred : other
+  const listMaxHeight = Math.max(LIST_MIN_HEIGHT, Math.min(LIST_MAX_HEIGHT, Math.floor(room[side])))
+  return { side, listMaxHeight }
 }
 
 function normalize(value: string) {
@@ -57,6 +91,7 @@ export function LanguagePicker({
   prefix,
   disabled = false,
   placement = 'bottom',
+  autoOpen = false,
   onChange,
 }: LanguagePickerProps) {
   const { t } = useTranslation()
@@ -67,10 +102,14 @@ export function LanguagePicker({
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
   const [isOpen, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const [align, setAlign] = useState<PopoverAlign>('start')
+  const [side, setSide] = useState<PopoverSide>(placement)
+  const [listMaxHeight, setListMaxHeight] = useState(LIST_MAX_HEIGHT)
 
   const options = useMemo<PickerOption[]>(() => {
     const search = normalize(query)
@@ -131,6 +170,29 @@ export function LanguagePicker({
     if (isOpen) searchRef.current?.focus({ preventScroll: true })
   }, [isOpen])
 
+  // Размер окна подбирается до отрисовки кадра и пересчитывается при смене
+  // размеров экрана и при появлении строки статуса (загрузка, ошибка),
+  // чтобы окно не уходило за край и не обрезалось.
+  const hasStatusRow = catalog.status === 'loading' || catalog.status === 'error'
+  useLayoutEffect(() => {
+    if (!isOpen) return
+    const fit = () => {
+      const trigger = triggerRef.current?.getBoundingClientRect()
+      if (!trigger) return
+      const popover = popoverRef.current
+      const list = listRef.current
+      const measured = popover && list ? popover.offsetHeight - list.offsetHeight : 0
+      const chromeHeight = measured > 0 ? measured : FALLBACK_CHROME_HEIGHT
+      const next = popoverFitFor(trigger, window.innerHeight, placement, chromeHeight)
+      setAlign(popoverAlignFor(trigger, window.innerWidth))
+      setSide(next.side)
+      setListMaxHeight(next.listMaxHeight)
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [isOpen, placement, hasStatusRow])
+
   useEffect(() => {
     if (!isOpen || !activeOption) return
     document
@@ -141,13 +203,21 @@ export function LanguagePicker({
   const open = () => {
     if (disabled) return
     void load()
-    const trigger = triggerRef.current?.getBoundingClientRect()
-    setAlign(trigger ? popoverAlignFor(trigger, window.innerWidth) : 'start')
     setQuery('')
     const selectedIndex = POPULAR_LANGUAGES.indexOf(value)
     setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0)
     setOpen(true)
   }
+
+  // Эффект ребёнка срабатывает раньше эффекта окна-родителя, поэтому список
+  // раскрывается после того, как окно поставит фокус, и фокус уходит в поиск.
+  const openRef = useRef(open)
+  useLayoutEffect(() => {
+    openRef.current = open
+  })
+  useEffect(() => {
+    if (autoOpen) openRef.current()
+  }, [autoOpen])
 
   const close = (restoreFocus: boolean) => {
     setOpen(false)
@@ -239,8 +309,10 @@ export function LanguagePicker({
 
       {isOpen ? (
         <div
-          className={`${styles.popover} ${align === 'end' ? styles.popoverEnd : ''} ${placement === 'top' ? styles.popoverTop : ''}`}
+          ref={popoverRef}
+          className={`${styles.popover} ${align === 'end' ? styles.popoverEnd : ''} ${side === 'top' ? styles.popoverTop : ''}`}
           data-align={align}
+          data-side={side}
         >
           <div className={styles.searchRow}>
             <svg className={styles.searchIcon} viewBox="0 0 16 16" aria-hidden="true">
@@ -269,7 +341,14 @@ export function LanguagePicker({
             />
           </div>
 
-          <ul id={listboxId} role="listbox" aria-label={label} className={styles.list}>
+          <ul
+            ref={listRef}
+            id={listboxId}
+            role="listbox"
+            aria-label={label}
+            className={styles.list}
+            style={{ maxHeight: listMaxHeight }}
+          >
             {query ? (
               searchOptions.map(renderOption)
             ) : (

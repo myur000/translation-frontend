@@ -8,6 +8,7 @@ import {
 import { Link, NavLink } from 'react-router'
 import { DocumentActionsMenu } from '../toolbar/DocumentActionsMenu.tsx'
 import { DeleteDocumentDialog } from '../workspace/DeleteDocumentDialog.tsx'
+import { CancelTranslationDialog } from '../workspace/CancelTranslationDialog.tsx'
 import { documentMenuActions } from '../../documents/documentMenuActions.ts'
 import { usePinnedDocuments } from '../../documents/pinnedDocuments.ts'
 import {
@@ -20,15 +21,23 @@ import { documentStatusLabel } from '../../documents/documentStatusLabel.ts'
 import { shortLanguageCode } from '../../languages/languageCatalog.ts'
 import { BrandMark } from '../brand/BrandMark.tsx'
 import { UserMenu } from '../user/UserMenu.tsx'
+import { NotesSidebar } from '../notes/NotesSidebar.tsx'
+import { SidebarModeSwitch, type SidebarMode } from './SidebarModeSwitch.tsx'
 import styles from './Sidebar.module.css'
 
 interface SidebarProps {
+  /** Раздел определяется адресом: `/notes…` — заметки, остальное — книги. */
+  mode: SidebarMode
+  booksPath: string
+  notesPath: string
   documents: DocumentItem[]
   activeDocumentId?: string
   onSelectDocument: (documentId: string) => void
   onUploadDocument: (file: File) => string
   /** Удаляет задачу на бэкенде (черновики — только локально). */
   onDeleteDocument: (documentId: string) => Promise<void>
+  /** Отменяет идущий перевод (после подтверждения). */
+  onCancelTranslation: (documentId: string) => Promise<void>
   /** Открывает документ и сразу предлагает оценить перевод. */
   onRateDocument: (documentId: string) => void
   width: number
@@ -43,11 +52,15 @@ interface SidebarProps {
 }
 
 export function Sidebar({
+  mode,
+  booksPath,
+  notesPath,
   documents,
   activeDocumentId,
   onSelectDocument,
   onUploadDocument,
   onDeleteDocument,
+  onCancelTranslation,
   onRateDocument,
   width,
   isCollapsed,
@@ -63,6 +76,7 @@ export function Sidebar({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploadMessage, setUploadMessage] = useState('')
   const [pendingDelete, setPendingDelete] = useState<DocumentItem | null>(null)
+  const [pendingCancel, setPendingCancel] = useState<DocumentItem | null>(null)
   const { pinnedJobIds, isPinned, setPinned } = usePinnedDocuments()
   // Закреплённые идут отдельным разделом в порядке закрепления; остальные — как пришли.
   const pinned = pinnedJobIds.flatMap((jobId) => documents.filter((document) => document.jobId === jobId))
@@ -74,6 +88,7 @@ export function Sidebar({
     isPinned: isPinned(document.jobId),
     onTogglePin: () => { if (document.jobId) setPinned(document.jobId, !isPinned(document.jobId)) },
     onRate: () => onRateDocument(document.id),
+    onCancelTranslation: () => setPendingCancel(document),
     onDelete: () => document.jobId ? setPendingDelete(document) : void onDeleteDocument(document.id),
   })
 
@@ -98,7 +113,8 @@ export function Sidebar({
               title={document.errorMessage}
             >
               {t(documentStatusLabel(document))}
-              {document.progress !== undefined ? ` · ${document.progress}%` : ''}
+              {/* Процент у отменённой задачи ничего не значит: работа остановлена. */}
+              {document.progress !== undefined && document.status !== 'canceled' ? ` · ${document.progress}%` : ''}
               {document.jobId
                 ? ` · ${shortLanguageCode(document.sourceLanguage)} → ${shortLanguageCode(document.targetLanguage)}`
                 : ''}
@@ -142,59 +158,72 @@ export function Sidebar({
           aria-expanded={!isCollapsed}
           title={isCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
         >
-          <span aria-hidden="true">{isCollapsed ? '›' : '‹'}</span>
+          <SidebarToggleIcon />
         </button>
       </div>
 
-      <div className={styles.primaryAction}>
-        <button
-          type="button"
-          className={styles.uploadButton}
-          onClick={() => fileInputRef.current?.click()}
-          aria-describedby="local-upload-status"
-          title={t('sidebar.addBook')}
-        >
-          <span aria-hidden="true">＋</span>
-          <span className={styles.uploadLabel}>{t('sidebar.addBook')}</span>
-        </button>
-        <input
-          ref={fileInputRef}
-          className={styles.fileInput}
-          type="file"
-          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          onChange={handleFileChange}
-        />
-        <p id="local-upload-status" className={styles.uploadStatus} role="status">
-          {uploadMessage}
-        </p>
-      </div>
+      <SidebarModeSwitch mode={mode} booksPath={booksPath} notesPath={notesPath} isCollapsed={isCollapsed} />
 
-      <div className={styles.documentList}>
-        {pinned.length ? (
-          <>
-            <div className={styles.sectionHeader}>
-              <span>{t('sidebar.pinned')}</span>
-              <span className={styles.count}>{pinned.length}</span>
-            </div>
-            <nav className={styles.documentGroup} aria-label={t('sidebar.pinned')}>
-              {pinned.map(renderDocument)}
-            </nav>
-          </>
-        ) : null}
-        <div className={styles.sectionHeader}>
-          <span>{t('sidebar.myBooks')}</span>
-          <span className={styles.count}>{unpinned.length}</span>
+      {mode === 'notes' ? <NotesSidebar isCollapsed={isCollapsed} /> : (
+        <>
+        <div className={styles.primaryAction}>
+          <button
+            type="button"
+            className={styles.uploadButton}
+            onClick={() => fileInputRef.current?.click()}
+            aria-describedby="local-upload-status"
+            title={t('sidebar.addBook')}
+          >
+            <span aria-hidden="true">＋</span>
+            <span className={styles.uploadLabel}>{t('sidebar.addBook')}</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            className={styles.fileInput}
+            type="file"
+            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            onChange={handleFileChange}
+          />
+          <p id="local-upload-status" className={styles.uploadStatus} role="status">
+            {uploadMessage}
+          </p>
         </div>
-        <nav className={styles.documentGroup} aria-label={t('sidebar.myBooks')}>
-          {unpinned.map(renderDocument)}
-        </nav>
-      </div>
+
+        <div className={styles.documentList}>
+          {pinned.length ? (
+            <>
+              <div className={styles.sectionHeader}>
+                <span>{t('sidebar.pinned')}</span>
+                <span className={styles.count}>{pinned.length}</span>
+              </div>
+              <nav className={styles.documentGroup} aria-label={t('sidebar.pinned')}>
+                {pinned.map(renderDocument)}
+              </nav>
+            </>
+          ) : null}
+          <div className={styles.sectionHeader}>
+            <span>{t('sidebar.myBooks')}</span>
+            <span className={styles.count}>{unpinned.length}</span>
+          </div>
+          <nav className={styles.documentGroup} aria-label={t('sidebar.myBooks')}>
+            {unpinned.map(renderDocument)}
+          </nav>
+        </div>
+        </>
+      )}
 
       {pendingDelete ? (
         <DeleteDocumentDialog
           document={pendingDelete}
           onDelete={onDeleteDocument}
           onClose={() => setPendingDelete(null)}
+        />
+      ) : null}
+      {pendingCancel ? (
+        <CancelTranslationDialog
+          document={pendingCancel}
+          onCancelTranslation={onCancelTranslation}
+          onClose={() => setPendingCancel(null)}
         />
       ) : null}
 
@@ -232,5 +261,18 @@ export function Sidebar({
         />
       ) : null}
     </aside>
+  )
+}
+
+/**
+ * Иконка «боковая панель»: окно с выделенной левой колонкой. Одна и та же в обоих
+ * состояниях — направление действия передают aria-label и подсказка, а не форма.
+ */
+function SidebarToggleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="3.5" y="4.5" width="17" height="15" rx="3.5" />
+      <path d="M9.5 4.5v15" />
+    </svg>
   )
 }

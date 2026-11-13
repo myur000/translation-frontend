@@ -1,14 +1,9 @@
-import { ApiClientError } from '../api/client.ts'
+import { hasApiErrorCode } from '../api/client.ts'
 
 /**
- * Бэкенд отвечает 429 и при исчерпанной квоте, и при ограничении частоты запросов,
- * а машиночитаемого кода, чтобы их различить, нет, поэтому квоту узнаём
- * по тексту сообщения (UsageLimitExceededException).
+ * Бэкенд отвечает 429 и при исчерпанной квоте, и при ограничении частоты запросов;
+ * различаем их по машинному коду `USAGE_LIMIT_EXCEEDED`, а не по тексту сообщения.
  */
-const QUOTA_EXCEEDED_MESSAGE = 'Лимит использования функции на текущий период исчерпан'
-
 export function isQuotaExceeded(error: unknown) {
-  return error instanceof ApiClientError &&
-    error.status === 429 &&
-    error.details?.message === QUOTA_EXCEEDED_MESSAGE
+  return hasApiErrorCode(error, 'USAGE_LIMIT_EXCEEDED')
 }

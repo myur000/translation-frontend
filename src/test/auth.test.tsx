@@ -259,7 +259,9 @@ describe('authentication flow', () => {
     )
     await user.click(screen.getByRole('menuitem', { name: 'Выйти' }))
 
-    expect(screen.getByRole('heading', { name: 'Вход' })).toBeTruthy()
+    // Выход сначала дожидается запроса к backend и только потом сбрасывает сессию:
+    // синхронная проверка зависела от того, успел ли запрос за время клика.
+    expect(await screen.findByRole('heading', { name: 'Вход' })).toBeTruthy()
     expect(sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)).toBeNull()
   })
 

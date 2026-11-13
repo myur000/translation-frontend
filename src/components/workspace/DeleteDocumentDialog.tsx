@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { ApiClientError } from '../../api/client.ts'
+import { hasApiErrorCode } from '../../api/client.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
+import { useNotesList } from '../../notes/useNotesList.ts'
 import type { DocumentItem } from '../../types/document.ts'
 import { ConfirmDialog } from '../ui/ConfirmDialog.tsx'
 
@@ -15,6 +16,10 @@ export function DeleteDocumentDialog({ document, onDelete, onClose }: DeleteDocu
   const { t } = useTranslation()
   const [isDeleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Цитаты переживают удаление книги — предупреждаем, в скольких заметках они останутся.
+  const quotingNotes = useNotesList(document.jobId ? { job_id: document.jobId, size: 1 } : null, 0)
+  const notesKept = quotingNotes.status === 'ready' && quotingNotes.total > 0
+    ? ` ${t('delete.notesKept', { count: quotingNotes.total })}` : ''
 
   const confirm = async () => {
     setDeleting(true)
@@ -23,8 +28,8 @@ export function DeleteDocumentDialog({ document, onDelete, onClose }: DeleteDocu
       await onDelete(document.id)
       onClose()
     } catch (reason) {
-      // 409: задача ещё выполняется, бэкенд удалит её только после завершения.
-      setError(reason instanceof ApiClientError && reason.status === 409
+      // Задача ещё выполняется: удалить её можно после завершения или отмены перевода.
+      setError(hasApiErrorCode(reason, 'DOCUMENT_STILL_PROCESSING')
         ? t('delete.processing')
         : t('delete.failed'))
       setDeleting(false)
@@ -34,7 +39,7 @@ export function DeleteDocumentDialog({ document, onDelete, onClose }: DeleteDocu
   return (
     <ConfirmDialog
       title={t('delete.title', { name: document.name })}
-      description={t('delete.description')}
+      description={`${t('delete.description')}${notesKept}`}
       confirmLabel={t('delete.confirm')}
       busy={isDeleting}
       error={error}

@@ -3,6 +3,7 @@ import { AccountProvider } from '../account/AccountProvider.tsx'
 import { useAccount } from '../account/useAccount.ts'
 import { Outlet, useLocation, useMatch, useNavigate } from 'react-router'
 import {
+  cancelDocumentTranslation,
   deleteDocument as deleteDocumentRequest,
   estimateDocument,
   getDocumentHistory,
@@ -15,11 +16,14 @@ import type {
   DocumentUploadResponse,
 } from '../api/contracts/documents.ts'
 import { getTranslationStatus } from '../api/translations.ts'
-import { ApiClientError } from '../api/client.ts'
+import { ApiClientError, hasApiErrorCode } from '../api/client.ts'
 import { useAuth } from '../auth/useAuth.ts'
 import { EmailVerificationBanner } from '../components/auth/EmailVerificationBanner.tsx'
 import { Sidebar } from '../components/sidebar/Sidebar.tsx'
+import { NotesProvider } from '../notes/NotesProvider.tsx'
+import { isNotesPath } from '../notes/notesQuery.ts'
 import { historyItemsToDocuments } from '../documents/documentHistory.ts'
+import { isFinalTranslationStatus, toDocumentStatus } from '../documents/translationStatus.ts'
 import {
   readDocumentMetadata,
   rememberDocumentMetadata,
@@ -85,6 +89,11 @@ export interface AppLayoutContextValue {
   /** Удаляет задачу на бэкенде (черновики — только локально) и убирает её из списка. */
   deleteDocument: (documentId: string) => Promise<void>
   /**
+   * Отменяет перевод, который ещё идёт, и сразу применяет ответ (`CANCELED`, `quota_refund`).
+   * Ошибку пробрасывает вызывающему: текст выбирает диалог подтверждения.
+   */
+  cancelTranslation: (documentId: string) => Promise<void>
+  /**
    * Добавляет локальный черновик из выбранного файла и открывает его. Возвращает текст
    * ошибки для неподдерживаемого или слишком большого файла, иначе `null`.
    */
@@ -121,6 +130,16 @@ function AppLayoutContent() {
   const routeJobId = useMatch('/documents/:jobId')?.params.jobId ?? null
   const routeDraftId = useMatch('/drafts/:draftId')?.params.draftId ?? null
   const isWorkspaceRoute = routeJobId !== null || routeDraftId !== null
+  const isNotesRoute = isNotesPath(location.pathname)
+  // Последнее место в каждом разделе: переключатель «Книги | Заметки» возвращает туда.
+  // Страницы аккаунта (настройки, профиль, тарифы) к разделам не относятся.
+  const [sectionPaths, setSectionPaths] = useState({ books: '/', notes: '/notes' })
+  const currentSection = isNotesRoute ? 'notes'
+    : isWorkspaceRoute || location.pathname === '/' || location.pathname === '/history' ? 'books' : null
+  const currentPath = `${location.pathname}${location.search}`
+  if (currentSection && sectionPaths[currentSection] !== currentPath) {
+    setSectionPaths((paths) => ({ ...paths, [currentSection]: currentPath }))
+  }
 
   // AppLayout переживает навигацию. React повторяет этот рендер до фиксации
   // дочерних элементов, поэтому устаревший полноэкранный режим не попадает на новую страницу.
@@ -149,10 +168,14 @@ function AppLayoutContent() {
   const routeDocumentState: RouteDocumentState = routeDraftId !== null
     ? activeDocument ? 'found' : 'draft-missing'
     : jobRouteState
+  // Кроме идущих переводов досматриваем отменённые, у которых возврат страниц ещё уточняется:
+  // сервис перевода отвечает за секунды, и итог (`REFUNDED` или `NONE`) стоит показать сразу.
   const pollingJobs = documents.flatMap((document) =>
-    document.jobId && document.status === 'processing' && !document.waitingIssue
+    document.jobId && !document.waitingIssue &&
+    (document.status === 'processing' || (document.status === 'canceled' && document.quotaRefund === 'PENDING'))
       ? [{ documentId: document.id, jobId: document.jobId,
-          status: document.serverStatus ?? 'PENDING', progress: document.progress ?? 0 }]
+          status: document.serverStatus ?? 'PENDING', progress: document.progress ?? 0,
+          quotaRefund: document.quotaRefund }]
       : [],
   )
 
@@ -204,12 +227,15 @@ function AppLayoutContent() {
 
   const handleStatusUpdates = useCallback(
     (updates: TranslationStatusUpdate[]) => {
-      // Обновляем один раз на каждую завершённую или упавшую задачу, а не на каждый шаг прогресса.
+      // Расход перечитываем один раз на каждое финальное состояние, а не на каждый шаг прогресса.
+      // У отменённой задачи финальных состояний два: `PENDING` и затем итог возврата страниц.
+      const terminalKey = (response: DocumentStatusResponse) =>
+        `${response.job_id}:${response.status}:${response.quota_refund ?? ''}`
       const completed = updates.filter(({ response }) =>
-        (response.status === 'DONE' || response.status === 'FAILED') &&
-        !observedTerminalJobs.current.has(response.job_id))
+        isFinalTranslationStatus(response.status) &&
+        !observedTerminalJobs.current.has(terminalKey(response)))
       if (completed.length) {
-        completed.forEach(({ response }) => observedTerminalJobs.current.add(response.job_id))
+        completed.forEach(({ response }) => observedTerminalJobs.current.add(terminalKey(response)))
         reloadAccount()
       }
       const updatesByDocument = new Map(
@@ -221,24 +247,21 @@ function AppLayoutContent() {
           const response = updatesByDocument.get(document.id)
           if (!response) return document
 
-          const status =
-            response.status === 'DONE'
-              ? 'ready'
-              : response.status === 'FAILED'
-                ? 'failed'
-                : 'processing'
+          const status = toDocumentStatus(response.status)
           const progress = Math.min(100, Math.max(0, response.progress))
           const errorMessage =
             response.status === 'FAILED'
               ? response.error_message ?? undefined
               : undefined
+          const quotaRefund = response.quota_refund ?? undefined
 
           if (
             document.status === status &&
             document.serverStatus === response.status &&
             !document.waitingIssue &&
             document.progress === progress &&
-            document.errorMessage === errorMessage
+            document.errorMessage === errorMessage &&
+            document.quotaRefund === quotaRefund
           ) {
             return document
           }
@@ -250,6 +273,7 @@ function AppLayoutContent() {
             waitingIssue: undefined,
             progress,
             errorMessage,
+            quotaRefund,
           }
         }),
       )
@@ -286,9 +310,11 @@ function AppLayoutContent() {
       handleStatusUpdates([{ documentId: document.id, response }])
     const partial: DocumentStatusResponse = {
       ...event, error_code: null, error_message: null, file_name: null, glossary_term_count: null,
+      quota_refund: null,
     }
-    // В событии нет текста ошибки; полный статус читаем, когда задача закончилась.
-    if ((event.status === 'DONE' || event.status === 'FAILED') && accessToken) {
+    // В событии нет текста ошибки и итога возврата страниц; полный статус читаем,
+    // когда задача закончилась (в том числе когда уточнился возврат у отменённой).
+    if (isFinalTranslationStatus(event.status) && accessToken) {
       getTranslationStatus(event.job_id, { accessToken }).then(apply, () => apply(partial))
     } else {
       apply(partial)
@@ -525,19 +551,47 @@ function AppLayoutContent() {
     }
   }
 
+  const cancelTranslation = async (documentId: string) => {
+    const document = documents.find((item) => item.id === documentId)
+    if (!document?.jobId || !session) {
+      throw new DocumentUploadPreparationError(t('workspace.uploadUnavailable'))
+    }
+    const jobId = document.jobId
+    const options = { accessToken: session.accessToken }
+    try {
+      const response = await cancelDocumentTranslation(jobId, options)
+      if (response.job_id === jobId) handleStatusUpdates([{ documentId, response }])
+    } catch (error) {
+      // Перевод успел завершиться до отмены: подтягиваем настоящий статус,
+      // чтобы документ не остался «переводящимся» до следующего опроса.
+      if (hasApiErrorCode(error, 'DOCUMENT_ALREADY_FINISHED')) {
+        getTranslationStatus(jobId, options).then(
+          (response) => handleStatusUpdates([{ documentId, response }]),
+          () => setStatusRefreshKey((key) => key + 1),
+        )
+      }
+      throw error
+    }
+  }
+
   return (
     <ProfileProvider>
+      <NotesProvider>
       <div
         className={`${styles.layout} ${isFullscreenMode ? styles.expandedMode : ''} ${sidebar.isResizing ? styles.resizing : ''}`}
         style={{ '--sidebar-current-width': `${sidebar.currentWidth}px` } as CSSProperties}
       >
         {!isFullscreenMode ? (
           <Sidebar
+            mode={isNotesRoute ? 'notes' : 'books'}
+            booksPath={sectionPaths.books}
+            notesPath={sectionPaths.notes}
             documents={documents}
             activeDocumentId={isWorkspaceRoute ? activeDocument?.id : undefined}
             onSelectDocument={handleSelectDocument}
             onUploadDocument={handleSidebarUpload}
             onDeleteDocument={deleteDocument}
+            onCancelTranslation={cancelTranslation}
             onRateDocument={handleRateDocument}
             width={sidebar.expandedWidth}
             isCollapsed={sidebar.isCollapsed}
@@ -570,12 +624,14 @@ function AppLayoutContent() {
                 startDocumentTranslation,
                 retranslateDocument,
                 deleteDocument,
+                cancelTranslation,
                 prepareDocument,
               } satisfies AppLayoutContextValue}
             />
           </div>
         </main>
       </div>
+      </NotesProvider>
     </ProfileProvider>
   )
 }

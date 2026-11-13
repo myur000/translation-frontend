@@ -6,7 +6,7 @@ const item = (jobId: string, overrides: Partial<DocumentHistoryItemResponse> = {
   job_id: jobId, source_lang: 'eng_Latn', target_lang: 'rus_Cyrl', format: 'docx',
   status: 'FAILED', progress: 5, created_at: '2026-11-05T00:00:00Z', updated_at: '2026-11-05T00:00:00Z',
   error_code: 'TRANSLATION_FAILED', error_message: null, billed_units: 1, file_name: null,
-  glossary_term_count: null, ...overrides,
+  glossary_term_count: null, quota_refund: null, ...overrides,
 })
 
 describe('historyItemsToDocuments', () => {
@@ -47,5 +47,15 @@ describe('historyItemsToDocuments', () => {
       { 'job-1': { name: 'local-name.docx', documentId: 'local-1' } },
     )
     expect(document).toMatchObject({ name: 'Договор.docx', billedUnits: 7, glossaryTermCount: 0 })
+  })
+
+  it('keeps a canceled job apart from failed ones together with its page refund', () => {
+    const [canceled, failed] = historyItemsToDocuments(
+      [item('job-1', { status: 'CANCELED', error_code: null, quota_refund: 'REFUNDED' }), item('job-2')],
+      {},
+    )
+    expect(canceled).toMatchObject({ status: 'canceled', serverStatus: 'CANCELED', quotaRefund: 'REFUNDED' })
+    expect(failed).toMatchObject({ status: 'failed' })
+    expect(failed.quotaRefund).toBeUndefined()
   })
 })

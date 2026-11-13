@@ -1,0 +1,147 @@
+.aside {
+  display: grid;
+  align-content: start;
+  gap: 22px;
+  min-width: 0;
+}
+
+.aside h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 9px;
+  color: var(--color-text-soft);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.count {
+  min-width: 20px;
+  padding: 0 6px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-subtle);
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  padding: 2px 9px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.links {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.links a {
+  display: block;
+  overflow: hidden;
+  padding: 6px 8px;
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.links a:hover {
+  background: var(--color-surface-subtle);
+}
+
+.quotes {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quote {
+  padding: 10px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.quote blockquote {
+  margin: 0;
+  padding-left: 10px;
+  color: var(--color-text);
+  border-left: 3px solid var(--color-primary-border);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.paired {
+  margin: 8px 0 0;
+  padding-left: 13px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.quoteMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 8px;
+  color: var(--color-text-soft);
+  font-size: 11px;
+}
+
+.quoteMeta a {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--color-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deleted {
+  font-style: italic;
+}
+
+.meta {
+  display: grid;
+  gap: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.meta p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.meta .storage {
+  margin-top: 6px;
+  line-height: 1.5;
+}

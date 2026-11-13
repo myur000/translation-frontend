@@ -115,9 +115,15 @@
   display: none;
 }
 
+.collapsed { margin-top: 0; }
+
+/* Квадрат того же размера, что и остальные плитки свёрнутой боковой панели. */
 .collapsed .trigger {
+  width: var(--rail-tile, 44px);
+  height: var(--rail-tile, 44px);
   justify-content: center;
-  padding: 7px;
+  margin: 0 auto;
+  padding: 0;
 }
 
 .collapsed .popover {
@@ -136,5 +142,5 @@
   }
   .collapsed .identity { display: grid; }
   .collapsed .chevron { display: inline; }
-  .collapsed .trigger { justify-content: flex-start; padding: 8px 9px; }
+  .collapsed .trigger { width: 100%; height: auto; justify-content: flex-start; margin: 0; padding: 8px 9px; }
 }

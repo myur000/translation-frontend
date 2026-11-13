@@ -146,9 +146,38 @@
   overflow: hidden;
 }
 
-/* Колонки — одна непрерывная поверхность, разделённая тонкой линией. */
-.workArea > section + section {
-  border-left: 1px solid var(--color-border);
+/* Шов между оригиналом и переводом: заметная линия, которая растворяется у плавающих
+   панелей сверху и снизу, и мягкая тень со стороны перевода — колонки читаются как
+   две поверхности, но не как разные окна. Псевдоэлементы не перехватывают прокрутку. */
+.workArea > section + section::before,
+.workArea > section + section::after {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  content: '';
+  pointer-events: none;
+}
+
+.workArea > section + section::before {
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--color-border-strong) 14%,
+    var(--color-border-strong) 86%,
+    transparent
+  );
+}
+
+.workArea > section + section::after {
+  width: 14px;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--color-text) 6%, transparent),
+    transparent
+  );
 }
 
 .withoutNotes {
@@ -297,4 +326,11 @@
     min-height: 280px;
     grid-column: auto;
   }
+}
+
+.notesLoading {
+  margin: 0;
+  padding: 18px 14px;
+  color: var(--color-text-muted);
+  font-size: 12px;
 }

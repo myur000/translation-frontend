@@ -1,7 +1,15 @@
 import type { ISO8601DateTime, UUID } from './common.ts'
 
-export type TranslationStatus = 'PENDING' | 'PROCESSING' | 'DONE' | 'FAILED'
+/** `DONE`, `FAILED` и `CANCELED` — финальные статусы. */
+export type TranslationStatus = 'PENDING' | 'PROCESSING' | 'DONE' | 'FAILED' | 'CANCELED'
 export type TranslationErrorCode = 'TRANSLATION_FAILED'
+/**
+ * Что стало со страницами отменённого документа:
+ * - `REFUNDED` — перевод не начинался, страницы вернули;
+ * - `PENDING` — ждём ответа сервиса перевода (обычно секунды, не дольше суток);
+ * - `NONE` — перевод уже начался, страницы не возвращаются.
+ */
+export type QuotaRefund = 'REFUNDED' | 'PENDING' | 'NONE'
 export type DocumentFileFormat = 'docx' | 'doc' | 'pdf'
 
 export interface DocumentUploadRequest {
@@ -45,6 +53,8 @@ export interface DocumentStatusResponse {
   /** Очищенное имя файла пользователя; `null` у задач, созданных до того, как имена начали сохранять. */
   file_name: string | null
   glossary_term_count: number | null
+  /** Только у `CANCELED`; у остальных статусов `null`. */
+  quota_refund: QuotaRefund | null
 }
 
 export interface DocumentFeedbackRequest {
@@ -81,6 +91,8 @@ export interface DocumentHistoryItemResponse {
   billed_units: number
   file_name: string | null
   glossary_term_count: number | null
+  /** Только у `CANCELED`; у остальных статусов `null`. */
+  quota_refund: QuotaRefund | null
 }
 
 export interface DocumentHistoryResponse {
@@ -95,5 +107,39 @@ export interface DocumentHistoryResponse {
 
 export interface DocumentHistoryQuery {
   page?: number
+  size?: number
+}
+
+/** Пара абзацев с одинаковым номером; сторона без текста приходит как `null`. */
+export interface DocumentTextParagraph {
+  index: number
+  source: string | null
+  translation: string | null
+}
+
+/** GET /api/documents/{jobId}/text — текст оригинала и перевода по абзацам, постранично. */
+export interface DocumentTextResponse {
+  job_id: UUID
+  file_format: 'DOCX' | 'DOC' | 'PDF'
+  source_lang: string
+  target_lang: string
+  /** `false`, когда исходник удалён по сроку хранения: у всех абзацев `source: null`. */
+  source_available: boolean
+  /** Абзац N оригинала соответствует абзацу N перевода (DOCX/DOC с равным числом абзацев). */
+  aligned: boolean
+  source_paragraphs: number | null
+  translation_paragraphs: number
+  /** Документ длиннее лимита просмотра — конец не показан. */
+  truncated: boolean
+  page: number
+  size: number
+  total_paragraphs: number
+  total_pages: number
+  paragraphs: DocumentTextParagraph[]
+}
+
+export interface DocumentTextQuery {
+  page?: number
+  /** До 500 абзацев за запрос. */
   size?: number
 }

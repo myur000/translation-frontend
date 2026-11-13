@@ -25,6 +25,21 @@ export const API_ENDPOINTS = {
       `/documents/${encodeURIComponent(jobId)}/translations`,
     feedback: (jobId: string) =>
       `/documents/${encodeURIComponent(jobId)}/feedback`,
+    cancel: (jobId: string) =>
+      `/documents/${encodeURIComponent(jobId)}/cancel`,
+    text: (jobId: string) =>
+      `/documents/${encodeURIComponent(jobId)}/text`,
+  },
+  notes: {
+    list: '/notes',
+    graph: '/notes/graph',
+    note: (noteId: string) => `/notes/${encodeURIComponent(noteId)}`,
+    backlinks: (noteId: string) =>
+      `/notes/${encodeURIComponent(noteId)}/backlinks`,
+    quotes: (noteId: string) =>
+      `/notes/${encodeURIComponent(noteId)}/quotes`,
+    quote: (noteId: string, quoteId: string) =>
+      `/notes/${encodeURIComponent(noteId)}/quotes/${encodeURIComponent(quoteId)}`,
   },
   terms: '/terms',
   profile: {

@@ -6,6 +6,7 @@ const statusKeys = {
   processing: 'status.processing',
   draft: 'status.draft',
   failed: 'status.failed',
+  canceled: 'status.canceled',
 } as const
 
 export function documentStatusLabel(document: DocumentItem): TranslationKey {

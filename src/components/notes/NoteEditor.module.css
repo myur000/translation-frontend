@@ -1,0 +1,226 @@
+.editor {
+  display: grid;
+  gap: 14px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.titleInput {
+  width: 100%;
+  padding: 8px 0;
+  color: var(--color-text);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  font: inherit;
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.titleInput:focus-visible {
+  border-bottom-color: var(--color-primary);
+  outline: none;
+}
+
+.titleInput[aria-invalid='true'] {
+  border-bottom-color: var(--color-danger);
+}
+
+.problem,
+.error {
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: 12px;
+}
+
+.error {
+  padding: 9px 12px;
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.counter {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tabs button {
+  margin-bottom: -1px;
+  padding: 7px 12px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tabs .tabActive {
+  color: var(--color-text);
+  border-bottom-color: var(--color-primary);
+}
+
+.bodyArea {
+  min-width: 0;
+}
+
+.writePanel {
+  position: relative;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 360px;
+  /* Поле растёт вместе с текстом, страница прокручивается целиком. */
+  field-sizing: content;
+  resize: vertical;
+  padding: 14px 16px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.65;
+  tab-size: 2;
+}
+
+.textarea:focus-visible {
+  border-color: var(--color-primary-border);
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 0;
+}
+
+.suggestions {
+  position: absolute;
+  z-index: 20;
+  width: min(300px, 100%);
+  max-width: calc(100% - 8px);
+  padding: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+}
+
+.suggestionsTitle {
+  display: block;
+  padding: 3px 8px 5px;
+  color: var(--color-text-soft);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.suggestions ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.suggestions li {
+  overflow: hidden;
+  padding: 7px 9px;
+  color: var(--color-text);
+  border-radius: 6px;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.suggestions .suggestionActive {
+  background: var(--color-primary-soft);
+}
+
+.suggestionsEmpty {
+  margin: 0;
+  padding: 4px 8px 6px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.previewPanel {
+  min-height: 360px;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.previewEmpty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.hint {
+  margin-right: auto;
+  color: var(--color-text-soft);
+  font-size: 12px;
+}
+
+.primary,
+.secondary {
+  min-height: 36px;
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+
+.primary {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.secondary {
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.6;
+}
+
+/* Панель рядом с книгой: та же форма, плотнее. */
+.compact { gap: 10px; }
+.compact .titleInput { font-size: 17px; }
+.compact .textarea,
+.compact .previewPanel { min-height: 200px; padding: 10px 12px; font-size: 13px; }
+.compact .actions { justify-content: stretch; }
+.compact .actions button { flex: 1; }

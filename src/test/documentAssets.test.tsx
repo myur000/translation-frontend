@@ -10,15 +10,18 @@ import type { DocumentItem } from '../types/document.ts'
 const mocks = vi.hoisted(() => ({
   session: { email: 'reader@example.com', accessToken: 'first-token' },
   download: vi.fn(),
+  originalText: vi.fn(),
 }))
 vi.mock('../auth/useAuth.ts', () => ({ useAuth: () => ({ session: mocks.session }) }))
 vi.mock('../api/translations.ts', () => ({ downloadTranslation: mocks.download }))
+vi.mock('../api/documentText.ts', () => ({ loadOriginalText: mocks.originalText }))
 const book: DocumentItem = { id: 'book-1', jobId: 'job-1', name: 'book.pdf',
   status: 'ready', pages: 0, sourceLanguage: 'en', targetLanguage: 'ru' }
 const response = () => ({ blob: new Blob(['%PDF fixture']), fileName: 'translated.pdf', contentType: 'application/pdf' })
 beforeEach(() => {
   mocks.session = { email: 'reader@example.com', accessToken: 'first-token' }
   mocks.download.mockReset().mockResolvedValue(response())
+  mocks.originalText.mockReset().mockResolvedValue({ available: true, paragraphs: [{ index: 0, text: 'Chapter One' }, { index: 1, text: 'Body' }], truncated: false })
 })
 afterEach(cleanup)
 
@@ -75,6 +78,47 @@ describe('real document assets', () => {
     act(() => result.current.retry())
     await waitFor(() => expect(result.current.translation.status).toBe('ready'))
     expect(mocks.download).toHaveBeenCalledTimes(2)
+  })
+  it('shows the server text of the original after a reload, when the local file is gone', async () => {
+    const { result } = renderHook(() => useDocumentAssets(book))
+    expect(result.current.original).toEqual({ status: 'loading' })
+    await waitFor(() => expect(result.current.original)
+      .toEqual({ status: 'text', paragraphs: [{ index: 0, text: 'Chapter One' }, { index: 1, text: 'Body' }], truncated: false }))
+    expect(mocks.originalText).toHaveBeenCalledWith('job-1', expect.objectContaining({ accessToken: 'first-token', signal: expect.any(AbortSignal) }))
+  })
+  it('requests the original text only after the translation download, which shares its file slot', async () => {
+    let finish!: (value: ReturnType<typeof response>) => void
+    mocks.download.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    const { result } = renderHook(() => useDocumentAssets(book))
+    expect(mocks.originalText).not.toHaveBeenCalled()
+    await act(async () => finish(response()))
+    await waitFor(() => expect(result.current.original.status).toBe('text'))
+    expect(mocks.originalText).toHaveBeenCalledTimes(1)
+  })
+  it('prefers the local original file and does not request its text', async () => {
+    const file = new File(['original'], 'original.pdf')
+    const { result } = renderHook(() => useDocumentAssets({ ...book, sourceFile: file }))
+    await waitFor(() => expect(result.current.translation.status).toBe('ready'))
+    expect(result.current.original.status).toBe('ready')
+    expect(mocks.originalText).not.toHaveBeenCalled()
+  })
+  it.each(['draft', 'processing', 'failed'] as const)('does not request the original text of a %s document', (status) => {
+    const { result } = renderHook(() => useDocumentAssets({ ...book, status }))
+    expect(result.current.original).toEqual({ status: 'message', message: 'viewer.originalMissing' })
+    expect(mocks.originalText).not.toHaveBeenCalled()
+  })
+  it('explains a source removed by retention and still offers the local file', async () => {
+    mocks.originalText.mockResolvedValue({ available: false, paragraphs: [], truncated: false })
+    const { result } = renderHook(() => useDocumentAssets(book))
+    await waitFor(() => expect(result.current.original).toEqual({ status: 'message', message: 'viewer.originalExpired' }))
+  })
+  it('falls back to choosing the file when the original text cannot be loaded, and retries on request', async () => {
+    mocks.originalText.mockRejectedValueOnce(new ApiClientError('Unavailable', 503, null, null, null))
+    const { result } = renderHook(() => useDocumentAssets(book))
+    await waitFor(() => expect(result.current.original).toEqual({ status: 'message', message: 'viewer.originalMissing', retry: true }))
+    act(() => result.current.retry())
+    await waitFor(() => expect(result.current.original.status).toBe('text'))
+    expect(mocks.originalText).toHaveBeenCalledTimes(2)
   })
   it('reads local files and rejects an aborted read', async () => {
     const buffer = await readBlob(new File(['real file'], 'file.pdf'), new AbortController().signal)

@@ -120,8 +120,10 @@
   cursor: pointer;
 }
 
+/* Компонент задаёт высоту inline по свободному месту на экране;
+   здесь — запасное значение на случай, если замер не удался. */
 .list {
-  max-height: min(340px, 50vh);
+  max-height: min(280px, 50vh);
   margin: 0;
   padding: 4px;
   overflow-y: auto;

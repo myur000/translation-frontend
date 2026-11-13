@@ -3,6 +3,7 @@ import { login } from '../api/auth.ts'
 import { ApiClient, ApiClientError } from '../api/client.ts'
 import { getDocumentHistory, uploadDocument } from '../api/documents.ts'
 import { getProfile } from '../api/profile.ts'
+import { isQuotaExceeded } from '../documents/documentErrors.ts'
 import {
   downloadTranslation,
   getTranslationStatus,
@@ -72,6 +73,28 @@ describe('API client', () => {
       expect(apiError.retryAfterSeconds).toBe(5)
       expect(apiError.details).toEqual(backendError)
     }
+  })
+
+  it('exposes the error code and tells an exhausted quota from rate limiting by it', async () => {
+    const failWith = (body: Record<string, unknown>) => new ApiClient({
+      fetchImplementation: vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        timestamp: '2026-11-09T00:00:00Z', status: 429, path: '/api/documents/upload',
+        fieldErrors: {}, correlation_id: 'c-429', ...body,
+      }), { status: 429, headers: { 'Content-Type': 'application/json' } })),
+    }).request('/documents/upload').catch((error: unknown) => error)
+
+    // Текст тот же, что у квоты, но решает только код.
+    const quota = await failWith({ code: 'USAGE_LIMIT_EXCEEDED', message: 'Лимит исчерпан' })
+    const rateLimit = await failWith({ code: 'RATE_LIMIT_EXCEEDED', message: 'Лимит исчерпан' })
+    const withoutCode = await failWith({ message: 'Лимит исчерпан' })
+
+    expect((quota as ApiClientError).code).toBe('USAGE_LIMIT_EXCEEDED')
+    expect(isQuotaExceeded(quota)).toBe(true)
+    expect(isQuotaExceeded(rateLimit)).toBe(false)
+    // Ответ без кода (например, от прокси) по-прежнему разбирается, просто без кода.
+    expect((withoutCode as ApiClientError).details?.message).toBe('Лимит исчерпан')
+    expect((withoutCode as ApiClientError).code).toBeNull()
+    expect(isQuotaExceeded(withoutCode)).toBe(false)
   })
 })
 

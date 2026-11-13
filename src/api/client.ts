@@ -1,4 +1,4 @@
-import type { ApiError } from './contracts/common.ts'
+import type { ApiError, ApiErrorCode, KnownApiErrorCode } from './contracts/common.ts'
 import { createBearerHeaders } from './authHeaders.ts'
 import { API_BASE_URL } from './config.ts'
 
@@ -87,6 +87,7 @@ function isApiError(value: unknown): value is ApiError {
     isRecord(value) &&
     typeof value.timestamp === 'string' &&
     typeof value.status === 'number' &&
+    (value.code === undefined || typeof value.code === 'string') &&
     typeof value.message === 'string' &&
     typeof value.path === 'string' &&
     isFieldErrors(value.fieldErrors) &&
@@ -138,6 +139,16 @@ export class ApiClientError extends Error {
     this.correlationId = correlationId
     this.retryAfterSeconds = retryAfterSeconds
   }
+
+  /** Машинный код ошибки из тела ответа; `null`, если тела нет или в нём нет кода. */
+  get code(): ApiErrorCode | null {
+    return this.details?.code ?? null
+  }
+}
+
+/** Ошибка API с указанным машинным кодом. */
+export function hasApiErrorCode(error: unknown, code: KnownApiErrorCode): error is ApiClientError {
+  return error instanceof ApiClientError && error.code === code
 }
 
 export class ApiClient {

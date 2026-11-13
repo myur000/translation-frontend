@@ -266,7 +266,7 @@ describe('workspace interactions', () => {
     size.width = 420
     size.height = 500
     fireEvent.contextMenu(original)
-    expect(screen.getByRole('complementary', { name: 'Заметки' })).toBeTruthy()
+    expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
     expect(original.scrollTop).toBeCloseTo(750)
     expect(original.scrollLeft).toBeCloseTo(490)
     fireEvent.scroll(original)
@@ -536,7 +536,7 @@ describe('workspace interactions', () => {
     expect(screen.queryByRole('button', { name: 'Заметки' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Свернуть панель «Оригинал»' })).toBeNull()
     fireEvent.contextMenu(screen.getByRole('region', { name: 'Оригинал' }))
-    expect(screen.getByRole('complementary', { name: 'Заметки' })).toBeTruthy()
+    expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
     await user.keyboard('{Escape}')
 
     expect(screen.getByRole('region', { name: 'Перевод' })).toBeTruthy()
@@ -653,7 +653,7 @@ describe('workspace interactions', () => {
 
     fireEvent.contextMenu(screen.getByRole('region', { name: 'Оригинал' }))
 
-    expect(screen.getByRole('complementary', { name: 'Заметки' })).toBeTruthy()
+    expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Заметки' })).toBeNull()
 
     await user.click(
@@ -703,7 +703,7 @@ describe('workspace interactions', () => {
     renderApp()
 
     await user.click(await screen.findByRole('button', { name: 'Заметки' }))
-    expect(screen.getByRole('complementary', { name: 'Заметки' })).toBeTruthy()
+    expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
 
     await user.click(
       await screen.findByRole('button', { name: /^project_report\.docx/i }),
@@ -868,7 +868,7 @@ describe('workspace interactions', () => {
     await user.keyboard('g')
     expect(screen.queryByRole('region', { name: 'Оригинал' })).toBeNull()
     fireEvent.contextMenu(screen.getByRole('region', { name: 'Перевод' }))
-    expect(screen.getByRole('complementary', { name: 'Заметки' })).toBeTruthy()
+    expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
     await user.keyboard('g')
     expect(screen.getByText('Мои книги')).toBeTruthy()
     fireEvent.keyDown(window, { key: 'в', code: 'KeyD' })
@@ -880,6 +880,21 @@ describe('workspace interactions', () => {
     expect(screen.getByRole('region', { name: 'Перевод' })).toBeTruthy()
     await user.keyboard('{Escape}')
     expect(screen.getByText('Мои книги')).toBeTruthy()
+  })
+
+  it('focuses the document column on F without a focus ring until it loses focus', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    await findWorkspaceRegion('Оригинал')
+
+    await user.keyboard('f')
+    const viewport = screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' })
+    expect(document.activeElement).toBe(viewport)
+    expect(viewport.hasAttribute('data-quiet-focus')).toBe(true)
+
+    // Дальнейшая навигация по Tab снова показывает обычное кольцо фокуса.
+    act(() => viewport.blur())
+    expect(viewport.hasAttribute('data-quiet-focus')).toBe(false)
   })
 
   it('sends an unverified account upload to backend and keeps the draft when backend rejects it', async () => {
@@ -1000,6 +1015,36 @@ describe('workspace interactions', () => {
     expect(screen.getByRole('listbox', { name: 'Язык перевода' }).parentElement?.dataset.align).toBe('start')
   })
 
+  it('keeps the language list inside the viewport vertically', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    await addDraft(user)
+    const trigger = await screen.findByRole('button', { name: 'Язык перевода: Русский' })
+    const height = window.innerHeight
+
+    // Кнопка у нижнего края: снизу места нет, список раскрывается вверх.
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(
+      DOMRect.fromRect({ x: 20, y: height - 60, width: 120, height: 30 }),
+    )
+    await user.click(trigger)
+    let listbox = screen.getByRole('listbox', { name: 'Язык перевода' })
+    expect(listbox.parentElement?.dataset.side).toBe('top')
+    expect(parseFloat(listbox.style.maxHeight)).toBeLessThanOrEqual(280)
+    await user.keyboard('{Escape}')
+
+    // Места мало с обеих сторон: список укорачивается, а не уходит за край.
+    vi.mocked(trigger.getBoundingClientRect).mockReturnValue(
+      DOMRect.fromRect({ x: 20, y: 200, width: 120, height: 30 }),
+    )
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(450)
+    await user.click(trigger)
+    listbox = screen.getByRole('listbox', { name: 'Язык перевода' })
+    const freeBelow = 450 - 230 - 6 - 16
+    expect(listbox.parentElement?.dataset.side).toBe('bottom')
+    expect(parseFloat(listbox.style.maxHeight)).toBeLessThanOrEqual(freeBelow)
+    expect(parseFloat(listbox.style.maxHeight)).toBeGreaterThanOrEqual(120)
+  })
+
   it('keeps popular languages available when the catalog fails to load', async () => {
     const user = userEvent.setup()
     renderApp()
@@ -1035,7 +1080,7 @@ describe('workspace interactions', () => {
     expect(screen.queryByRole('complementary', { name: 'Заметки' })).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'Заметки' }))
-    expect(screen.getByRole('complementary', { name: 'Заметки' })).toBeTruthy()
+    expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
   })
 
   it('changes and persists theme and interface language', async () => {
@@ -1253,8 +1298,8 @@ describe('history integration', () => {
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 
-const apiErrorBody = (status: number, message: string) => ({
-  timestamp: '2026-11-05T00:00:00Z', status, message, path: '/api', fieldErrors: {}, correlation_id: `c-${status}`,
+const apiErrorBody = (status: number, message: string, code?: string) => ({
+  timestamp: '2026-11-05T00:00:00Z', status, code, message, path: '/api', fieldErrors: {}, correlation_id: `c-${status}`,
 })
 
 type ApiOverride = (init?: RequestInit) => Response
@@ -1364,7 +1409,7 @@ describe('document actions', () => {
       }),
     })
 
-    await user.click(within(await openTools(user)).getByRole('menuitem', { name: 'Перевести на другой язык…' }))
+    await user.click(within(await openTools(user)).getByRole('menuitem', { name: 'На другой язык' }))
     const dialog = screen.getByRole('dialog', { name: 'Перевести на другой язык' })
     expect(within(dialog).getByRole('button', { name: 'Язык перевода: Немецкий' })).toBeTruthy()
     await user.click(await within(dialog).findByRole('checkbox', { name: 'Применить мой глоссарий · терминов: 3' }))
@@ -1379,6 +1424,23 @@ describe('document actions', () => {
     expect(within(sidebarList()).getAllByRole('button', { name: /^english_course_book\.pdf/ })).toHaveLength(2)
   })
 
+  it('shows the document menu with icons and opens the language list from the language pair', async () => {
+    const user = userEvent.setup()
+    renderDocumentRoute(`/documents/${firstJob}`)
+
+    const menu = await openActions(user)
+    expect(within(menu).getAllByRole('menuitem').map((item) => item.textContent))
+      .toEqual(['Закрепить', 'Оценить перевод', 'На другой язык', 'Удалить'])
+    expect(within(menu).getAllByRole('menuitem').every((item) => item.querySelector('svg'))).toBe(true)
+    await user.keyboard('{Escape}')
+
+    await user.click(screen.getByRole('button', { name: /Языки перевода/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Перевести на другой язык' })
+    // Список языков раскрыт сразу, фокус — в поиске.
+    expect(within(dialog).getByRole('listbox', { name: 'Язык перевода' })).toBeTruthy()
+    expect(document.activeElement).toBe(within(dialog).getByRole('combobox', { name: 'Найти язык' }))
+  })
+
   it('explains that the original has expired on the server', async () => {
     const user = userEvent.setup()
     renderDocumentRoute(`/documents/${firstJob}`, {
@@ -1386,7 +1448,7 @@ describe('document actions', () => {
         jsonResponse(apiErrorBody(410, 'Исходный файл удалён'), 410),
     })
 
-    await user.click(within(await openTools(user)).getByRole('menuitem', { name: 'Перевести на другой язык…' }))
+    await user.click(within(await openTools(user)).getByRole('menuitem', { name: 'На другой язык' }))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Перевести' }))
 
     expect((await within(screen.getByRole('dialog')).findByRole('alert')).textContent)
@@ -1405,7 +1467,7 @@ describe('document actions', () => {
     })
 
     await user.click(within(await openBookActions(user, 'english_course_book.pdf'))
-      .getByRole('menuitem', { name: 'Удалить документ…' }))
+      .getByRole('menuitem', { name: 'Удалить' }))
     const dialog = screen.getByRole('alertdialog', { name: 'Удалить «english_course_book.pdf»?' })
     await user.click(within(dialog).getByRole('button', { name: 'Удалить' }))
 
@@ -1417,15 +1479,16 @@ describe('document actions', () => {
   it('keeps a document that is still being translated', async () => {
     const user = userEvent.setup()
     renderDocumentRoute(`/documents/${firstJob}`, {
-      [`/api/documents/${firstJob}`]: () => jsonResponse(apiErrorBody(409, 'Документ переводится'), 409),
+      [`/api/documents/${firstJob}`]: () =>
+        jsonResponse(apiErrorBody(409, 'Документ переводится', 'DOCUMENT_STILL_PROCESSING'), 409),
     })
 
     await user.click(within(await openBookActions(user, 'english_course_book.pdf'))
-      .getByRole('menuitem', { name: 'Удалить документ…' }))
+      .getByRole('menuitem', { name: 'Удалить' }))
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Удалить' }))
 
     expect((await within(screen.getByRole('alertdialog')).findByRole('alert')).textContent)
-      .toBe('Документ ещё переводится — удалить его можно после завершения.')
+      .toBe('Документ ещё переводится — удалить его можно после завершения или отмены перевода.')
     expect(screen.getAllByRole('button', { name: /^english_course_book\.pdf/ }).length).toBeGreaterThan(0)
   })
 
@@ -1474,7 +1537,7 @@ describe('document actions', () => {
       [`/api/documents/${firstJob}`]: () => new Response(null, { status: 204 }),
     })
 
-    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Удалить документ…' }))
+    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Удалить' }))
     await user.click(within(screen.getByRole('alertdialog', { name: 'Удалить «english_course_book.pdf»?' }))
       .getByRole('button', { name: 'Удалить' }))
 
@@ -1510,10 +1573,12 @@ describe('document actions', () => {
       }),
     })
 
-    const item = within(await openBookActions(user, 'english_course_book.pdf'))
-      .getByRole('menuitem', { name: 'Удалить документ…' })
+    const menu = within(await openBookActions(user, 'english_course_book.pdf'))
+    const item = menu.getByRole('menuitem', { name: 'Удалить' })
     expect(item.getAttribute('aria-disabled')).toBe('true')
-    expect(item.getAttribute('title')).toBe('Документ ещё переводится')
+    expect(item.getAttribute('title')).toBe('Сначала отмените перевод или дождитесь его завершения')
+    // Вместо удаления меню предлагает то, что сейчас доступно, — отмену.
+    expect(menu.getByRole('menuitem', { name: 'Отменить перевод' }).getAttribute('aria-disabled')).toBe('false')
   })
 })
 
@@ -1608,7 +1673,7 @@ describe('cost, glossary and rating', () => {
       },
     })
 
-    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Оценить перевод…' }))
+    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Оценить перевод' }))
     const prompt = await screen.findByRole('dialog', { name: 'Как вам перевод?' })
     await user.click(within(prompt).getByRole('radio', { name: '4 из 5' }))
 
@@ -1631,7 +1696,7 @@ describe('cost, glossary and rating', () => {
 
     await user.click(await screen.findByRole('button', { name: `Действия: ${secondName}` }))
     await user.click(within(screen.getByRole('menu', { name: `Действия: ${secondName}` }))
-      .getByRole('menuitem', { name: 'Оценить перевод…' }))
+      .getByRole('menuitem', { name: 'Оценить перевод' }))
 
     const prompt = await screen.findByRole('dialog', { name: 'Как вам перевод?' })
     expect(within(prompt).getByText(secondName)).toBeTruthy()
@@ -1651,7 +1716,7 @@ describe('cost, glossary and rating', () => {
       },
     })
 
-    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Оценить перевод…' }))
+    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Оценить перевод' }))
     const prompt = await screen.findByRole('dialog', { name: 'Как вам перевод?' })
     expect(within(prompt).getByRole('radio', { name: '5 из 5' }).getAttribute('aria-checked')).toBe('true')
     await user.click(within(prompt).getByRole('radio', { name: '2 из 5' }))
@@ -1666,9 +1731,9 @@ describe('document status events', () => {
     items: [{ ...historyItems[0], status: 'PROCESSING', progress: 10, file_name: 'Книга.pdf' }],
     page: 0, size: 100, total_elements: 1, total_pages: 1, first: true, last: true,
   })
-  const statusResponse = (status: string, progress: number) => () => jsonResponse({
+  const statusResponse = (status: string, progress: number, quotaRefund: string | null = null) => () => jsonResponse({
     job_id: job, status, progress, error_code: null, error_message: null,
-    file_name: 'Книга.pdf', glossary_term_count: null,
+    file_name: 'Книга.pdf', glossary_term_count: null, quota_refund: quotaRefund,
   })
 
   /** Открытый поток text/event-stream, в который пишет тест. */
@@ -1714,6 +1779,146 @@ describe('document status events', () => {
 
     expect(await screen.findByText(/Готов · 100%/)).toBeTruthy()
     expect(callsTo(fetchMock, '/api/documents/events', 'GET')).toHaveLength(1)
+  })
+
+  describe('cancellation', () => {
+    let restoreDialog: () => void
+    beforeEach(() => { restoreDialog = installDialogPolyfill() })
+    // Размонтируем открытые диалоги до того, как исчезнут их методы.
+    afterEach(() => {
+      cleanup()
+      restoreDialog()
+    })
+
+    type ServerState = [status: string, progress: number, quotaRefund: string | null]
+    const historyWith = (status: string, progress: number) => () => jsonResponse({
+      items: [{ ...historyItems[0], status, progress, file_name: 'Книга.pdf' }],
+      page: 0, size: 100, total_elements: 1, total_pages: 1, first: true, last: true,
+    })
+    const noEvents = () => jsonResponse(apiErrorBody(404, 'Not found'), 404)
+    const notice = (text: string) => screen.findByText(text, { selector: '[role="status"]' })
+
+    it('cancels a running translation after warning that its pages stay spent', async () => {
+      const user = userEvent.setup()
+      let server: ServerState = ['PROCESSING', 40, null]
+      const { fetchMock } = renderDocumentRoute(`/documents/${job}`, {
+        '/api/documents/history?page=0&size=100': historyWith('PROCESSING', 40),
+        '/api/documents/events': noEvents,
+        [`/api/documents/${job}/status`]: () => statusResponse(...server)(),
+        [`/api/documents/${job}/cancel`]: () => {
+          server = ['CANCELED', 40, 'NONE']
+          return statusResponse(...server)()
+        },
+      })
+
+      await user.click(await screen.findByRole('button', { name: 'Отменить перевод' }))
+      const dialog = screen.getByRole('alertdialog', { name: 'Отменить перевод «Книга.pdf»?' })
+      expect(dialog.textContent).toContain('работа остановится, но списанные страницы не вернутся')
+      await user.click(within(dialog).getByRole('button', { name: 'Отменить перевод' }))
+
+      expect(await notice('Перевод отменён. Он уже начался, поэтому списанные страницы не вернутся.')).toBeTruthy()
+      expect(screen.queryByRole('alertdialog')).toBeNull()
+      expect(within(sidebarList()).getByText(/^Отменён/).textContent).not.toContain('%')
+      // Отменённый документ можно отправить снова, а кнопки отмены больше нет.
+      expect(screen.getByRole('button', { name: 'Повторить' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'Отменить перевод' })).toBeNull()
+      expect(callsTo(fetchMock, `/api/documents/${job}/cancel`, 'POST')).toHaveLength(1)
+    })
+
+    it('replaces the "sent for translation" notice with the result of the cancellation', async () => {
+      const user = userEvent.setup()
+      const newJob = '00000000-0000-0000-0000-000000000601'
+      let server: ServerState = ['PENDING', 0, null]
+      const status = () => jsonResponse({
+        job_id: newJob, status: server[0], progress: server[1], error_code: null, error_message: null,
+        file_name: 'Договор.pdf', glossary_term_count: null, quota_refund: server[2],
+      })
+      renderDocumentRoute('/', {
+        '/api/documents/events': noEvents,
+        '/api/documents/upload': () => jsonResponse({ job_id: newJob, billed_units: 2, glossary_term_count: null }, 202),
+        [`/api/documents/${newJob}/status`]: status,
+        [`/api/documents/${newJob}/cancel`]: () => {
+          server = ['CANCELED', 0, 'REFUNDED']
+          return status()
+        },
+      })
+      await screen.findAllByText('english_course_book.pdf')
+      const input = document.body.querySelector<HTMLInputElement>('input[type="file"]')
+      await user.upload(input as HTMLInputElement, new File(['%PDF'], 'Договор.pdf', { type: 'application/pdf' }))
+      await user.click(await screen.findByRole('button', { name: 'Перевести' }))
+      expect(await screen.findByText(/«Договор\.pdf» отправлен на перевод/)).toBeTruthy()
+
+      await user.click(screen.getByRole('button', { name: 'Отменить перевод' }))
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Отменить перевод' }))
+
+      expect(await notice('Перевод отменён. Списанные страницы вернулись на счёт.')).toBeTruthy()
+      expect(screen.queryByText(/отправлен на перевод/)).toBeNull()
+      // Возвращённые страницы больше не показываются как списанные.
+      expect(screen.queryByText(/списано 2 стр\./)).toBeNull()
+    })
+
+    it('keeps translating when the user changes their mind', async () => {
+      const user = userEvent.setup()
+      const { fetchMock } = renderDocumentRoute(`/documents/${job}`, {
+        '/api/documents/history?page=0&size=100': historyWith('PROCESSING', 40),
+        '/api/documents/events': noEvents,
+        [`/api/documents/${job}/status`]: statusResponse('PROCESSING', 40),
+      })
+
+      await user.click(await screen.findByRole('button', { name: 'Отменить перевод' }))
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Продолжить перевод' }))
+
+      expect(screen.queryByRole('alertdialog')).toBeNull()
+      expect(callsTo(fetchMock, `/api/documents/${job}/cancel`, 'POST')).toHaveLength(0)
+    })
+
+    it('shows the page refund once the translation service confirms it', async () => {
+      const user = userEvent.setup()
+      const stream = eventStream()
+      let server: ServerState = ['PENDING', 0, null]
+      renderDocumentRoute(`/documents/${job}`, {
+        '/api/documents/history?page=0&size=100': historyWith('PENDING', 0),
+        '/api/documents/events': stream.response,
+        [`/api/documents/${job}/status`]: () => statusResponse(...server)(),
+        [`/api/documents/${job}/cancel`]: () => {
+          server = ['CANCELED', 0, 'PENDING']
+          return statusResponse(...server)()
+        },
+      })
+      await stream.send('ready', { expires_at: '2026-11-05T01:00:00Z' })
+
+      await user.click(await screen.findByRole('button', { name: 'Отменить перевод' }))
+      const dialog = screen.getByRole('alertdialog')
+      expect(dialog.textContent).toContain('страницы вернутся на счёт')
+      await user.click(within(dialog).getByRole('button', { name: 'Отменить перевод' }))
+      expect(await notice('Перевод отменён. Возврат страниц уточняется — обычно это несколько секунд.')).toBeTruthy()
+
+      // Сервис перевода подтвердил, что не начинал: событие CANCELED просит перечитать статус.
+      server = ['CANCELED', 0, 'REFUNDED']
+      await stream.send('job', { job_id: job, status: 'CANCELED', progress: 0 })
+      expect(await notice('Перевод отменён. Списанные страницы вернулись на счёт.')).toBeTruthy()
+    })
+
+    it('explains that a finished translation can no longer be canceled and shows the result', async () => {
+      const user = userEvent.setup()
+      let server: ServerState = ['PROCESSING', 90, null]
+      renderDocumentRoute(`/documents/${job}`, {
+        '/api/documents/history?page=0&size=100': historyWith('PROCESSING', 90),
+        '/api/documents/events': noEvents,
+        [`/api/documents/${job}/status`]: () => statusResponse(...server)(),
+        [`/api/documents/${job}/cancel`]: () => {
+          server = ['DONE', 100, null]
+          return jsonResponse(apiErrorBody(409, 'Перевод уже завершён', 'DOCUMENT_ALREADY_FINISHED'), 409)
+        },
+      })
+
+      await user.click(await screen.findByRole('button', { name: 'Отменить перевод' }))
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Отменить перевод' }))
+
+      expect((await within(screen.getByRole('alertdialog')).findByRole('alert')).textContent)
+        .toBe('Перевод уже завершён — отменить его нельзя.')
+      expect(await within(sidebarList()).findByText(/Готов · 100%/)).toBeTruthy()
+    })
   })
 })
 

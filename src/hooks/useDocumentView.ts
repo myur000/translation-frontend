@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { AssetState, DocumentAsset, DocumentView } from '../viewer/types.ts'
 
 export function useDocumentView(source: AssetState): DocumentView {
   const asset = source.status === 'ready' ? source.asset : null
   const [loaded, setLoaded] = useState<{ asset: DocumentAsset; view: DocumentView } | null>(null)
+  // Текст уже разобран сервером; вид пересоздаётся только вместе с источником.
+  const textView = useMemo<DocumentView | null>(() => source.status === 'text'
+    ? { status: 'ready', kind: 'text', paragraphs: source.paragraphs, truncated: source.truncated, pageCount: null }
+    : null, [source])
   useEffect(() => {
     if (!asset || asset.format === 'doc') return
     const controller = new AbortController()
@@ -34,6 +38,8 @@ export function useDocumentView(source: AssetState): DocumentView {
     return () => controller.abort()
   }, [asset])
 
+  // textView строится из того же source, поэтому запасная ветка недостижима и нужна только типам.
+  if (source.status === 'text') return textView ?? { status: 'loading' }
   if (source.status !== 'ready') return source
   if (source.asset.format === 'doc') return { status: 'message', message: 'viewer.legacyDoc' }
   return loaded?.asset === source.asset ? loaded.view : { status: 'loading' }

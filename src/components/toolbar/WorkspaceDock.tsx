@@ -1,5 +1,6 @@
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import { useLanguageCatalog } from '../../languages/useLanguageCatalog.ts'
+import { endedWithoutResult } from '../../documents/translationStatus.ts'
 import type { DocumentItem, LanguageCode } from '../../types/document.ts'
 import { LanguagePicker } from '../languages/LanguagePicker.tsx'
 import { DocumentActionsMenu, type DocumentAction } from './DocumentActionsMenu.tsx'
@@ -14,6 +15,8 @@ interface WorkspaceDockProps {
   onSourceLanguageChange: (language: LanguageCode) => void
   onTargetLanguageChange: (language: LanguageCode) => void
   onSwapLanguages: () => void
+  /** Нажатие на пару языков отправленного документа: перевод на другой язык. */
+  onChooseLanguage: () => void
   /** Пункты меню «+»: глоссарий, другой язык и всё, что появится позже. */
   tools: DocumentAction[]
   currentPage: number
@@ -27,6 +30,8 @@ interface WorkspaceDockProps {
   isTranslating: boolean
   canTranslate: boolean
   onTranslate: () => void
+  /** Отмена идущего перевода; без него кнопка не показывается. */
+  onCancelTranslation?: () => void
   isDownloading: boolean
   canDownload: boolean
   onDownload: () => void
@@ -34,14 +39,14 @@ interface WorkspaceDockProps {
 
 /**
  * Что предлагает панель, зависит от состояния документа:
- * - `edit` — черновик или неудачная задача: выбор языков и перевод;
- * - `progress` — задача выполняется: языки зафиксированы, показан прогресс;
+ * - `edit` — черновик, неудачная или отменённая задача: выбор языков и перевод;
+ * - `progress` — задача выполняется: языки зафиксированы, показан прогресс и отмена;
  * - `done` — результат готов: главное действие — скачать.
  */
 type DockMode = 'edit' | 'progress' | 'done'
 
 function dockMode(document: DocumentItem): DockMode {
-  if (!document.jobId || document.status === 'failed' || document.status === 'draft') return 'edit'
+  if (!document.jobId || endedWithoutResult(document) || document.status === 'draft') return 'edit'
   return document.status === 'processing' ? 'progress' : 'done'
 }
 
@@ -78,13 +83,23 @@ export function WorkspaceDock(props: WorkspaceDockProps) {
           <LanguagePicker value={props.targetLanguage} label={t('toolbar.targetLanguage')} prefix={t('toolbar.to')} placement="top" onChange={props.onTargetLanguageChange} />
         </div>
       ) : (
-        <span className={styles.languagePair}>
+        // У отправленного документа язык оригинала уже закреплён за файлом на сервере,
+        // поэтому плашка открывает перевод того же текста на другой язык.
+        <button
+          type="button"
+          className={styles.languagePair}
+          aria-haspopup="dialog"
+          disabled={mode === 'progress'}
+          title={mode === 'progress' ? t('documentActions.processing') : t('retranslate.title')}
+          onClick={props.onChooseLanguage}
+        >
           <span className={styles.visuallyHidden}>{t('toolbar.languagePair')}: </span>
           {getLabel(document.sourceLanguage)}
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9.5m0 0L9.5 5m3 3-3 3" /></svg>
           <span className={styles.visuallyHidden}> → </span>
           {getLabel(document.targetLanguage)}
-        </span>
+          <svg className={styles.chevron} viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+        </button>
       )}
 
       <span className={styles.separator} aria-hidden="true" />
@@ -113,7 +128,7 @@ export function WorkspaceDock(props: WorkspaceDockProps) {
           <button type="button" className={styles.primaryButton} disabled={props.isTranslating || !props.canTranslate} aria-busy={props.isTranslating} onClick={props.onTranslate}>
             {t(props.isTranslating
               ? 'toolbar.translating'
-              : document.status === 'failed' ? 'toolbar.retryTranslation' : 'toolbar.translate')}
+              : endedWithoutResult(document) ? 'toolbar.retryTranslation' : 'toolbar.translate')}
           </button>
         ) : null}
         {mode === 'progress' ? (
@@ -124,6 +139,18 @@ export function WorkspaceDock(props: WorkspaceDockProps) {
           ) : (
             <ProgressPill document={document} />
           )
+        ) : null}
+        {mode === 'progress' && props.onCancelTranslation ? (
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            aria-haspopup="dialog"
+            aria-label={t('documentActions.cancelTranslation')}
+            title={t('documentActions.cancelTranslation')}
+            onClick={props.onCancelTranslation}
+          >
+            {t('toolbar.cancelTranslation')}
+          </button>
         ) : null}
         {mode === 'done' ? (
           <button
