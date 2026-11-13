@@ -1,11 +1,10 @@
-/* Плавающие блоки как поле ввода в чате: белая карточка с мягкой тенью. */
-.dock,
-.notes {
+/* Плавающая панель как поле ввода в чате: белая карточка с мягкой тенью. */
+.dock {
   background: var(--color-surface);
   border: 1px solid var(--color-border-strong);
   border-radius: 16px;
   box-shadow: 0 6px 24px rgb(9 20 35 / 10%), 0 1px 3px rgb(9 20 35 / 6%);
-  /* Слой под блоками прозрачен для кликов; сами блоки их принимают. */
+  /* Слой под панелью прозрачен для кликов; сама панель их принимает. */
   pointer-events: auto;
 }
 
@@ -131,8 +130,7 @@
 
 .languagePair svg,
 .iconButton svg,
-.primaryButton svg,
-.notes svg {
+.primaryButton svg {
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -235,31 +233,6 @@
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.notes {
-  width: 52px;
-  height: 52px;
-  display: grid;
-  flex: none;
-  place-items: center;
-  color: var(--color-text);
-}
-
-.notes svg {
-  width: 22px;
-  height: 22px;
-}
-
-.notes:hover {
-  background: var(--color-surface-subtle);
-}
-
-.notesActive,
-.notesActive:hover {
-  color: var(--color-primary);
-  background: var(--color-primary-soft);
-  border-color: var(--color-primary-border);
 }
 
 .visuallyHidden {

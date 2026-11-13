@@ -193,31 +193,3 @@ function ProgressPill({ document }: { document: DocumentItem }) {
     </div>
   )
 }
-
-interface NotesToggleProps {
-  isOpen: boolean
-  onToggle: () => void
-}
-
-/**
- * Заметки вынесены в собственный блок рядом с панелью: в будущем это отдельный
- * большой раздел (заметки и граф связей), а не одна из кнопок просмотра.
- */
-export function NotesToggle({ isOpen, onToggle }: NotesToggleProps) {
-  const { t } = useTranslation()
-  return (
-    <button
-      type="button"
-      className={`${styles.notes} ${isOpen ? styles.notesActive : ''}`}
-      aria-label={t('toolbar.notes')}
-      aria-pressed={isOpen}
-      title={t('toolbar.notes')}
-      onClick={onToggle}
-    >
-      <svg viewBox="0 0 20 20" aria-hidden="true">
-        <path d="M10 17H5V3h7l3 3v3.5M12 3v3h3M7.5 8h5M7.5 11h3" />
-        <path d="m11.8 17.6.6-2.6 4.6-4.6a1.3 1.3 0 0 1 1.9 1.9l-4.6 4.6z" />
-      </svg>
-    </button>
-  )
-}

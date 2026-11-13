@@ -1,12 +1,6 @@
-import { lazy, Suspense, useEffect, useState, type CSSProperties, type MouseEvent } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useOutletContext } from 'react-router'
 import { ApiClientError } from '../api/client.ts'
-import type { NoteQuoteResponse } from '../api/contracts/notes.ts'
-import type { ShowQuoteResult } from '../components/notes/PanelNoteView.tsx'
-import { QuoteSelectionButton } from '../components/notes/QuoteSelectionButton.tsx'
-import { useQuoteSelection } from '../hooks/useQuoteSelection.ts'
-import { findQuoteElement, revealQuoteElement } from '../notes/quoteHighlight.ts'
-import type { QuoteSelection } from '../notes/quoteLocator.ts'
 import type { DocumentAction } from '../components/toolbar/DocumentActionsMenu.tsx'
 import { createIdempotencyKey } from '../api/idempotency.ts'
 import { RetranslateDialog } from '../components/workspace/RetranslateDialog.tsx'
@@ -17,7 +11,7 @@ import {
 } from '../documents/feedbackPromptStorage.ts'
 import { useGlossaryTermCount } from '../documents/useGlossaryTermCount.ts'
 import { DocumentHeader } from '../components/toolbar/DocumentHeader.tsx'
-import { NotesToggle, WorkspaceDock } from '../components/toolbar/WorkspaceDock.tsx'
+import { WorkspaceDock } from '../components/toolbar/WorkspaceDock.tsx'
 import { DeleteDocumentDialog } from '../components/workspace/DeleteDocumentDialog.tsx'
 import { CancelTranslationDialog } from '../components/workspace/CancelTranslationDialog.tsx'
 import { documentMenuActions } from '../documents/documentMenuActions.ts'
@@ -26,11 +20,6 @@ import { usePinnedDocuments } from '../documents/pinnedDocuments.ts'
 import { wantsFeedbackPrompt } from '../documents/documentRoutes.ts'
 import { OriginalPanel } from '../components/workspace/OriginalPanel.tsx'
 import { TranslationPanel } from '../components/workspace/TranslationPanel.tsx'
-import {
-  NOTES_MAX_WIDTH,
-  NOTES_MIN_WIDTH,
-  useResizableNotesPanel,
-} from '../hooks/useResizableNotesPanel.ts'
 import { useElementHeight } from '../hooks/useElementHeight.ts'
 import { useSynchronizedScroll } from '../hooks/useSynchronizedScroll.ts'
 import { useBookZoom } from '../hooks/useBookZoom.ts'
@@ -106,7 +95,6 @@ function DocumentWorkspace({
   const [targetLanguage, setTargetLanguage] = useState(() => toCatalogLanguageCode(document.targetLanguage))
   const [currentPage, setCurrentPage] = useState(1)
   const [navigationRevision, setNavigationRevision] = useState(0)
-  const [notesOpen, setNotesOpen] = useState(false)
   const [notice, setNotice] = useState('')
   const [isTranslating, setTranslating] = useState(false)
   const [dialog, setDialog] = useState<WorkspaceDialog>(null)
@@ -143,10 +131,9 @@ function DocumentWorkspace({
   const canUploadFile = Boolean(document.sourceFile) &&
     (!document.jobId || endedWithoutResult(document))
   const glossaryTermCount = useGlossaryTermCount(sourceLanguage, targetLanguage, canUploadFile)
-  const notesPanel = useResizableNotesPanel()
   const synchronizedScroll = useSynchronizedScroll(
     isScrollSyncEnabled,
-    `${expandedPanel ?? 'both'}:${isDualPanelFullscreen}:${notesOpen}:${notesPanel.width}`,
+    `${expandedPanel ?? 'both'}:${isDualPanelFullscreen}`,
   )
   const bookZoom = useBookZoom(isScrollSyncEnabled)
   const translationDownload = useTranslationDownload(document)
@@ -163,20 +150,6 @@ function DocumentWorkspace({
     if (!pageCount) return
     setCurrentPage(Math.max(1, Math.min(pageCount, displayedPage + direction)))
     setNavigationRevision((value) => value + 1)
-  }
-  const notesVisible = notesOpen
-  // Цитировать можно только готовый перевод: backend принимает цитаты из документов DONE.
-  const canQuote = Boolean(document.jobId) && document.status === 'ready'
-  const quoteSelection = useQuoteSelection(synchronizedScroll.originalRef, synchronizedScroll.translationRef, canQuote)
-  const [pendingQuote, setPendingQuote] = useState<QuoteSelection | null>(null)
-  const showQuote = (quote: NoteQuoteResponse): ShowQuoteResult => {
-    // Колонка скрыта, когда другая развёрнута на весь экран: её ref пуст.
-    const viewport = quote.side === 'SOURCE' ? synchronizedScroll.originalRef.current : synchronizedScroll.translationRef.current
-    if (!viewport) return 'hidden'
-    const element = findQuoteElement(viewport, quote.paragraph_index, quote.quote)
-    if (!element) return 'notFound'
-    revealQuoteElement(element)
-    return 'shown'
   }
   const isImmersiveMode = isDualPanelFullscreen || expandedPanel !== null
 
@@ -213,7 +186,6 @@ function DocumentWorkspace({
         onExpandedPanelChange(null)
         onDualPanelFullscreenChange(false)
       } else {
-        if (!isImmersiveMode) setNotesOpen(false)
         onExpandedPanelChange(view === 'both' ? null : view)
         onDualPanelFullscreenChange(view === 'both')
       }
@@ -387,15 +359,8 @@ function DocumentWorkspace({
     void translationDownload.download()
   }
 
-  const handleToggleNotes = () => {
-    setNotesOpen((isOpen) => !isOpen)
-  }
-
   const handlePanelExpandToggle = (panel: Exclude<ExpandedPanel, null>) => {
-    if (expandedPanel !== panel) {
-      onDualPanelFullscreenChange(false)
-      setNotesOpen(false)
-    }
+    if (expandedPanel !== panel) onDualPanelFullscreenChange(false)
 
     onExpandedPanelChange(expandedPanel === panel ? null : panel)
   }
@@ -403,18 +368,9 @@ function DocumentWorkspace({
   const handleDualPanelFullscreenToggle = () => {
     const nextFullscreenState = !isDualPanelFullscreen
 
-    if (nextFullscreenState) {
-      onExpandedPanelChange(null)
-      setNotesOpen(false)
-    }
+    if (nextFullscreenState) onExpandedPanelChange(null)
 
     onDualPanelFullscreenChange(nextFullscreenState)
-  }
-
-  const handleContextMenu = (event: MouseEvent<HTMLDivElement>) => {
-    if (!isImmersiveMode) return
-    event.preventDefault()
-    setNotesOpen(true)
   }
 
   return (
@@ -424,7 +380,6 @@ function DocumentWorkspace({
         '--chrome-top': `${topChromeHeight}px`,
         '--chrome-bottom': `${bottomChromeHeight}px`,
       } as CSSProperties}
-      onContextMenu={handleContextMenu}
     >
       {/* Панели плавают над колонками чтения; текст прокручивается под ними. */}
       {!isImmersiveMode ? (
@@ -456,12 +411,7 @@ function DocumentWorkspace({
       ) : null}
 
       <div
-        className={`${styles.workArea} ${notesVisible ? '' : styles.withoutNotes} ${expandedPanel !== null ? styles.singlePanel : ''} ${expandedPanel !== null && notesVisible ? styles.singlePanelWithNotes : ''} ${notesPanel.isResizing ? styles.resizing : ''} ${isImmersiveMode ? styles.immersiveWorkArea : ''}`}
-        style={
-          {
-            '--notes-current-width': `${notesPanel.width}px`,
-          } as CSSProperties
-        }
+        className={`${styles.workArea} ${expandedPanel !== null ? styles.singlePanel : ''} ${isImmersiveMode ? styles.immersiveWorkArea : ''}`}
       >
         {expandedPanel !== 'translation' ? (
           <OriginalPanel
@@ -504,42 +454,10 @@ function DocumentWorkspace({
             onViewportRestore={synchronizedScroll.restoreTranslationScroll}
           />
         ) : null}
-        {notesVisible ? (
-          <div className={styles.notesArea}>
-            <div
-              className={`${styles.notesResizeHandle} ${notesPanel.isResizing ? styles.notesResizeHandleActive : ''}`}
-              role="separator"
-              aria-label={t('notes.resize')}
-              aria-orientation="vertical"
-              aria-valuemin={NOTES_MIN_WIDTH}
-              aria-valuemax={NOTES_MAX_WIDTH}
-              aria-valuenow={notesPanel.width}
-              aria-valuetext={t('sidebar.pixels', { value: notesPanel.width })}
-              tabIndex={0}
-              onPointerDown={notesPanel.handleResizeStart}
-              onPointerMove={notesPanel.handleResizeMove}
-              onPointerUp={notesPanel.handleResizeEnd}
-              onPointerCancel={notesPanel.handleResizeEnd}
-              onKeyDown={notesPanel.handleResizeKeyDown}
-              onDoubleClick={notesPanel.resetWidth}
-              title={t('sidebar.resizeHint')}
-            />
-            <Suspense fallback={<p className={styles.notesLoading} role="status">{t('notes.loading')}</p>}>
-            <WorkspaceNotesPanel
-              document={document}
-              pendingQuote={pendingQuote}
-              onQuoteFinished={() => { setPendingQuote(null); quoteSelection.clear() }}
-              onShowQuote={showQuote}
-              onClose={() => { setNotesOpen(false); setPendingQuote(null) }}
-            />
-            </Suspense>
-          </div>
-        ) : null}
       </div>
 
       {!isImmersiveMode ? (
         <div ref={bottomChromeRef} className={styles.bottomChrome}>
-          <span className={styles.dockSpacer} aria-hidden="true" />
           <WorkspaceDock
             document={document}
             sourceLanguage={sourceLanguage}
@@ -565,9 +483,6 @@ function DocumentWorkspace({
             canDownload={translationDownload.canDownload}
             onDownload={handleDownload}
           />
-          <div className={styles.notesSlot}>
-            <NotesToggle isOpen={notesVisible} onToggle={handleToggleNotes} />
-          </div>
         </div>
       ) : null}
 
@@ -598,17 +513,6 @@ function DocumentWorkspace({
           onClose={() => setFeedbackPrompt(null)}
         />
       ) : null}
-      {/* Пока цитата оформляется в панели, кнопка над старым выделением только мешает. */}
-      {quoteSelection.selection && !pendingQuote ? (
-        <QuoteSelectionButton
-          selection={quoteSelection.selection}
-          onQuote={() => {
-            const { rect: _rect, ...selection } = quoteSelection.selection!
-            setPendingQuote(selection)
-            setNotesOpen(true)
-          }}
-        />
-      ) : null}
     </div>
   )
 }
@@ -620,10 +524,6 @@ function canceledNoticeKey(quotaRefund: DocumentItem['quotaRefund']): Translatio
   if (quotaRefund === 'NONE') return 'workspace.canceledNoRefund'
   return 'workspace.canceled'
 }
-
-// Панель заметок с парсером Markdown нужна, только когда её открыли: грузится отдельно.
-const WorkspaceNotesPanel = lazy(() => import('../components/notes/WorkspaceNotesPanel.tsx')
-  .then((module) => ({ default: module.WorkspaceNotesPanel })))
 
 export function WorkspacePage() {
   const {

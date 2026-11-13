@@ -248,7 +248,7 @@ describe('workspace interactions', () => {
     expect(await screen.findByText('Осталось страниц: 7')).toBeTruthy()
   })
 
-  it('preserves relative reading position when fullscreen or notes change the viewport size', async () => {
+  it('preserves relative reading position when fullscreen changes the viewport size', async () => {
     const size = mockBookViewportGeometry()
     renderApp()
     const original = await findWorkspaceRegion('Прокрутка панели «Оригинал»')
@@ -263,19 +263,8 @@ describe('workspace interactions', () => {
     expect(original.scrollLeft).toBeCloseTo(200)
     fireEvent.scroll(original)
 
-    size.width = 420
-    size.height = 500
-    fireEvent.contextMenu(original)
-    expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
-    expect(original.scrollTop).toBeCloseTo(750)
-    expect(original.scrollLeft).toBeCloseTo(490)
-    fireEvent.scroll(original)
-
     size.width = 600
     size.height = 400
-    fireEvent.click(screen.getByRole('button', { name: 'Закрыть панель заметок' }))
-    expect(original.scrollTop).toBeCloseTo(800)
-    expect(original.scrollLeft).toBeCloseTo(400)
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(original.scrollTop).toBeCloseTo(800)
     expect(original.scrollLeft).toBeCloseTo(400)
@@ -523,20 +512,13 @@ describe('workspace interactions', () => {
     const user = userEvent.setup()
     renderApp()
 
-    expect(screen.queryByRole('complementary', { name: 'Заметки' })).toBeNull()
-    await user.click(await screen.findByRole('button', { name: 'Заметки' }))
-
     await user.click(
-      screen.getByRole('button', { name: 'Развернуть панель «Оригинал»' }),
+      await screen.findByRole('button', { name: 'Развернуть панель «Оригинал»' }),
     )
 
     expect(screen.queryByText('Мои книги')).toBeNull()
-    expect(screen.queryByRole('complementary', { name: 'Заметки' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Перевод' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Заметки' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Свернуть панель «Оригинал»' })).toBeNull()
-    fireEvent.contextMenu(screen.getByRole('region', { name: 'Оригинал' }))
-    expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
     await user.keyboard('{Escape}')
 
     expect(screen.getByRole('region', { name: 'Перевод' })).toBeTruthy()
@@ -550,7 +532,6 @@ describe('workspace interactions', () => {
     await user.keyboard('{Escape}')
 
     expect(screen.getByText('Мои книги')).toBeTruthy()
-    expect(screen.queryByRole('complementary', { name: 'Заметки' })).toBeNull()
     expect(screen.getByRole('region', { name: 'Оригинал' })).toBeTruthy()
   })
 
@@ -627,7 +608,7 @@ describe('workspace interactions', () => {
     expect(original.dataset.zoom).toBe('100')
   })
 
-  it('shows only documents fullscreen and opens notes with right click', async () => {
+  it('shows only documents fullscreen', async () => {
     const user = userEvent.setup()
     renderApp()
 
@@ -641,7 +622,6 @@ describe('workspace interactions', () => {
     expect(screen.getByRole('region', { name: 'Оригинал' })).toBeTruthy()
     expect(screen.getByRole('region', { name: 'Перевод' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Перевести' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Заметки' })).toBeNull()
     expect(
       screen.queryByRole('button', { name: 'Развернуть панель «Оригинал»' }),
     ).toBeNull()
@@ -651,17 +631,6 @@ describe('workspace interactions', () => {
       }),
     ).toBeNull()
 
-    fireEvent.contextMenu(screen.getByRole('region', { name: 'Оригинал' }))
-
-    expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Заметки' })).toBeNull()
-
-    await user.click(
-      screen.getByRole('button', { name: 'Закрыть панель заметок' }),
-    )
-    expect(screen.queryByRole('complementary', { name: 'Заметки' })).toBeNull()
-    expect(screen.queryByText('Мои книги')).toBeNull()
-
     await user.keyboard('{Escape}')
 
     expect(screen.getByText('Мои книги')).toBeTruthy()
@@ -670,46 +639,16 @@ describe('workspace interactions', () => {
         name: 'Открыть оригинал и перевод на весь экран',
       }),
     ).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Заметки' })).toBeTruthy()
-  })
-
-  it('resizes the notes panel without changing the document columns manually', async () => {
-    const user = userEvent.setup()
-    renderApp()
-
-    await user.click(await screen.findByRole('button', { name: 'Заметки' }))
-
-    const resizeHandle = screen.getByRole('separator', {
-      name: 'Изменить ширину панели заметок',
-    })
-    const workArea = resizeHandle.parentElement?.parentElement as HTMLElement
-
-    expect(resizeHandle.getAttribute('aria-valuenow')).toBe('280')
-    expect(workArea.style.getPropertyValue('--notes-current-width')).toBe(
-      '280px',
-    )
-
-    resizeHandle.focus()
-    await user.keyboard('{ArrowLeft}')
-
-    expect(resizeHandle.getAttribute('aria-valuenow')).toBe('296')
-    expect(workArea.style.getPropertyValue('--notes-current-width')).toBe(
-      '296px',
-    )
   })
 
   it('selects a document and updates the workspace content', async () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('button', { name: 'Заметки' }))
-    expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
-
     await user.click(
       await screen.findByRole('button', { name: /^project_report\.docx/i }),
     )
 
-    expect(screen.queryByRole('complementary', { name: 'Заметки' })).toBeNull()
     expect(screen.getAllByText('project_report.docx')).toHaveLength(2)
     expect(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }).getAttribute('lang')).toBe('en-Latn')
     expect(screen.queryByRole('heading', { name: 'Translation service progress' })).toBeNull()
@@ -867,8 +806,6 @@ describe('workspace interactions', () => {
     expect(screen.queryByRole('region', { name: 'Перевод' })).toBeNull()
     await user.keyboard('g')
     expect(screen.queryByRole('region', { name: 'Оригинал' })).toBeNull()
-    fireEvent.contextMenu(screen.getByRole('region', { name: 'Перевод' }))
-    expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
     await user.keyboard('g')
     expect(screen.getByText('Мои книги')).toBeTruthy()
     fireEvent.keyDown(window, { key: 'в', code: 'KeyD' })
@@ -1066,21 +1003,12 @@ describe('workspace interactions', () => {
     expect(within(listbox).queryByText(/Все языки/)).toBeNull()
   })
 
-  it('responds to document actions and toggles notes', async () => {
+  it('reports a failed download', async () => {
     const user = userEvent.setup()
     renderApp()
 
     await user.click(await screen.findByRole('button', { name: 'Скачать' }))
     expect(await screen.findByText(/Не удалось скачать перевод/)).toBeTruthy()
-
-    await user.click(screen.getByRole('button', { name: 'Заметки' }))
-    await user.click(
-      screen.getByRole('button', { name: 'Закрыть панель заметок' }),
-    )
-    expect(screen.queryByRole('complementary', { name: 'Заметки' })).toBeNull()
-
-    await user.click(screen.getByRole('button', { name: 'Заметки' }))
-    expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
   })
 
   it('changes and persists theme and interface language', async () => {
