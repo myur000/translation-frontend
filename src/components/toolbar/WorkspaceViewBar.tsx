@@ -2,7 +2,6 @@ import { useTranslation } from '../../i18n/useTranslation.ts'
 import type { LayoutPreset } from '../../workspace/workspaceLayout.ts'
 import { LayoutSwitcher, type PaneLanguage } from './LayoutSwitcher.tsx'
 import { NotesToggle } from './NotesToggle.tsx'
-import { ScrollSyncButton } from './ScrollSyncButton.tsx'
 import { WorkspaceViewButton } from './WorkspaceViewButton.tsx'
 import styles from './WorkspaceViewBar.module.css'
 
@@ -26,15 +25,16 @@ export function WorkspaceViewBar(props: WorkspaceViewBarProps) {
   const { t } = useTranslation()
   return (
     <div className={styles.bar} role="group" aria-label={t('layout.viewBar')}>
-      <LayoutSwitcher value={props.layout} onChange={props.onLayoutChange} source={props.source} target={props.target} />
+      <LayoutSwitcher
+        value={props.layout}
+        onChange={props.onLayoutChange}
+        source={props.source}
+        target={props.target}
+        scrollSync={{ isEnabled: props.isScrollSyncEnabled, onToggle: props.onToggleScrollSync }}
+      />
       {/* Заметки — тоже «что рядом с книгой», поэтому сразу за раскладкой. */}
       <NotesToggle isOpen={props.notes.isOpen} panelId={props.notes.panelId} onToggle={props.notes.onToggle} />
       <span className={styles.separator} aria-hidden="true" />
-      <ScrollSyncButton
-        isEnabled={props.isScrollSyncEnabled}
-        isAvailable={props.layout === 'compare'}
-        onToggle={props.onToggleScrollSync}
-      />
       <WorkspaceViewButton layout={props.layout} onOpen={props.onOpenFullscreen} />
     </div>
   )

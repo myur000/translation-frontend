@@ -8,9 +8,12 @@ export interface PreferencesContextValue {
   language: InterfaceLanguage
   /** Синхронная прокрутка колонок в сравнении; по умолчанию включена. */
   isScrollSyncEnabled: boolean
+  /** Тихая подсветка цитат из заметок в тексте книги; по умолчанию включена. */
+  isQuoteHighlightEnabled: boolean
   setTheme: (theme: ThemePreference) => void
   setLanguage: (language: InterfaceLanguage) => void
   setScrollSyncEnabled: (isEnabled: boolean) => void
+  setQuoteHighlightEnabled: (isEnabled: boolean) => void
 }
 
 export const PreferencesContext =

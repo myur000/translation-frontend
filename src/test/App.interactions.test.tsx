@@ -214,6 +214,21 @@ async function addDraft(user: ReturnType<typeof userEvent.setup>, name = 'draft.
 
 const sidebarList = () => screen.getByRole('navigation', { name: 'Мои книги' })
 
+/** Синхронная прокрутка — пункт-галочка в меню вида; после выбора меню закрывается. */
+async function toggleScrollSync(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /^Вид: / }))
+  await user.click(screen.getByRole('menuitemcheckbox', { name: 'Синхронная прокрутка' }))
+}
+
+/** Состояние пункта синхронной прокрутки: меню открывается, читается и закрывается по Esc. */
+async function scrollSyncItem(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /^Вид: / }))
+  const item = screen.getByRole('menuitemcheckbox', { name: 'Синхронная прокрутка' })
+  const state = { checked: item.getAttribute('aria-checked'), disabled: item.getAttribute('aria-disabled'), text: item.textContent }
+  await user.keyboard('{Escape}')
+  return state
+}
+
 /** Открывает меню документа «⋯» в панели. */
 async function openActions(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: 'Действия с документом' }))
@@ -355,7 +370,7 @@ describe('workspace interactions', () => {
     mockBookViewportGeometry()
     renderApp()
     await findWorkspaceRegion('Оригинал')
-    await user.click(screen.getByRole('button', { name: 'Включить синхронную прокрутку' }))
+    await toggleScrollSync(user)
     fireEvent.keyDown(window, { key: 'd' })
     const original = screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' })
     fireEvent.keyDown(original, { key: '+' })
@@ -568,18 +583,18 @@ describe('workspace interactions', () => {
     expect(translation.dataset.zoom).toBe('100')
     await user.click(screen.getByRole('button', { name: 'Уменьшить масштаб «Перевод»' }))
     expect(translation.dataset.zoom).toBe('90')
-    await user.click(screen.getByRole('button', { name: 'Включить синхронную прокрутку' }))
+    await toggleScrollSync(user)
     expect(original.dataset.zoom).toBe('90')
     expect(translation.dataset.zoom).toBe('90')
 
     await user.click(screen.getByRole('button', { name: 'Увеличить масштаб «Оригинал»' }))
     expect(original.dataset.zoom).toBe('100')
     expect(translation.dataset.zoom).toBe('100')
-    await user.click(screen.getByRole('button', { name: 'Выключить синхронную прокрутку' }))
+    await toggleScrollSync(user)
     fireEvent.wheel(original, { deltaY: -100, ctrlKey: true })
     await waitFor(() => expect(original.dataset.zoom).toBe('105'))
     expect(translation.dataset.zoom).toBe('100')
-    await user.click(screen.getByRole('button', { name: 'Включить синхронную прокрутку' }))
+    await toggleScrollSync(user)
     expect(translation.dataset.zoom).toBe('105')
     await user.click(screen.getByRole('button', { name: 'Сбросить масштаб «Перевод»' }))
     expect(original.dataset.zoom).toBe('100')
@@ -594,7 +609,7 @@ describe('workspace interactions', () => {
     const translation = screen.getByRole('region', { name: 'Прокрутка панели «Перевод»' })
     fireEvent.wheel(original, { deltaY: -100 })
     expect(original.dataset.zoom).toBe('100')
-    await user.click(screen.getByRole('button', { name: 'Включить синхронную прокрутку' }))
+    await toggleScrollSync(user)
     await user.click(screen.getByRole('button', { name: 'Открыть оригинал и перевод на весь экран' }))
     fireEvent.wheel(translation, { deltaY: -100, metaKey: true })
     await waitFor(() => expect(original.dataset.zoom).toBe('105'))
@@ -610,7 +625,7 @@ describe('workspace interactions', () => {
     await user.keyboard('3')
     expect(screen.getByRole('region', { name: 'Перевод' })).toBeTruthy()
     await user.keyboard('{Escape}')
-    expect(screen.getByRole('button', { name: 'Выключить синхронную прокрутку' })).toBeTruthy()
+    expect((await scrollSyncItem(user)).checked).toBe('true')
     expect(screen.getAllByText('115%')).toHaveLength(2)
   })
 
@@ -684,9 +699,8 @@ describe('workspace interactions', () => {
     // research_notes.doc старше кодов NLLB: старые `de`/`ru` сопоставляются с каталогом.
     expect(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }).getAttribute('lang')).toBe('de-Latn')
     expect(screen.getByRole('region', { name: 'Прокрутка панели «Перевод»' }).getAttribute('lang')).toBe('ru-Cyrl')
-    // Коды языков написаны на страницах переключателя вида.
-    expect(screen.getByRole('radio', { name: 'Оригинал DE' })).toBeTruthy()
-    expect(screen.getByRole('radio', { name: 'Перевод RU' })).toBeTruthy()
+    // Коды языков — в имени кнопки вида и на картинках меню.
+    expect(screen.getByRole('button', { name: 'Вид: Сравнение DE и RU' })).toBeTruthy()
   })
 
   it('hides page navigation until real PDF metadata is available', async () => {
@@ -710,9 +724,6 @@ describe('workspace interactions', () => {
     const translationViewport = screen.getByRole('region', {
       name: 'Прокрутка панели «Перевод»',
     })
-    const toggle = screen.getByRole('button', {
-      name: 'Включить синхронную прокрутку',
-    })
 
     Object.defineProperties(originalViewport, {
       scrollHeight: { configurable: true, value: 1000 },
@@ -727,12 +738,8 @@ describe('workspace interactions', () => {
     fireEvent.scroll(originalViewport)
     expect(translationViewport.scrollTop).toBe(0)
 
-    await user.click(toggle)
-    expect(
-      screen
-        .getByRole('button', { name: 'Выключить синхронную прокрутку' })
-        .getAttribute('aria-pressed'),
-    ).toBe('true')
+    await toggleScrollSync(user)
+    expect((await scrollSyncItem(user)).checked).toBe('true')
 
     originalViewport.scrollTop = 400
     fireEvent.scroll(originalViewport)
@@ -749,9 +756,7 @@ describe('workspace interactions', () => {
     fireEvent.scroll(translationViewport)
     expect(originalViewport.scrollTop).toBe(200)
 
-    await user.click(
-      screen.getByRole('button', { name: 'Выключить синхронную прокрутку' }),
-    )
+    await toggleScrollSync(user)
     originalViewport.scrollTop = 640
     fireEvent.scroll(originalViewport)
     expect(translationViewport.scrollTop).toBe(250)
@@ -779,7 +784,7 @@ describe('workspace interactions', () => {
     original.scrollTop = 400
     fireEvent.scroll(original)
     expect(translation.scrollLeft).toBe(0)
-    await user.click(screen.getByRole('button', { name: 'Включить синхронную прокрутку' }))
+    await toggleScrollSync(user)
     expect(translation.scrollLeft).toBe(200)
     expect(translation.scrollTop).toBe(200)
     fireEvent.scroll(translation)
@@ -795,7 +800,7 @@ describe('workspace interactions', () => {
     original.scrollLeft = 1000
     fireEvent.scroll(original)
     expect(translation.scrollLeft).toBe(500)
-    await user.click(screen.getByRole('button', { name: 'Выключить синхронную прокрутку' }))
+    await toggleScrollSync(user)
     translation.scrollLeft = 100
     fireEvent.scroll(translation)
     expect(original.scrollLeft).toBe(1000)
@@ -886,18 +891,13 @@ describe('workspace interactions', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Включить синхронную прокрутку' }),
-    )
+    await screen.findByRole('button', { name: /^Вид: / })
+    await toggleScrollSync(user)
     await user.click(
       await screen.findByRole('button', { name: /^Project report/i }),
     )
 
-    expect(
-      screen
-        .getByRole('button', { name: 'Выключить синхронную прокрутку' })
-        .getAttribute('aria-pressed'),
-    ).toBe('true')
+    expect((await scrollSyncItem(user)).checked).toBe('true')
   })
 
   it('swaps languages instead of allowing an invalid equal pair', async () => {
@@ -1406,9 +1406,13 @@ describe('document route', () => {
 
 describe('workspace layout', () => {
   const firstJob = '00000000-0000-0000-0000-000000000101'
-  // Имя кнопки — раскладка и видимый на картинке код языка: «Перевод RU».
-  const layoutRadio = (layout: string) =>
-    screen.getByRole('radio', { name: new RegExp(`^${layout} `) }) as HTMLInputElement
+  // Вид спрятан в меню: имя кнопки называет текущий вид с кодом языка — «Вид: Перевод RU».
+  const viewMenuButton = () => screen.getByRole('button', { name: /^Вид: / })
+  const isLayout = (layout: string) => viewMenuButton().getAttribute('aria-label')!.startsWith(`Вид: ${layout} `)
+  const chooseLayout = async (user: ReturnType<typeof userEvent.setup>, layout: string) => {
+    await user.click(viewMenuButton())
+    await user.click(screen.getByRole('menuitemradio', { name: new RegExp(`^${layout} `) }))
+  }
   const region = (name: string) => screen.queryByRole('region', { name })
 
   it('opens in comparison and remembers the chosen layout for each document', async () => {
@@ -1417,28 +1421,32 @@ describe('workspace layout', () => {
     await findWorkspaceRegion('Оригинал')
 
     // Первое открытие — сравнение: оригинал и перевод рядом.
-    expect(screen.getByRole('group', { name: 'Раскладка' })).toBeTruthy()
-    expect(layoutRadio('Сравнение').checked).toBe(true)
-    // На картинках — языки этого документа: страница перевода, книга «оригинал | перевод», страница оригинала.
-    expect(screen.getByRole('radio', { name: 'Перевод RU' })).toBeTruthy()
-    expect(screen.getByRole('radio', { name: 'Сравнение EN и RU' })).toBeTruthy()
-    expect(screen.getByRole('radio', { name: 'Оригинал EN' })).toBeTruthy()
+    expect(isLayout('Сравнение')).toBe(true)
+    // В меню вида — языки этого документа: страница перевода, книга «оригинал | перевод», страница оригинала.
+    await user.click(viewMenuButton())
+    const menu = screen.getByRole('menu', { name: 'Раскладка' })
+    expect(within(menu).getAllByRole('menuitemradio').map((item) => [item.getAttribute('aria-label'), item.getAttribute('aria-checked')]))
+      .toEqual([['Перевод RU', 'false'], ['Сравнение EN и RU', 'true'], ['Оригинал EN', 'false']])
+    // Esc закрывает меню и возвращает фокус на кнопку, не трогая вид.
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(document.activeElement).toBe(viewMenuButton())
     expect(region('Перевод')).toBeTruthy()
 
-    await user.click(layoutRadio('Перевод'))
+    await chooseLayout(user, 'Перевод')
     expect(region('Оригинал')).toBeNull()
     expect(region('Перевод')).toBeTruthy()
     // Синхронной прокрутке нечего связывать, а полный экран откроет то, что видно.
-    expect(screen.getByRole('button', { name: /синхронную прокрутку/ }).getAttribute('aria-disabled')).toBe('true')
+    expect((await scrollSyncItem(user)).disabled).toBe('true')
     expect(screen.getByRole('button', { name: 'Открыть перевод на весь экран' })).toBeTruthy()
 
     // У другого документа своя раскладка: он, как новый, открывается в сравнении.
     await user.click(within(sidebarList()).getByRole('button', { name: /^Project report/ }))
-    expect(layoutRadio('Сравнение').checked).toBe(true)
+    expect(isLayout('Сравнение')).toBe(true)
     expect(await findWorkspaceRegion('Оригинал')).toBeTruthy()
 
     await user.click(within(sidebarList()).getByRole('button', { name: /^English course book/ }))
-    expect(layoutRadio('Перевод').checked).toBe(true)
+    expect(isLayout('Перевод')).toBe(true)
     expect(region('Оригинал')).toBeNull()
   })
 
@@ -1447,27 +1455,48 @@ describe('workspace layout', () => {
     renderDocumentRoute(`/documents/${firstJob}`)
     await findWorkspaceRegion('Оригинал')
 
-    // Кнопка — в группе вида, рядом с раскладкой.
-    const viewBar = screen.getByRole('group', { name: 'Вид документа' })
-    await user.click(within(viewBar).getByRole('button', { name: 'Выключить синхронную прокрутку' }))
+    // Пункт — в меню вида, под режимами: прокрутка нужна только в сравнении.
+    await toggleScrollSync(user)
 
     cleanup()
     renderDocumentRoute(`/documents/${firstJob}`)
     await findWorkspaceRegion('Оригинал')
-    const toggle = () => screen.getByRole('button', { name: /синхронную прокрутку/ })
-    expect(toggle().getAttribute('aria-pressed')).toBe('false')
+    expect((await scrollSyncItem(user)).checked).toBe('false')
 
-    // В одной колонке связывать нечего: кнопка остаётся на месте, чтобы панель
-    // не сдвигалась, но недоступна и не меняет настройку.
-    await user.click(layoutRadio('Перевод'))
-    expect(toggle().getAttribute('aria-disabled')).toBe('true')
-    expect(toggle().title).toBe('Синхронная прокрутка доступна в сравнении')
-    await user.click(toggle())
-    expect(toggle().getAttribute('aria-pressed')).toBe('false')
+    // В одной колонке связывать нечего: пункт виден, но недоступен, объясняет почему
+    // и настройку не меняет.
+    await chooseLayout(user, 'Перевод')
+    const unavailable = await scrollSyncItem(user)
+    expect(unavailable.disabled).toBe('true')
+    expect(unavailable.text).toContain('Только в сравнении')
+    await user.click(screen.getByRole('button', { name: /^Вид: / }))
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Синхронная прокрутка' }))
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Синхронная прокрутка' }).getAttribute('aria-checked')).toBe('false')
+    await user.keyboard('{Escape}')
 
-    await user.click(layoutRadio('Сравнение'))
-    expect(toggle().getAttribute('aria-disabled')).toBeNull()
-    expect(toggle().getAttribute('aria-pressed')).toBe('false')
+    await chooseLayout(user, 'Сравнение')
+    const available = await scrollSyncItem(user)
+    expect(available.disabled).toBeNull()
+    expect(available.checked).toBe('false')
+  })
+
+  it('turns quote highlighting off and on from the view menu and remembers it', async () => {
+    const user = userEvent.setup()
+    renderDocumentRoute(`/documents/${firstJob}`)
+    await findWorkspaceRegion('Оригинал')
+    const highlightItem = () => screen.getByRole('menuitemcheckbox', { name: 'Подсвечивать цитаты' })
+
+    await user.click(viewMenuButton())
+    expect(highlightItem().getAttribute('aria-checked')).toBe('true')
+    await user.click(highlightItem())
+    // Настройка чтения, а не документа: хранится в настройках интерфейса.
+    expect(JSON.parse(localStorage.getItem('doctranslate.preferences.v1')!)).toMatchObject({ isQuoteHighlightEnabled: false })
+
+    cleanup()
+    renderDocumentRoute(`/documents/${firstJob}`)
+    await findWorkspaceRegion('Оригинал')
+    await user.click(viewMenuButton())
+    expect(highlightItem().getAttribute('aria-checked')).toBe('false')
   })
 
   it('keeps the dock of a finished document short', async () => {
@@ -1487,14 +1516,14 @@ describe('workspace layout', () => {
     const user = userEvent.setup()
     renderDocumentRoute(`/documents/${firstJob}`)
     await findWorkspaceRegion('Оригинал')
-    await user.click(layoutRadio('Оригинал'))
+    await chooseLayout(user, 'Оригинал')
     expect(region('Перевод')).toBeNull()
 
     cleanup()
     renderDocumentRoute(`/documents/${firstJob}`)
 
     expect(await findWorkspaceRegion('Оригинал')).toBeTruthy()
-    expect(layoutRadio('Оригинал').checked).toBe(true)
+    expect(isLayout('Оригинал')).toBe(true)
     expect(region('Перевод')).toBeNull()
   })
 
@@ -1502,7 +1531,7 @@ describe('workspace layout', () => {
     const user = userEvent.setup()
     renderDocumentRoute(`/documents/${firstJob}`)
     await findWorkspaceRegion('Оригинал')
-    await user.click(layoutRadio('Перевод'))
+    await chooseLayout(user, 'Перевод')
 
     // D временно показывает оригинал на весь экран, не трогая выбор документа.
     await user.keyboard('d')
@@ -1513,7 +1542,7 @@ describe('workspace layout', () => {
     await user.keyboard('{Escape}')
     expect(screen.getByText('Мои книги')).toBeTruthy()
     expect(region('Оригинал')).toBeNull()
-    expect(layoutRadio('Перевод').checked).toBe(true)
+    expect(isLayout('Перевод')).toBe(true)
 
     // Кнопка в нижней панели открывает на весь экран именно текущую раскладку.
     await user.click(screen.getByRole('button', { name: 'Открыть перевод на весь экран' }))
@@ -1799,7 +1828,7 @@ describe('document actions', () => {
     expect(JSON.parse(String(init?.body))).toEqual({ target_lang: 'deu_Latn', use_glossary: true })
     expect(new Headers(init?.headers).get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/)
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(await screen.findByRole('radio', { name: 'Перевод DE' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /^Вид: .* DE$/ })).toBeTruthy()
     expect(within(sidebarList()).getAllByRole('button', { name: /^English course book/ })).toHaveLength(2)
   })
 

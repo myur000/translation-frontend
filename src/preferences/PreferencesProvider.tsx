@@ -16,6 +16,7 @@ interface StoredPreferences {
   theme: ThemePreference
   language: InterfaceLanguage
   isScrollSyncEnabled: boolean
+  isQuoteHighlightEnabled: boolean
 }
 
 const DEFAULT_PREFERENCES: StoredPreferences = {
@@ -23,6 +24,8 @@ const DEFAULT_PREFERENCES: StoredPreferences = {
   language: 'ru',
   // Сравнение читают параллельно, поэтому колонки по умолчанию прокручиваются вместе.
   isScrollSyncEnabled: true,
+  // Цитаты видны в тексте сразу; кто читает «начисто», выключает в меню «Вид».
+  isQuoteHighlightEnabled: true,
 }
 
 function readPreferences(): StoredPreferences {
@@ -39,6 +42,7 @@ function readPreferences(): StoredPreferences {
       language: preferences.language === 'en' ? 'en' : 'ru',
       // Сохранённые до появления настройки значения её не содержат — тогда включена.
       isScrollSyncEnabled: preferences.isScrollSyncEnabled !== false,
+      isQuoteHighlightEnabled: preferences.isQuoteHighlightEnabled !== false,
     }
   } catch {
     return DEFAULT_PREFERENCES
@@ -63,6 +67,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         setPreferences((current) => ({ ...current, language })),
       setScrollSyncEnabled: (isScrollSyncEnabled: boolean) =>
         setPreferences((current) => ({ ...current, isScrollSyncEnabled })),
+      setQuoteHighlightEnabled: (isQuoteHighlightEnabled: boolean) =>
+        setPreferences((current) => ({ ...current, isQuoteHighlightEnabled })),
     }),
     [preferences],
   )
