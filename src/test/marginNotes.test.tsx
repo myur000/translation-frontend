@@ -16,6 +16,8 @@ const api = vi.hoisted(() => ({
   getNoteBacklinks: vi.fn(), getNoteGraph: vi.fn(), addNoteQuote: vi.fn(), deleteNoteQuote: vi.fn(),
 }))
 vi.mock('../api/notes.ts', () => api)
+const text = vi.hoisted(() => ({ loadDocumentText: vi.fn() }))
+vi.mock('../api/documentText.ts', () => text)
 vi.mock('../auth/useAuth.ts', () => ({ useAuth: () => ({ session: { email: 'reader@example.com', accessToken: 'jwt' } }) }))
 
 const note = (id: string, title: string, body: string): NoteResponse => ({
@@ -69,6 +71,11 @@ const nextFrame = () => act(() => new Promise<void>((resolve) => window.requestA
 beforeEach(() => {
   for (const mock of Object.values(api)) mock.mockReset()
   api.listNotes.mockResolvedValue({ items: [], page: 0, size: 50, total_elements: 0, total_pages: 0 })
+  text.loadDocumentText.mockResolvedValue({ sourceAvailable: true, aligned: true, truncated: false, paragraphs: [
+    { index: 0, source: 'Chapter One', translation: 'Глава первая' },
+    { index: 1, source: 'The wind came from the north-east.', translation: 'Ветер дул с северо-востока.' },
+    { index: 2, source: 'Shortly before midnight he saw a light.', translation: 'Незадолго до полуночи он увидел свет.' },
+  ] })
 })
 afterEach(() => {
   cleanup()
@@ -179,6 +186,20 @@ describe('margin notes', () => {
     const draft = await screen.findByRole('region', { name: 'Новая заметка' })
     expect(within(draft).getByRole('textbox', { name: 'Название' })).toBeTruthy()
     expect(draft.style.top).toBe('300px')
+  })
+
+  it('opens a short quote card with the caret in the thought and the notes of this paragraph first', async () => {
+    mockGeometry(600)
+    const selection = { side: 'TRANSLATION' as const, text: 'дул', blockText: 'Ветер дул с северо-востока.', paragraphIndex: 1 }
+    render(<Book quotes={[quote(storm, 1)]} draft={{ nonce: 4, kind: 'quote', selection, anchor: 240 }} />)
+
+    const draft = await screen.findByRole('region', { name: 'Цитата в заметку' })
+    const thought = within(draft).getByRole('textbox', { name: 'Текст заметки' })
+    expect(document.activeElement).toBe(thought)
+    // Абзац уже с заметкой — дописать в неё можно одним кликом; поиск остальных свёрнут.
+    expect(await within(draft).findByRole('button', { name: 'Добавить к «Шторм»' })).toBeTruthy()
+    expect(within(draft).getByRole('button', { name: 'ещё…' }).getAttribute('aria-expanded')).toBe('false')
+    expect(within(draft).queryByRole('searchbox')).toBeNull()
   })
 
   it('keeps an open draft at its place in the text when notes are turned off and on', async () => {

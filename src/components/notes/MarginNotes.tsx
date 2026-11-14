@@ -389,6 +389,7 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
               jobId={jobId}
               selection={draft.selection}
               bookNotes={bookNotes}
+              bookQuotes={quotes}
               onSaved={finishDraft}
               onCancel={closeDraft}
             />

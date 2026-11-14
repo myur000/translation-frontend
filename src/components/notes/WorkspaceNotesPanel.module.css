@@ -116,7 +116,6 @@
   outline-offset: 0;
 }
 
-.primary,
 .secondary {
   min-height: 34px;
   display: inline-flex;
@@ -129,17 +128,6 @@
   text-decoration: none;
 }
 
-.primary {
-  color: var(--color-on-accent);
-  background: var(--color-accent);
-  border: 1px solid var(--color-accent);
-}
-
-.primary:hover:not(:disabled) {
-  background: var(--color-accent-hover);
-}
-
-
 .secondary {
   color: var(--color-text);
   background: var(--color-surface);
@@ -150,7 +138,6 @@
   background: var(--color-surface-subtle);
 }
 
-.primary:disabled,
 .secondary:disabled {
   opacity: 0.55;
 }
@@ -297,8 +284,7 @@
   font-size: inherit;
 }
 
-.quotes h4,
-.composer h3 {
+.quotes h4 {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -318,8 +304,7 @@
   list-style: none;
 }
 
-.quoteCard,
-.quotePreview {
+.quoteCard {
   display: grid;
   gap: 7px;
   padding: 10px 12px;
@@ -329,8 +314,7 @@
 }
 
 /* Цитата и её пара — текст книги, поэтому набраны книжным шрифтом. */
-.quoteCard blockquote,
-.quotePreview blockquote {
+.quoteCard blockquote {
   margin: 0;
   font-family: var(--font-serif);
   padding-left: 10px;
@@ -391,59 +375,6 @@
 
 .deleted {
   font-style: italic;
-}
-
-.composer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-}
-
-.composerSection {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-}
-
-.candidates {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 4px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.candidates button {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 10px;
-  color: var(--color-text);
-  text-align: left;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-}
-
-.candidates button:hover:not(:disabled) {
-  border-color: var(--color-primary-border);
-  background: var(--color-primary-soft);
-}
-
-.candidates span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.candidates small {
-  flex: 0 0 auto;
-  color: var(--color-text-soft);
-  font-size: 11px;
 }
 
 /* Длинная цитата свёрнута: сам абзац доступен в книге по «Показать в книге». */

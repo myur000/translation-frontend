@@ -88,3 +88,11 @@ export function titleFromQuote(quote: string, maxLength = 60) {
   const lastSpace = cut.lastIndexOf(' ')
   return `${(lastSpace > maxLength / 2 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:—-]+$/, '')}…`
 }
+
+/** Текст дописывается в конец заметки отдельным абзацем; пустой ничего не меняет. */
+export function appendToBody(body: string, text: string) {
+  const addition = text.trim()
+  if (!addition) return body
+  const base = body.trimEnd()
+  return base ? `${base}\n\n${addition}` : addition
+}

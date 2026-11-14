@@ -99,6 +99,7 @@ export function WorkspaceNotesPanel({ document, bookQuotes, pendingQuote, reques
           jobId={jobId}
           selection={pendingQuote}
           bookNotes={bookNotes.items}
+          bookQuotes={bookQuotes}
           onSaved={(id) => { changed(); onQuoteFinished(); openNote(id) }}
           onCancel={onQuoteFinished}
         />

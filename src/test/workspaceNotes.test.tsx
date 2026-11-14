@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiClientError } from '../api/client.ts'
 import type { NoteResponse, NoteSummary } from '../api/contracts/notes.ts'
 import type { DocumentText } from '../api/documentText.ts'
 import { WorkspaceNotesPanel } from '../components/notes/WorkspaceNotesPanel.tsx'
@@ -44,6 +45,8 @@ const storm: NoteResponse = { id: 'n-1', title: 'Шторм', body: 'Ветер 
   created_at: '2026-11-10T10:00:00Z', updated_at: '2026-11-10T10:00:00Z', tags: [], links: [], quotes: [quoteResponse] }
 const summary = (note: NoteResponse): NoteSummary => ({ id: note.id, title: note.title, excerpt: note.body, tags: [],
   quote_count: note.quotes.length, version: note.version, updated_at: note.updated_at })
+const conflict = (message: string) =>
+  new ApiClientError(message, 409, { timestamp: '', status: 409, message, path: '', fieldErrors: {}, correlation_id: '' } as never, null, null)
 const page = (items: NoteSummary[]) => ({ items, page: 0, size: 50, total_elements: items.length, total_pages: 1 })
 
 const bookQuote = (noteId: string, paragraphIndex: number): BookQuote => ({ id: `q-${noteId}`, noteId, noteTitle: '', side: 'TRANSLATION',
@@ -101,34 +104,82 @@ describe('notes next to the book', () => {
     expect(await screen.findByRole('textbox', { name: 'Название' })).toBeTruthy()
   })
 
-  it('turns a selection into a bilingual quote in a new note', async () => {
+  it('writes a thought right away and saves it with the bilingual quote', async () => {
     const user = userEvent.setup()
     api.createNote.mockResolvedValue({ ...storm, id: 'n-3', title: 'дул с северо-востока' })
     const handlers = renderPanel({ pendingQuote: selection })
-    expect(await screen.findByText('The wind came from the north-east.')).toBeTruthy()
-    expect((screen.getByRole('textbox', { name: 'Название' }) as HTMLInputElement).value).toBe('дул с северо-востока')
-    await user.click(screen.getByRole('button', { name: 'Создать с цитатой' }))
+    const composer = await screen.findByRole('group', { name: 'Новая цитата' })
+    // Курсор сразу в тексте мысли; второй язык и поле названия не занимают место.
+    const thought = within(composer).getByRole('textbox', { name: 'Текст заметки' })
+    expect(document.activeElement).toBe(thought)
+    expect(within(composer).queryByText('The wind came from the north-east.')).toBeNull()
+    expect(within(composer).getByText('Название: дул с северо-востока')).toBeTruthy()
+    await user.click(await within(composer).findByRole('button', { name: 'Показать оригинал' }))
+    expect(within(composer).getByText('The wind came from the north-east.')).toBeTruthy()
+
+    await user.type(thought, 'Ветер как предвестник')
+    await user.keyboard('{Control>}{Enter}{/Control}')
     expect(api.createNote).toHaveBeenCalledWith({
-      title: 'дул с северо-востока', body: '',
+      title: 'дул с северо-востока', body: 'Ветер как предвестник',
       quote: { job_id: 'job-1', side: 'TRANSLATION', paragraph_index: 1, quote: 'дул с северо-востока', paired_text: 'The wind came from the north-east.' },
     }, expect.objectContaining({ accessToken: 'jwt' }))
     expect(handlers.onQuoteFinished).toHaveBeenCalled()
   })
 
-  it('adds a quote to an existing note of this book', async () => {
+  it('opens the title field when the title from the quote is already taken', async () => {
+    const user = userEvent.setup()
+    api.createNote.mockRejectedValueOnce(conflict('Заметка с таким названием уже есть'))
+    renderPanel({ pendingQuote: selection })
+    const composer = await screen.findByRole('group', { name: 'Новая цитата' })
+    await within(composer).findByRole('button', { name: 'Показать оригинал' })
+    await user.click(within(composer).getByRole('button', { name: 'Сохранить' }))
+
+    const title = await within(composer).findByRole('textbox', { name: 'Название' })
+    expect(document.activeElement).toBe(title)
+    expect(within(composer).getByRole('alert').textContent).toContain('Заметка с таким названием уже есть')
+    await user.clear(title)
+    await user.type(title, 'Северо-восточный ветер')
+    api.createNote.mockResolvedValue({ ...storm, id: 'n-3' })
+    await user.click(within(composer).getByRole('button', { name: 'Сохранить' }))
+    expect(api.createNote).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Северо-восточный ветер' }), expect.anything())
+  })
+
+  it('adds the quote and the thought to a note of the same paragraph in one click', async () => {
     const user = userEvent.setup()
     api.addNoteQuote.mockResolvedValue(quoteResponse)
+    api.updateNote.mockResolvedValue({ ...storm, version: 2 })
     renderPanel({ pendingQuote: selection })
-    await screen.findByText('The wind came from the north-east.')
-    await user.click(await screen.findByRole('button', { name: /Шторм/ }))
+    const composer = await screen.findByRole('group', { name: 'Новая цитата' })
+    await within(composer).findByRole('button', { name: 'Показать оригинал' })
+    await user.type(within(composer).getByRole('textbox', { name: 'Текст заметки' }), 'И снова ветер')
+    await user.click(within(composer).getByRole('button', { name: 'Добавить к «Шторм»' }))
+
     expect(api.addNoteQuote).toHaveBeenCalledWith('n-1', expect.objectContaining({ job_id: 'job-1', paragraph_index: 1 }), expect.anything())
+    // Текст дописан в конец заметки отдельным абзацем, с её текущей версией.
+    expect(api.updateNote).toHaveBeenCalledWith('n-1',
+      { title: 'Шторм', body: 'Ветер — важная деталь.\n\nИ снова ветер', version: 1 }, expect.anything())
+  })
+
+  it('finds another note to add the quote to on request', async () => {
+    const user = userEvent.setup()
+    api.addNoteQuote.mockResolvedValue(quoteResponse)
+    renderPanel({ pendingQuote: selection, bookQuotes: [] })
+    const composer = await screen.findByRole('group', { name: 'Новая цитата' })
+    await within(composer).findByRole('button', { name: 'Показать оригинал' })
+    // У абзаца нет заметок — поиск свёрнут в одну ссылку.
+    expect(within(composer).queryByRole('searchbox')).toBeNull()
+    await user.click(within(composer).getByRole('button', { name: 'Добавить к другой заметке…' }))
+    await user.click(await within(composer).findByRole('button', { name: /Общая/ }))
+    expect(api.addNoteQuote).toHaveBeenCalledWith('n-2', expect.objectContaining({ paragraph_index: 1 }), expect.anything())
+    // Без текста заметка не переписывается.
+    expect(api.updateNote).not.toHaveBeenCalled()
   })
 
   it('explains that a removed original can no longer be quoted', async () => {
     text.loadDocumentText.mockResolvedValue({ ...bookText, sourceAvailable: false })
     renderPanel({ pendingQuote: { ...selection, side: 'SOURCE', text: 'north-east' } })
     expect((await screen.findByRole('alert')).textContent).toContain('Оригинал уже удалён с сервера')
-    expect((screen.getByRole('button', { name: 'Создать с цитатой' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Сохранить' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('opens a note in the panel, shows its quote in the book and removes it', async () => {

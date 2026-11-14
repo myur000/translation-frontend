@@ -1,0 +1,288 @@
+/* Быстрая запись из выделения: на полях книги и в колонке заметок. Тон тот же,
+   что у карточек на полях: книжный шрифт для цитаты и мысли, без рамок у полей. */
+.composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.quote {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  margin: 0;
+}
+
+/* Цитата — две строки: полностью она видна в книге рядом. */
+.quoteText {
+  display: -webkit-box;
+  overflow: hidden;
+  width: 100%;
+  margin: 0;
+  padding-left: 10px;
+  color: var(--color-text);
+  border-left: 2px solid var(--color-accent);
+  font-family: var(--font-serif);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.paired {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  padding-left: 12px;
+  color: var(--color-text-muted);
+  font-family: var(--font-serif);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.link {
+  padding: 0;
+  color: var(--color-text-muted);
+  background: none;
+  border: 0;
+  font-size: 12px;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.quote .link {
+  margin-left: 12px;
+}
+
+.link:hover {
+  color: var(--color-text);
+}
+
+.form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+/* Мысль — главное поле: без рамки, растёт по тексту, фокус — линия слева. */
+.thought {
+  width: 100%;
+  min-height: 4.5em;
+  max-height: 40vh;
+  field-sizing: content;
+  resize: none;
+  padding: 6px 8px;
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-serif);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.thought::placeholder {
+  color: var(--color-text-soft);
+}
+
+.thought:focus {
+  outline: none;
+  border-color: var(--color-border);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+.titleLine {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: 12px;
+}
+
+.titleValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titleField {
+  display: grid;
+  gap: 4px;
+  color: var(--color-text-soft);
+  font-size: 12px;
+}
+
+.titleField input,
+.search {
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 8px;
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 13px;
+}
+
+.titleField input:focus-visible,
+.search:focus-visible {
+  outline: none;
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+.titleField input[aria-invalid='true'] {
+  border-color: var(--color-danger-border);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save {
+  min-height: 30px;
+  padding: 4px 12px;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.save:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.save:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Подсказка в одну строку; в узкой карточке обрезается, а не переносится. */
+.hint {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-soft);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cancel {
+  margin-left: auto;
+  padding: 4px 6px;
+  color: var(--color-text-muted);
+  background: none;
+  border: 0;
+  font-size: 13px;
+}
+
+.cancel:hover {
+  color: var(--color-text);
+}
+
+/* Куда ещё можно положить цитату — тихо, под чертой. */
+.existing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.addTo {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  color: var(--color-accent);
+  background: none;
+  border: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addTo:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.addTo:disabled {
+  opacity: 0.5;
+}
+
+.picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+.candidates {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidates button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.candidates button:hover:not(:disabled) {
+  background: var(--color-surface-subtle);
+}
+
+.candidates span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.candidates small {
+  flex: none;
+  color: var(--color-text-soft);
+  font-size: 11px;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.problem {
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: 12px;
+  line-height: 1.45;
+}
