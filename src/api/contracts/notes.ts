@@ -26,6 +26,18 @@ export interface NoteQuoteResponse {
   created_at: ISO8601DateTime
 }
 
+/**
+ * Документ, о котором заметка (конспект книги, T-67): привязка без цитаты. У
+ * удалённого документа `document_available: false` и `document_name: null`, а
+ * `job_id` остаётся, чтобы связь можно было снять.
+ */
+export interface NoteDocumentResponse {
+  job_id: UUID
+  document_name: string | null
+  document_available: boolean
+  linked_at: ISO8601DateTime
+}
+
 /** GET/POST/PUT /api/notes/{id}: заметка целиком. Теги и ссылки backend извлекает из `body` сам. */
 export interface NoteResponse {
   id: UUID
@@ -38,6 +50,8 @@ export interface NoteResponse {
   tags: string[]
   links: NoteLinkResponse[]
   quotes: NoteQuoteResponse[]
+  /** Документы, о которых заметка (без цитат). Нет у ответов до T-67 — читать через `?? []`. */
+  documents?: NoteDocumentResponse[]
 }
 
 /** Элемент списка GET /api/notes. */
@@ -50,6 +64,8 @@ export interface NoteSummary {
   quote_count: number
   version: number
   updated_at: ISO8601DateTime
+  /** Документы, о которых заметка (конспект), включая удалённые; нет у ответов до T-67. */
+  linked_job_ids?: UUID[]
 }
 
 export interface NotePageResponse {
@@ -67,7 +83,7 @@ export interface NoteListQuery {
   tag?: string
   /** Начало названия: подсказка при вводе `[[`. */
   prefix?: string
-  /** Заметки с цитатами из документа. */
+  /** Заметки с цитатами из документа или привязанные к нему (конспект), каждая один раз. */
   job_id?: UUID
   page?: number
   /** До 100. */
@@ -90,6 +106,13 @@ export interface NoteCreateRequest {
   /** Markdown, до 50 000 символов. */
   body?: string
   quote?: NoteQuoteRequest
+  /** Документы, о которых заметка (конспект книги); статус документа не важен. До 50. */
+  job_ids?: UUID[]
+}
+
+/** POST /api/notes/{id}/documents: привязать заметку к документу без цитаты. */
+export interface NoteDocumentRequest {
+  job_id: UUID
 }
 
 export interface NoteUpdateRequest {
@@ -105,7 +128,7 @@ export interface NoteReference {
 }
 
 export type NoteGraphNodeType = 'note' | 'document' | 'tag' | 'missing' | 'term'
-export type NoteGraphEdgeType = 'links' | 'quotes' | 'tagged' | 'appears_in'
+export type NoteGraphEdgeType = 'links' | 'quotes' | 'about' | 'tagged' | 'appears_in'
 
 export interface NoteGraphNode {
   /** `note:<uuid>`, `document:<uuid>`, `tag:<тег>`, `missing:<название>`, `term:<uuid>`. */

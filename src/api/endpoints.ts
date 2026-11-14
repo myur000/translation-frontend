@@ -40,6 +40,10 @@ export const API_ENDPOINTS = {
       `/notes/${encodeURIComponent(noteId)}/quotes`,
     quote: (noteId: string, quoteId: string) =>
       `/notes/${encodeURIComponent(noteId)}/quotes/${encodeURIComponent(quoteId)}`,
+    documents: (noteId: string) =>
+      `/notes/${encodeURIComponent(noteId)}/documents`,
+    document: (noteId: string, jobId: string) =>
+      `/notes/${encodeURIComponent(noteId)}/documents/${encodeURIComponent(jobId)}`,
   },
   terms: '/terms',
   profile: {

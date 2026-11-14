@@ -10,6 +10,8 @@ export type NoteErrorMessage =
 export function noteErrorMessage(error: unknown): NoteErrorMessage {
   if (!(error instanceof ApiClientError)) return { kind: 'key', key: 'notes.error.network' }
   if (error.status === 403) return { kind: 'key', key: 'notes.error.verifyEmail' }
+  // У привязки книги свой 404: удалена или чужая книга, а не заметка.
+  if (error.code === 'DOCUMENT_NOT_FOUND') return { kind: 'key', key: 'notes.error.documentNotFound' }
   if (error.status === 404) return { kind: 'key', key: 'notes.error.notFound' }
   const serverText = error.details?.message?.trim()
   if ((error.status === 400 || error.status === 409) && serverText) return { kind: 'server', text: serverText }

@@ -76,6 +76,7 @@ Frontend обновляет JWT за минуту до истечения и п�
 | GET | `/api/notes/{id}/backlinks` | JWT | — | `200 NoteReference[]` |
 | POST / DELETE | `/api/notes/{id}/quotes[/{quoteId}]` | verified JWT (POST) | `NoteQuoteRequest` | `201 NoteQuoteResponse` / `204` |
 | GET | `/api/notes/graph?types=tag` | JWT | — | `200 NoteGraphResponse` (сейчас — только для списка тегов) |
+| POST / DELETE | `/api/notes/{id}/documents[/{jobId}]` | JWT | `NoteDocumentRequest` `{job_id}` | `200 NoteResponse` / `204`; `404 DOCUMENT_NOT_FOUND`, `400 NOTE_DOCUMENT_LIMIT_REACHED` |
 | GET | `/api/documents/history?page=0&size=20` | JWT | query, `size` 1–100 | `200 DocumentHistoryResponse` |
 | GET | `/api/profile` | JWT | — | `200 ProfileResponse` |
 | PUT | `/api/profile` | JWT | `UpdateProfileRequest` | `200 ProfileResponse` |
@@ -307,6 +308,25 @@ OpenAPI выключен по умолчанию. После запуска с
 - **Черновики** несохранённой правки хранятся в памяти вкладки (не в
   `sessionStorage`) и восстанавливаются при возврате к заметке; закрытие вкладки
   с правкой — `beforeunload`.
+
+## Конспект книги: заметка о документе без цитаты (T-67)
+
+Backend с 2026-11-14 привязывает заметку к документу целиком.
+
+- **Контракт.** `NoteCreateRequest.job_ids` — привязка при создании (вместе с
+  `quote` тоже можно); `POST /api/notes/{id}/documents {job_id}` → `200
+  NoteResponse` (повторная привязка ничего не меняет); `DELETE
+  /api/notes/{id}/documents/{jobId}` → `204`, `404`, если связи нет. У
+  `NoteResponse` — `documents[]` (`job_id`, `document_name`,
+  `document_available`, `linked_at`; у удалённой книги имя `null`, но `job_id`
+  есть, чтобы связь можно было снять), у `NoteSummary` — `linked_job_ids`. В
+  графе — ребро `about` (заметка → документ). `GET /api/notes?job_id=` отдаёт
+  заметки с цитатами **и** привязанные, каждую один раз. Статус документа не
+  важен: конспект можно начать, пока книга переводится. Больше 50 документов —
+  `400 NOTE_DOCUMENT_LIMIT_REACHED` (показывается текст сервера), чужой или
+  удалённый — `404 DOCUMENT_NOT_FOUND` («Книга удалена или недоступна», а не
+  «Заметка не найдена»). Поля `documents` и `linked_job_ids` в типах
+  необязательные: ответы до T-67 их не содержат.
 
 ## Заметки рядом с книгой и цитаты (этап 2)
 

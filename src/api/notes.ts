@@ -10,6 +10,7 @@ import type {
   NoteReference,
   NoteResponse,
   NoteUpdateRequest,
+  NoteDocumentRequest,
 } from './contracts/notes.ts'
 import { API_ENDPOINTS } from './endpoints.ts'
 
@@ -96,6 +97,31 @@ export function addNoteQuote(noteId: string, quote: NoteQuoteRequest, options: A
 
 export function deleteNoteQuote(noteId: string, quoteId: string, options: AuthenticatedApiCallOptions) {
   return apiClient.request<void>(API_ENDPOINTS.notes.quote(noteId, quoteId), {
+    method: 'DELETE',
+    accessToken: options.accessToken,
+    responseType: 'void',
+    signal: options.signal,
+  })
+}
+
+/**
+ * Привязать заметку к документу без цитаты (конспект книги). Повторная привязка
+ * ничего не меняет. `404 DOCUMENT_NOT_FOUND` — документ чужой или удалён,
+ * `400 NOTE_DOCUMENT_LIMIT_REACHED` — у заметки уже 50 документов.
+ */
+export function linkNoteDocument(noteId: string, jobId: string, options: AuthenticatedApiCallOptions) {
+  return apiClient.request<NoteResponse>(API_ENDPOINTS.notes.documents(noteId), {
+    method: 'POST',
+    accessToken: options.accessToken,
+    json: { job_id: jobId } satisfies NoteDocumentRequest,
+    signal: options.signal,
+    notifyAccessErrors: false,
+  })
+}
+
+/** Снять привязку; удалённый документ тоже можно отвязать. `404` — связи нет. */
+export function unlinkNoteDocument(noteId: string, jobId: string, options: AuthenticatedApiCallOptions) {
+  return apiClient.request<void>(API_ENDPOINTS.notes.document(noteId, jobId), {
     method: 'DELETE',
     accessToken: options.accessToken,
     responseType: 'void',
