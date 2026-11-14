@@ -148,3 +148,94 @@
   margin-top: 6px;
   line-height: 1.5;
 }
+
+/* Книги, о которых заметка (конспект): название и «×», ниже — выбор книги для привязки. */
+.books {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.books li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.books a,
+.books .deleted {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.books a:hover {
+  text-decoration: underline;
+}
+
+.bookKind {
+  flex: none;
+  color: var(--color-text-soft);
+  font-size: 11px;
+}
+
+.unlink {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.unlink:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+}
+
+.linkForm {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.linkForm select {
+  min-width: 0;
+  flex: 1;
+  height: 30px;
+  padding: 0 6px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.linkForm button {
+  padding: 0 10px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.linkForm button:disabled {
+  opacity: 0.55;
+}
+
+.error {
+  margin: 6px 0 0;
+  color: var(--color-danger-text);
+  font-size: 12px;
+}

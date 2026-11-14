@@ -1,62 +1,134 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { NoteLinkResponse, NoteResponse } from '../../api/contracts/notes.ts'
 import { useAuth } from '../../auth/useAuth.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import type { NoteErrorMessage } from '../../notes/noteErrors.ts'
+import { noteTitleProblem } from '../../notes/noteSyntax.ts'
 import { saveNoteChecked } from '../../notes/saveNote.ts'
 import { useNotes } from '../../notes/useNotes.ts'
 import { NoteEditor } from './NoteEditor.tsx'
 import styles from './NotesPage.module.css'
 import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 
+/** Пауза в наборе, после которой правка сохраняется сама. */
+export const NOTE_AUTOSAVE_DELAY_MS = 1000
+
+type SaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'waitTitle'
+
 interface NoteEditSessionProps {
   note: NoteResponse
   knownLinks: readonly NoteLinkResponse[]
   compact?: boolean
-  /** Сохранено: родитель показывает новую версию и закрывает правку. */
+  /** Между названием и текстом (цитаты заметки). */
+  afterTitle?: ReactNode
+  /** Каждое удачное сохранение: родитель показывает новую версию, правка продолжается. */
   onSaved: (note: NoteResponse) => void
   /** Пользователь выбрал актуальную версию после конфликта. */
   onLatest: (note: NoteResponse) => void
-  onClose: () => void
+  /** Правка закончена («Готово», Esc); `hasSaved` — сохранялось ли что-нибудь. */
+  onClose: (hasSaved: boolean) => void
 }
 
 /**
- * Правка существующей заметки: черновик, версия, от которой начата правка,
- * конфликт с другим окном. Общая для страницы заметки и панели рядом с книгой —
- * черновик одной заметки виден в обоих местах.
+ * Правка существующей заметки с автосохранением: через секунду после паузы в
+ * наборе правка уходит на сервер. Сохранения идут по одному: следующее ждёт
+ * предыдущее и берёт его новую версию. Без корректного названия сохранение
+ * ждёт. Черновик живёт в памяти вкладки, пока не сохранён, — его не теряют ни
+ * закрытие редактора, ни переход на другую заметку. Конфликт с другим окном
+ * останавливает автосохранение и предлагает выбор. Общая для страницы заметки,
+ * колонки и карточек на полях книги.
  */
-export function NoteEditSession({ note, knownLinks, compact = false, onSaved, onLatest, onClose }: NoteEditSessionProps) {
+export function NoteEditSession({ note, knownLinks, compact = false, afterTitle, onSaved, onLatest, onClose }: NoteEditSessionProps) {
   const { t } = useTranslation()
   const { session } = useAuth()
   const { drafts, notesChanged } = useNotes()
   const [restored] = useState(() => drafts.get(note.id))
   const [showRestoredNotice, setShowRestoredNotice] = useState(Boolean(restored))
-  // Восстановленный черновик мог начаться со старой версии: тогда сохранение уйдёт в конфликт.
-  const [baseVersion, setBaseVersion] = useState(restored?.baseVersion ?? note.version)
   const [editorRevision, setEditorRevision] = useState(0)
-  const [isSaving, setSaving] = useState(false)
+  const [status, setStatus] = useState<SaveStatus>(restored ? 'pending' : 'idle')
   const [error, setError] = useState<NoteErrorMessage | null>(null)
   const [conflict, setConflict] = useState<NoteResponse | null>(null)
-  const edited = useRef<{ title: string; body: string } | null>(null)
-  const initial = drafts.get(note.id) ?? { title: note.title, body: note.body }
+  // С чего начинается редактор; меняется, когда он перезапускается (взята актуальная версия, сброшен черновик).
+  const [initial, setInitial] = useState(() => drafts.get(note.id) ?? { title: note.title, body: note.body })
+  // Восстановленный черновик мог начаться со старой версии: тогда сохранение уйдёт в конфликт.
+  const baseVersion = useRef(restored?.baseVersion ?? note.version)
+  const current = useRef({ title: initial.title, body: initial.body })
+  const saved = useRef({ title: note.title, body: note.body })
+  const hasSaved = useRef(false)
+  const timer = useRef(0)
+  const inFlight = useRef<Promise<boolean> | null>(null)
+  const isConflict = useRef(false)
 
-  const save = async (title: string, body: string, version: number) => {
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+  // Несохранённая правка — браузер переспросит при закрытии вкладки.
+  useEffect(() => {
+    if (status !== 'pending' && status !== 'saving' && status !== 'waitTitle') return
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault() }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [status])
+
+  const isSaved = () => current.current.title.trim() === saved.current.title && current.current.body === saved.current.body
+
+  /** Сохранить то, что сейчас в редакторе. `true` — на сервере то же, что в редакторе. */
+  const save = async (version?: number): Promise<boolean> => {
+    // Сохранения по одному: следующее берёт версию, которую вернуло предыдущее.
+    if (inFlight.current) await inFlight.current
     const token = session?.accessToken
-    if (!token) return
-    setSaving(true)
+    if (!token || isConflict.current) return false
+    const { title, body } = current.current
+    if (noteTitleProblem(title)) {
+      setStatus('waitTitle')
+      return false
+    }
+    if (version === undefined && isSaved()) return true
+    setStatus('saving')
     setError(null)
-    const result = await saveNoteChecked(note.id, { title, body, version }, token)
-    setSaving(false)
-    if (result.kind === 'saved') {
-      drafts.clear(note.id)
-      notesChanged()
-      onSaved(result.note)
-    } else if (result.kind === 'conflict') {
-      setConflict(result.latest)
-    } else {
-      setError(result.message)
+    const request = (async () => {
+      const result = await saveNoteChecked(note.id, { title: title.trim(), body, version: version ?? baseVersion.current }, token)
+      if (result.kind === 'saved') {
+        baseVersion.current = result.note.version
+        saved.current = { title: result.note.title, body: result.note.body }
+        hasSaved.current = true
+        onSaved(result.note)
+        if (isSaved()) drafts.clear(note.id)
+        else drafts.set(note.id, { ...current.current, baseVersion: result.note.version })
+        setStatus(isSaved() ? 'saved' : 'pending')
+        return isSaved()
+      }
+      if (result.kind === 'conflict') {
+        isConflict.current = true
+        setConflict(result.latest)
+      } else {
+        setError(result.message)
+      }
+      setStatus('pending')
+      return false
+    })()
+    inFlight.current = request
+    try {
+      return await request
+    } finally {
+      inFlight.current = null
     }
   }
+
+  const finish = async () => {
+    window.clearTimeout(timer.current)
+    if (!(await save())) return
+    drafts.clear(note.id)
+    // Списки, метки и карточки перечитываются один раз — когда правка закончена.
+    if (hasSaved.current) notesChanged()
+    onClose(hasSaved.current)
+  }
+
+  const statusText = {
+    idle: t('notes.autosave.idle'),
+    pending: t('notes.autosave.pending'),
+    saving: t('notes.autosave.saving'),
+    saved: t('notes.autosave.saved'),
+    waitTitle: t('notes.autosave.waitTitle'),
+  }[status]
 
   const notice = conflict ? (
     <div className={`${styles.notice} ${styles.noticeWarning}`} role="alert">
@@ -65,14 +137,19 @@ export function NoteEditSession({ note, knownLinks, compact = false, onSaved, on
         <button type="button" onClick={() => {
           onLatest(conflict)
           drafts.clear(note.id)
-          edited.current = null
-          setBaseVersion(conflict.version)
+          baseVersion.current = conflict.version
+          current.current = { title: conflict.title, body: conflict.body }
+          saved.current = { title: conflict.title, body: conflict.body }
+          setInitial({ title: conflict.title, body: conflict.body })
+          isConflict.current = false
           setConflict(null)
+          setStatus('saved')
           setEditorRevision((value) => value + 1)
         }}>{t('notes.conflictUseLatest')}</button>
-        <button type="button" disabled={isSaving} onClick={() => {
-          const mine = edited.current ?? initial
-          void save(mine.title.trim(), mine.body, conflict.version)
+        <button type="button" disabled={status === 'saving'} onClick={() => {
+          isConflict.current = false
+          setConflict(null)
+          void save(conflict.version)
         }}>{t('notes.conflictOverwrite')}</button>
       </span>
     </div>
@@ -81,9 +158,12 @@ export function NoteEditSession({ note, knownLinks, compact = false, onSaved, on
       <span>{t('notes.draftRestored')}</span>
       <button type="button" onClick={() => {
         drafts.clear(note.id)
-        edited.current = null
+        window.clearTimeout(timer.current)
+        current.current = { title: note.title, body: note.body }
+        baseVersion.current = note.version
+        setInitial({ title: note.title, body: note.body })
         setShowRestoredNotice(false)
-        setBaseVersion(note.version)
+        setStatus('idle')
         setEditorRevision((value) => value + 1)
       }}>{t('notes.draftDiscard')}</button>
     </div>
@@ -96,21 +176,27 @@ export function NoteEditSession({ note, knownLinks, compact = false, onSaved, on
       initialBody={initial.body}
       knownLinks={knownLinks}
       submitLabel={t('notes.save')}
-      isSaving={isSaving}
+      isSaving={status === 'saving'}
       error={error}
       notice={notice}
+      afterTitle={afterTitle}
       compact={compact}
       autoFocus="body"
+      autosave={{ status: statusText, onDone: () => void finish() }}
       onChange={(title, body) => {
-        edited.current = { title, body }
-        if (title === note.title && body === note.body) drafts.clear(note.id)
-        else drafts.set(note.id, { title, body, baseVersion })
+        current.current = { title, body }
+        if (title === saved.current.title && body === saved.current.body) drafts.clear(note.id)
+        else drafts.set(note.id, { title, body, baseVersion: baseVersion.current })
+        setStatus('pending')
+        window.clearTimeout(timer.current)
+        timer.current = window.setTimeout(() => void save(), NOTE_AUTOSAVE_DELAY_MS)
       }}
-      onSubmit={(title, body) => void save(title, body, baseVersion)}
-      onCancel={() => {
-        drafts.clear(note.id)
-        onClose()
+      // Ctrl/⌘ + S — сохранить сейчас, не дожидаясь паузы.
+      onSubmit={() => {
+        window.clearTimeout(timer.current)
+        void save()
       }}
+      onCancel={() => void finish()}
     />
   )
 }

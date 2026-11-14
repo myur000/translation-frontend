@@ -147,12 +147,14 @@ describe('notes section', () => {
     await user.clear(body)
     await user.type(body, 'Моя правка')
     api.getNote.mockResolvedValue(newer)
-    await user.click(screen.getByRole('button', { name: 'Сохранить' }))
+    // «Готово» сохраняет то, что не успело уйти автосохранением.
+    await user.click(screen.getByRole('button', { name: 'Готово' }))
     expect(api.updateNote).toHaveBeenLastCalledWith('n-1', { title: 'Сроки', body: 'Моя правка', version: 1 }, expect.anything())
     expect((await screen.findByRole('alert')).textContent).toContain('Заметку изменили в другом окне')
 
     await user.click(screen.getByRole('button', { name: 'Сохранить мою' }))
     expect(api.updateNote).toHaveBeenLastCalledWith('n-1', { title: 'Сроки', body: 'Моя правка', version: 2 }, expect.anything())
+    await user.click(screen.getByRole('button', { name: 'Готово' }))
     expect(await screen.findByText('Моя правка')).toBeTruthy()
     expect(screen.queryByRole('textbox', { name: 'Текст заметки' })).toBeNull()
   })
@@ -162,10 +164,51 @@ describe('notes section', () => {
     api.updateNote.mockRejectedValue(conflict('Заметка с таким названием уже есть'))
     renderNotes('/notes/n-1')
     await user.click(await screen.findByRole('button', { name: 'Редактировать' }))
-    await user.click(screen.getByRole('button', { name: 'Сохранить' }))
+    await user.type(screen.getByLabelText('Текст заметки'), '!')
+    await user.click(screen.getByRole('button', { name: 'Готово' }))
     // Версия на сервере та же — значит, причина в названии или лимите, а не в чужой правке.
     expect((await screen.findByRole('alert')).textContent).toBe('Заметка с таким названием уже есть')
     expect(screen.queryByText('Заметку изменили в другом окне')).toBeNull()
+  })
+
+  it('saves an edit by itself after a pause and shows it in the status', async () => {
+    const user = userEvent.setup()
+    api.updateNote.mockImplementation(async (_id: string, request: { title: string; body: string }) => note({ ...request, version: 2 }))
+    renderNotes('/notes/n-1')
+    await user.click(await screen.findByRole('button', { name: 'Редактировать' }))
+    // Правка выглядит как чтение: ни вкладок, ни кнопки «Сохранить».
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Сохранить' })).toBeNull()
+    await user.type(screen.getByLabelText('Текст заметки'), ' Дополнение')
+    expect(screen.getByText('Изменено')).toBeTruthy()
+
+    await waitFor(() => expect(api.updateNote).toHaveBeenCalledWith('n-1',
+      { title: 'Сроки', body: 'Срок — **десять дней**. #договор Дополнение', version: 1 }, expect.anything()), { timeout: 2500 })
+    expect(await screen.findByText('Сохранено')).toBeTruthy()
+    // Уже сохранённое «Готово» не отправляет второй раз, а возвращает к чтению.
+    await user.click(screen.getByRole('button', { name: 'Готово' }))
+    expect(api.updateNote).toHaveBeenCalledTimes(1)
+    expect(screen.queryByLabelText('Текст заметки')).toBeNull()
+  })
+
+  it('formats the selection from the toolbar and previews the note', async () => {
+    const user = userEvent.setup()
+    renderNotes('/notes/n-1')
+    await user.click(await screen.findByRole('button', { name: 'Редактировать' }))
+    const body = screen.getByLabelText('Текст заметки') as HTMLTextAreaElement
+    await user.clear(body)
+    await user.type(body, 'важно')
+    body.setSelectionRange(0, 5)
+    await user.click(screen.getByRole('button', { name: 'Жирный — Ctrl/⌘ + B' }))
+    expect(body.value).toBe('**важно**')
+    // Выделение осталось на слове — ссылка оборачивает его же.
+    await user.click(screen.getByRole('button', { name: 'Ссылка на заметку [[…]]' }))
+    expect(body.value).toBe('**[[важно]]**')
+
+    await user.click(screen.getByRole('button', { name: 'Просмотр' }))
+    expect(screen.getByRole('button', { name: 'Просмотр' }).getAttribute('aria-pressed')).toBe('true')
+    expect(document.querySelector('strong')?.textContent).toBe('важно')
+    expect(body.closest('[hidden]')).toBeTruthy()
   })
 
   it('keeps an unsaved edit when the reader opens another note and comes back', async () => {
@@ -190,11 +233,20 @@ describe('notes section', () => {
     expect((screen.getByLabelText('Текст заметки') as HTMLTextAreaElement).value).toBe('Срок — **десять дней**. #договор')
   })
 
+  it('opens the editor by clicking the note text', async () => {
+    const user = userEvent.setup()
+    renderNotes('/notes/n-1')
+    await user.click(await screen.findByText(/десять дней/))
+    expect(screen.getByLabelText('Текст заметки')).toBeTruthy()
+  })
+
   it('deletes a note after confirmation and returns to the list', async () => {
     const user = userEvent.setup()
     api.deleteNote.mockResolvedValue(undefined)
     renderNotes('/notes/n-1?tag=%D0%B4%D0%BE%D0%B3%D0%BE%D0%B2%D0%BE%D1%80')
-    await user.click(await screen.findByRole('button', { name: 'Удалить' }))
+    // Удаление — в меню «⋯» рядом с названием: на странице оно не спорит с текстом.
+    await user.click(await screen.findByRole('button', { name: 'Действия с заметкой' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Удалить' }))
     const dialog = screen.getByRole('alertdialog', { name: 'Удалить заметку?' })
     await user.click(within(dialog).getByRole('button', { name: 'Удалить' }))
     expect(api.deleteNote).toHaveBeenCalledWith('n-1', expect.anything())

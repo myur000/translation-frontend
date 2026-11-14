@@ -1,0 +1,167 @@
+/* Корешки книг — тех же тонов, что обложки на полке (Sidebar.module.css). */
+.bar,
+.quotes {
+  --cover-0: #2f5d73;
+  --cover-1: #5b4a6e;
+  --cover-2: #7a5a2e;
+  --cover-3: #4a6b4f;
+  --cover-4: #7a3f3f;
+  --cover-5: #3d4f7a;
+}
+
+.spine {
+  width: 12px;
+  height: 17px;
+  flex: none;
+  border-radius: 1px 3px 3px 1px;
+  box-shadow: inset 2px 0 0 rgb(0 0 0 / 24%);
+}
+
+/* Плашка книги над заметкой. */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 10px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.barText {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+
+.barTitle {
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barWhere {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+/* Главное действие страницы — акцентная кнопка. */
+.openButton {
+  flex: none;
+  padding: 6px 12px;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.openButton:hover {
+  background: var(--color-accent-hover, var(--color-accent));
+}
+
+.openButton:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Цитаты карточками в основной колонке. */
+.quotes {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.quote {
+  padding: 12px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.quoteText {
+  margin: 0;
+  padding-left: 12px;
+  color: var(--color-text);
+  border-left: 2px solid var(--color-accent);
+  font-family: var(--font-serif);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* Свёрнутая цитата — три строки: цитатой часто бывает целый абзац. */
+.clamped {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.paired {
+  margin: 8px 0 0;
+  padding-left: 14px;
+  color: var(--color-text-muted);
+  font-family: var(--font-serif);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.quoteMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.quoteSource {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+}
+
+.textButton {
+  padding: 0;
+  color: var(--color-text-muted);
+  background: none;
+  border: 0;
+  font-size: 12px;
+}
+
+.textButton:hover:not(:disabled),
+.textButton[aria-pressed='true'] {
+  color: var(--color-text);
+}
+
+.textButton:disabled {
+  opacity: 0.55;
+}
+
+.inBook {
+  margin-left: auto;
+  color: var(--color-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.inBook:hover {
+  text-decoration: underline;
+}
+
+.error {
+  margin: 8px 0 0;
+  color: var(--color-danger-text);
+  font-size: 12px;
+}

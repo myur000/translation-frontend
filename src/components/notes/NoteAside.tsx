@@ -1,5 +1,14 @@
-import { Link } from 'react-router'
+import { useState } from 'react'
+import { Link, useOutletContext } from 'react-router'
 import type { NoteReference, NoteResponse } from '../../api/contracts/notes.ts'
+import { linkNoteDocument, unlinkNoteDocument } from '../../api/notes.ts'
+import { useAuth } from '../../auth/useAuth.ts'
+import { bookTitle } from '../../documents/bookTitle.ts'
+import type { AppLayoutContextValue } from '../../layouts/AppLayout.tsx'
+import { noteErrorMessage, type NoteErrorMessage } from '../../notes/noteErrors.ts'
+import { useNotes } from '../../notes/useNotes.ts'
+import { bookNoteHref, noteBooks } from '../../notes/noteBooks.ts'
+import { NoteErrorText } from './NoteErrorText.tsx'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import { notesSearch } from '../../notes/notesQuery.ts'
 import { useNoteDateFormat } from '../../notes/useNoteDateFormat.ts'
@@ -12,10 +21,12 @@ interface NoteAsideProps {
   backlinks: NoteReference[] | null
   /** Строка фильтров списка: переходы не сбрасывают поиск в боковой панели. */
   search: string
+  /** Привязки к книгам изменились: показать заметку из ответа сервера. */
+  onChanged?: (note: NoteResponse) => void
 }
 
-/** Связи заметки: теги, обратные ссылки и цитаты из книг. */
-export function NoteAside({ note, backlinks, search }: NoteAsideProps) {
+/** Связи заметки, коротко: книги (с переходом к заметке в книге), обратные ссылки и теги. Сами цитаты — в основной колонке. */
+export function NoteAside({ note, backlinks, search, onChanged }: NoteAsideProps) {
   const { t } = useTranslation()
   const formatDate = useNoteDateFormat()
   return (
@@ -45,27 +56,7 @@ export function NoteAside({ note, backlinks, search }: NoteAsideProps) {
           ) : <p className={styles.empty}>{t('notes.backlinksEmpty')}</p>}
       </section>
 
-      <section>
-        <h2>{t('notes.quotes')}{note.quotes.length ? <span className={styles.count}>{note.quotes.length}</span> : null}</h2>
-        {note.quotes.length ? (
-          <ul className={styles.quotes}>
-            {note.quotes.map((quote) => (
-              <li key={quote.id} className={styles.quote}>
-                <blockquote>{quote.quote}</blockquote>
-                {quote.paired_text ? <p className={styles.paired}>{quote.paired_text}</p> : null}
-                <div className={styles.quoteMeta}>
-                  <span>{t(quote.side === 'SOURCE' ? 'panel.original' : 'panel.translation')}</span>
-                  {quote.document_available && quote.job_id ? (
-                    <Link to={`/documents/${encodeURIComponent(quote.job_id)}`} title={t('notes.openDocument')}>
-                      {quote.document_name ?? t('notes.openDocument')}
-                    </Link>
-                  ) : <span className={styles.deleted}>{t('notes.documentDeleted')}</span>}
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : <p className={styles.empty}>{t('notes.quotesEmpty')}</p>}
-      </section>
+      <NoteBooks note={note} onChanged={onChanged} />
 
       <section className={styles.meta}>
         <p>{t('notes.createdAt', { date: formatDate(note.created_at) })}</p>
@@ -73,5 +64,98 @@ export function NoteAside({ note, backlinks, search }: NoteAsideProps) {
         <p className={styles.storage}>{t('notes.storage')}</p>
       </section>
     </aside>
+  )
+}
+
+/**
+ * Книги, о которых заметка (конспект, T-67): привязка без цитаты. Отвязать можно и
+ * удалённую книгу. Привязать — к любой своей отправленной книге, статус не важен.
+ */
+function NoteBooks({ note, onChanged }: { note: NoteResponse; onChanged?: (note: NoteResponse) => void }) {
+  const { t } = useTranslation()
+  const { session } = useAuth()
+  const { notesChanged } = useNotes()
+  // Вне раздела приложения (тесты, отдельные экраны) списка книг нет — привязывать не к чему.
+  const layout = useOutletContext<AppLayoutContextValue | undefined>()
+  const [selected, setSelected] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<NoteErrorMessage | null>(null)
+  const linked = note.documents ?? []
+  const books = noteBooks(note)
+  // Привязать можно к любой своей отправленной книге, кроме уже привязанных целиком.
+  const seen = new Set(linked.map((document) => document.job_id))
+  const candidates = (layout?.documents ?? []).flatMap((document) => {
+    if (!document.jobId || seen.has(document.jobId)) return []
+    seen.add(document.jobId)
+    return [{ jobId: document.jobId, title: bookTitle(document.name) }]
+  })
+
+  const run = async (action: (token: string) => Promise<NoteResponse>) => {
+    const token = session?.accessToken
+    if (!token) return
+    setBusy(true)
+    setError(null)
+    try {
+      onChanged?.(await action(token))
+      setSelected('')
+      notesChanged()
+    } catch (caught) {
+      setError(noteErrorMessage(caught))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const unlink = (jobId: string) => run(async (token) => {
+    await unlinkNoteDocument(note.id, jobId, { accessToken: token })
+    return { ...note, documents: linked.filter((document) => document.job_id !== jobId) }
+  })
+
+  return (
+    <section aria-label={t('notes.books')}>
+      <h2>{t('notes.books')}{books.length ? <span className={styles.count}>{books.length}</span> : null}</h2>
+      {books.length ? (
+        <ul className={styles.books}>
+          {books.map((book) => {
+            const title = book.title || t('notes.documentDeleted')
+            return (
+              <li key={book.jobId}>
+                {book.isAvailable
+                  ? <Link to={bookNoteHref(book.jobId, note.id, book.quote?.id)} title={t('notes.openInBook')}>{title}</Link>
+                  : <span className={styles.deleted}>{title}</span>}
+                <span className={styles.bookKind}>{book.quote ? `¶${book.quote.paragraphIndex + 1}` : t('marginNotes.aboutBook')}</span>
+                {book.isLinked ? (
+                  <button
+                    type="button"
+                    className={styles.unlink}
+                    disabled={busy}
+                    aria-label={t('notes.unlinkBook', { title })}
+                    title={t('notes.unlinkBook', { title })}
+                    onClick={() => void unlink(book.jobId)}
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </li>
+            )
+          })}
+        </ul>
+      ) : <p className={styles.empty}>{t('notes.aboutBooksEmpty')}</p>}
+      {candidates.length ? (
+        <form
+          className={styles.linkForm}
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (selected) void run((token) => linkNoteDocument(note.id, selected, { accessToken: token }))
+          }}
+        >
+          <select value={selected} aria-label={t('notes.linkBook')} onChange={(event) => setSelected(event.currentTarget.value)}>
+            <option value="">{t('notes.linkBookPlaceholder')}</option>
+            {candidates.map((candidate) => <option key={candidate.jobId} value={candidate.jobId}>{candidate.title}</option>)}
+          </select>
+          <button type="submit" disabled={busy || !selected}>{t('notes.linkBookSubmit')}</button>
+        </form>
+      ) : null}
+      {error ? <p className={styles.error} role="alert"><NoteErrorText message={error} /></p> : null}
+    </section>
   )
 }

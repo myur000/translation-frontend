@@ -26,9 +26,16 @@ interface NoteEditorProps {
   error: NoteErrorMessage | null
   /** Сообщение над формой: восстановленный черновик, конфликт версий. */
   notice?: ReactNode
+  /** Между названием и текстом — цитаты заметки: при правке видно, к чему пишешь. */
+  afterTitle?: ReactNode
   autoFocus?: 'title' | 'body'
   /** Узкая панель рядом с книгой: меньше заголовок и поле, без подсказки о клавишах. */
   compact?: boolean
+  /**
+   * Правка существующей заметки с автосохранением: вместо «Отмена / Сохранить» —
+   * статус сохранения и «Готово». Esc и «Готово» возвращают к чтению.
+   */
+  autosave?: { status: ReactNode; onDone: () => void }
   onChange: (title: string, body: string) => void
   onSubmit: (title: string, body: string) => void
   onCancel: () => void
@@ -43,10 +50,12 @@ export function NoteEditor(props: NoteEditorProps) {
   const id = useId()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const titleRef = useRef<HTMLInputElement>(null)
-  const pendingCaret = useRef<number | null>(null)
+  // Выделение, которое поставить в поле после обновления текста (вставка ссылки, разметки).
+  const pendingSelection = useRef<{ start: number; end: number; trackLink?: boolean } | null>(null)
   const [title, setTitle] = useState(initialTitle)
   const [body, setBody] = useState(initialBody)
-  const [tab, setTab] = useState<'write' | 'preview'>('write')
+  // Предпросмотр по кнопке-глазу: вкладки занимали строку ради редкого действия.
+  const [isPreview, setPreview] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [link, setLink] = useState<OpenLink | null>(null)
   const [suggestions, setSuggestions] = useState<{ fragment: string; items: NoteSummary[] } | null>(null)
@@ -60,28 +69,46 @@ export function NoteEditor(props: NoteEditorProps) {
   const shownSuggestions = link && suggestions?.fragment === link.fragment ? suggestions.items : null
 
   useEffect(() => {
-    if (props.autoFocus === 'body') textareaRef.current?.focus()
+    if (props.autoFocus === 'body') {
+      // Правку начинают, чтобы продолжить мысль: курсор — в конец текста.
+      const area = textareaRef.current
+      area?.focus()
+      area?.setSelectionRange(area.value.length, area.value.length)
+    }
     else titleRef.current?.focus()
     // Фокус ставится один раз при открытии редактора.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Закрытие или перезагрузка вкладки с несохранённым текстом — браузер переспросит.
+  const hasAutosave = Boolean(props.autosave)
   useEffect(() => {
-    if (!isDirty) return
+    // С автосохранением предупреждает сеанс правки: он знает, сохранено ли.
+    if (!isDirty || hasAutosave) return
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault() }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
-  }, [isDirty])
+  }, [hasAutosave, isDirty])
 
   useLayoutEffect(() => {
-    const caret = pendingCaret.current
+    const selection = pendingSelection.current
     const textarea = textareaRef.current
-    if (caret === null || !textarea) return
-    pendingCaret.current = null
+    if (selection === null || !textarea) return
+    pendingSelection.current = null
     textarea.focus()
-    textarea.setSelectionRange(caret, caret)
+    textarea.setSelectionRange(selection.start, selection.end)
+    if (selection.trackLink) trackLink(textarea)
+    // trackLink читает текущее поле, отдельной зависимостью он не нужен.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [body])
+
+  // Поле растёт вместе с текстом, как страница: без рамки и без своей прокрутки.
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea || isPreview) return
+    textarea.style.height = 'auto'
+    textarea.style.height = `${textarea.scrollHeight}px`
+  }, [body, isPreview])
 
   const fragment = link?.fragment ?? null
   useEffect(() => {
@@ -126,10 +153,43 @@ export function NoteEditor(props: NoteEditorProps) {
     const after = body.slice(caret)
     // `]]` уже стоит после курсора (поле дописали раньше) — не дублируем.
     const next = `${body.slice(0, link.start + 2)}${noteTitle}${after.startsWith(']]') ? '' : ']]'}${after}`
-    pendingCaret.current = link.start + 2 + noteTitle.length + 2
+    const afterLink = link.start + 2 + noteTitle.length + 2
+    pendingSelection.current = { start: afterLink, end: afterLink }
     setLink(null)
     update(title, next)
   }
+
+  /**
+   * Разметка вокруг выделения: **жирный**, *курсив*, [[ссылка]]. Без выделения —
+   * пара знаков с курсором между ними; для ссылки сразу открываются подсказки.
+   */
+  const wrapSelection = (before: string, after: string, options: { trackLink?: boolean } = {}) => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    setPreview(false)
+    const { selectionStart: start, selectionEnd: end } = textarea
+    const selected = body.slice(start, end)
+    const next = `${body.slice(0, start)}${before}${selected}${after}${body.slice(end)}`
+    pendingSelection.current = { start: start + before.length, end: start + before.length + selected.length, trackLink: options.trackLink }
+    update(title, next)
+  }
+  /** Тег: «#» у курсора, с пробелом перед ним, если курсор прямо после слова. */
+  const insertTag = () => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    setPreview(false)
+    const start = textarea.selectionStart
+    const prefix = start > 0 && !/\s/.test(body[start - 1]) ? ' #' : '#'
+    const next = `${body.slice(0, start)}${prefix}${body.slice(textarea.selectionEnd)}`
+    pendingSelection.current = { start: start + prefix.length, end: start + prefix.length }
+    update(title, next)
+  }
+  const formatButtons = [
+    { id: 'bold', label: t('notes.format.bold'), face: <b>Ж</b>, run: () => wrapSelection('**', '**') },
+    { id: 'italic', label: t('notes.format.italic'), face: <i>К</i>, run: () => wrapSelection('*', '*') },
+    { id: 'link', label: t('notes.format.link'), face: <span>[[ ]]</span>, run: () => wrapSelection('[[', ']]', { trackLink: true }) },
+    { id: 'tag', label: t('notes.format.tag'), face: <span>#</span>, run: insertTag },
+  ]
 
   const listboxId = `${id}-suggestions`
   const optionId = (index: number) => `${id}-suggestion-${index}`
@@ -141,9 +201,17 @@ export function NoteEditor(props: NoteEditorProps) {
       aria-busy={isSaving}
       onSubmit={(event) => { event.preventDefault(); submit() }}
       onKeyDown={(event) => {
-        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        const key = event.key.toLowerCase()
+        if ((event.metaKey || event.ctrlKey) && key === 's') {
           event.preventDefault()
           submit()
+        } else if ((event.metaKey || event.ctrlKey) && (key === 'b' || key === 'i') && event.target === textareaRef.current) {
+          event.preventDefault()
+          wrapSelection(key === 'b' ? '**' : '*', key === 'b' ? '**' : '*')
+        } else if (event.key === 'Escape' && props.autosave) {
+          // С автосохранением Esc — то же «Готово»: правка не теряется.
+          event.preventDefault()
+          props.autosave.onDone()
         } else if (event.key === 'Escape' && !isDirty && !isSaving) {
           // Без изменений Esc просто закрывает редактор; правку так не потерять.
           event.preventDefault()
@@ -152,11 +220,12 @@ export function NoteEditor(props: NoteEditorProps) {
       }}
     >
       {props.notice}
-      <label className={styles.field}>
-        <span className={styles.label}>{t('notes.titleLabel')}</span>
+      <div className={styles.field}>
+        {/* Название — тем же шрифтом, что при чтении; подпись — для экранного диктора. */}
         <input
           ref={titleRef}
           className={styles.titleInput}
+          aria-label={t('notes.titleLabel')}
           value={title}
           maxLength={NOTE_TITLE_MAX_LENGTH + 20}
           placeholder={t('notes.titlePlaceholder')}
@@ -169,27 +238,12 @@ export function NoteEditor(props: NoteEditorProps) {
             {t(`notes.titleProblem.${visibleTitleProblem}`, { max: NOTE_TITLE_MAX_LENGTH })}
           </span>
         ) : null}
-      </label>
-
-      <div className={styles.tabs} role="tablist" aria-label={t('notes.editorMode')}>
-        {(['write', 'preview'] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            id={`${id}-tab-${value}`}
-            aria-selected={tab === value}
-            aria-controls={`${id}-panel-${value}`}
-            className={tab === value ? styles.tabActive : undefined}
-            onClick={() => { setTab(value); setLink(null) }}
-          >
-            {t(value === 'write' ? 'notes.tabWrite' : 'notes.tabPreview')}
-          </button>
-        ))}
       </div>
 
+      {props.afterTitle}
+
       <div className={styles.bodyArea}>
-        <div id={`${id}-panel-write`} role="tabpanel" aria-labelledby={`${id}-tab-write`} hidden={tab !== 'write'} className={styles.writePanel}>
+        <div className={styles.writePanel} hidden={isPreview}>
           <textarea
             ref={textareaRef}
             className={styles.textarea}
@@ -247,8 +301,8 @@ export function NoteEditor(props: NoteEditorProps) {
             </div>
           ) : null}
         </div>
-        <div id={`${id}-panel-preview`} role="tabpanel" aria-labelledby={`${id}-tab-preview`} hidden={tab !== 'preview'} className={styles.previewPanel}>
-          {tab === 'preview' ? (body.trim()
+        <div id={`${id}-preview`} className={styles.previewPanel} hidden={!isPreview} aria-live="polite">
+          {isPreview ? (body.trim()
             ? <NoteContent body={body} links={props.knownLinks} />
             : <p className={styles.previewEmpty}>{t('notes.previewEmpty')}</p>) : null}
         </div>
@@ -261,12 +315,49 @@ export function NoteEditor(props: NoteEditorProps) {
       ) : null}
       {props.error ? <p className={styles.error} role="alert"><NoteErrorText message={props.error} /></p> : null}
 
+      {/* Нижняя панель: разметка и предпросмотр слева, статус и главное действие справа. */}
       <div className={styles.actions}>
-        {!props.compact ? <span className={styles.hint}>{t('notes.shortcuts')}</span> : null}
-        <button type="button" className={styles.secondary} onClick={onCancel} disabled={isSaving}>{t('common.cancel')}</button>
-        <button type="submit" className={styles.primary} disabled={isSaving}>
-          {isSaving ? t('notes.saving') : props.submitLabel}
-        </button>
+        <div className={styles.format} role="group" aria-label={t('notes.format.label')}>
+          {formatButtons.map((button) => (
+            <button
+              key={button.id}
+              type="button"
+              className={styles.formatButton}
+              aria-label={button.label}
+              title={button.label}
+              // mousedown, а не click: поле не теряет выделение до вставки разметки.
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={button.run}
+            >
+              {button.face}
+            </button>
+          ))}
+          <button
+            type="button"
+            className={styles.formatButton}
+            aria-label={t('notes.tabPreview')}
+            title={t('notes.tabPreview')}
+            aria-pressed={isPreview}
+            aria-controls={`${id}-preview`}
+            onClick={() => { setPreview(!isPreview); setLink(null) }}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z" /><circle cx="8" cy="8" r="2" /></svg>
+          </button>
+        </div>
+        {props.autosave ? (
+          <>
+            <span className={styles.status} role="status">{props.autosave.status}</span>
+            <button type="button" className={styles.secondary} onClick={props.autosave.onDone}>{t('notes.done')}</button>
+          </>
+        ) : (
+          <>
+            {!props.compact ? <span className={styles.hint}>{t('notes.shortcuts')}</span> : <span className={styles.status} />}
+            <button type="button" className={styles.secondary} onClick={onCancel} disabled={isSaving}>{t('common.cancel')}</button>
+            <button type="submit" className={styles.primary} disabled={isSaving}>
+              {isSaving ? t('notes.saving') : props.submitLabel}
+            </button>
+          </>
+        )}
       </div>
     </form>
   )

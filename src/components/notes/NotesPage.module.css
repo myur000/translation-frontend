@@ -304,7 +304,70 @@
 
 .noteActions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 4px;
+}
+
+.iconAction {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+
+.iconAction:hover {
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+}
+
+.iconAction:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 0;
+}
+
+.iconAction svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+/* Текст заметки: клик открывает правку на месте. */
+.editableBody {
+  margin: -6px -10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  cursor: text;
+}
+
+.editableBody:hover {
+  background: var(--color-surface-subtle);
+}
+
+/* Пустая заметка — приглашение написать, а не инструкция «нажмите „Редактировать“». */
+.writePrompt {
+  width: 100%;
+  padding: 14px 12px;
+  color: var(--color-text-soft);
+  text-align: left;
+  background: transparent;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-family: var(--font-serif);
+  font-size: 15px;
+}
+
+.writePrompt:hover {
+  color: var(--color-text-muted);
+  background: var(--color-surface-subtle);
 }
 
 .editorColumn {

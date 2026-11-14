@@ -84,9 +84,9 @@ export function PanelNoteView({ noteId, jobId, onBack, onShowQuote, onChanged }:
           note={note}
           knownLinks={note.links}
           compact
-          onSaved={(saved) => { applySaved(saved); setEditing(false); onChanged() }}
+          onSaved={applySaved}
           onLatest={applySaved}
-          onClose={() => setEditing(false)}
+          onClose={(hasSaved) => { setEditing(false); if (hasSaved) onChanged() }}
         />
       ) : (
         <>

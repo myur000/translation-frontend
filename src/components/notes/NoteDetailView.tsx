@@ -9,6 +9,8 @@ import { useNote } from '../../notes/useNote.ts'
 import { useNotes } from '../../notes/useNotes.ts'
 import { ConfirmDialog } from '../ui/ConfirmDialog.tsx'
 import { NoteAside } from './NoteAside.tsx'
+import { NoteBookBar, NoteQuoteCards } from './NoteBookContext.tsx'
+import { DocumentActionsMenu } from '../toolbar/DocumentActionsMenu.tsx'
 import { NoteContent } from './NoteContent.tsx'
 import { NoteEditSession } from './NoteEditSession.tsx'
 import { NoteErrorText } from './NoteErrorText.tsx'
@@ -71,11 +73,14 @@ export function NoteDetailView({ noteId }: { noteId: string }) {
       </Link>
       <div className={styles.detail}>
         <article className={styles.main}>
+          {/* Книга заметки и переход к месту в ней — первое, что видно на странице. */}
+          <NoteBookBar note={note} />
           {isEditing ? (
             <NoteEditSession
               note={note}
               knownLinks={knownLinks}
-              onSaved={(saved) => { applySaved(saved); setEditing(false) }}
+              afterTitle={<NoteQuoteCards note={note} onChanged={applySaved} />}
+              onSaved={applySaved}
               onLatest={applySaved}
               onClose={() => setEditing(false)}
             />
@@ -83,20 +88,38 @@ export function NoteDetailView({ noteId }: { noteId: string }) {
             <>
               <header className={styles.noteHeader}>
                 <h1>{note.title}</h1>
+                {/* Тихие действия: правка — карандашом или кликом по тексту, удаление — в «⋯». */}
                 <div className={styles.noteActions}>
-                  <button type="button" className={styles.primaryButton} onClick={() => setEditing(true)}>{t('notes.edit')}</button>
-                  <button type="button" className={styles.dangerButton} onClick={() => setDeleteState({ busy: false, error: null })}>
-                    {t('notes.delete')}
+                  <button type="button" className={styles.iconAction} aria-label={t('notes.edit')} title={t('notes.edit')} onClick={() => setEditing(true)}>
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.8l2.7 2.7-7.4 7.4H3.1v-2.7zM9 4.3l2.7 2.7" /></svg>
                   </button>
+                  <DocumentActionsMenu
+                    variant="quiet"
+                    label={t('notes.actions')}
+                    actions={[{ id: 'delete', label: t('notes.delete'), icon: 'trash', danger: true, onSelect: () => setDeleteState({ busy: false, error: null }) }]}
+                  />
                 </div>
               </header>
-              {note.body.trim()
-                ? <NoteContent body={note.body} links={note.links} />
-                : <p className={styles.state}>{t('notes.emptyBody')}</p>}
+              <NoteQuoteCards note={note} onChanged={applySaved} />
+              {note.body.trim() ? (
+                <div
+                  className={styles.editableBody}
+                  title={t('marginNotes.editHint')}
+                  onClick={(event) => {
+                    // Ссылки в тексте ведут по ссылке, выделение текста — не повод открывать правку.
+                    if ((event.target as Element).closest('a') || !window.getSelection()?.isCollapsed) return
+                    setEditing(true)
+                  }}
+                >
+                  <NoteContent body={note.body} links={note.links} />
+                </div>
+              ) : (
+                <button type="button" className={styles.writePrompt} onClick={() => setEditing(true)}>{t('notes.writePrompt')}</button>
+              )}
             </>
           )}
         </article>
-        <NoteAside note={note} backlinks={backlinks} search={search} />
+        <NoteAside note={note} backlinks={backlinks} search={search} onChanged={applySaved} />
       </div>
       {deleteState ? (
         <ConfirmDialog
