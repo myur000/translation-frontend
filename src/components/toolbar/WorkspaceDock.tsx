@@ -16,7 +16,13 @@ interface WorkspaceDockProps {
   /** Пункты меню «+»: глоссарий, другой язык и всё, что появится позже. */
   tools: DocumentAction[]
   currentPage: number
+  /** Число страниц; `null` — счётчик не показывается. */
   pageCount: number | null
+  /**
+   * Номер считан по прокрутке, а не по разметке страниц (DOCX, текст): учётные
+   * страницы книги, положение примерное. Подсказка на счётчике объясняет это.
+   */
+  isPageApproximate?: boolean
   onPreviousPage: () => void
   onNextPage: () => void
   isTranslating: boolean
@@ -79,7 +85,7 @@ export function WorkspaceDock(props: WorkspaceDockProps) {
         </div>
       ) : null}
 
-      {/* Номера страниц есть только у PDF; у DOCX и текста стрелкам нечего листать. */}
+      {/* У PDF — его страницы; у DOCX и текста — учётные страницы по доле прокрутки. */}
       {pageCount !== null ? (
         <>
           <span className={styles.separator} aria-hidden="true" />
@@ -88,7 +94,7 @@ export function WorkspaceDock(props: WorkspaceDockProps) {
             <button type="button" className={styles.iconButton} aria-label={t('toolbar.previousPage')} title={t('toolbar.previousPage')} onClick={props.onPreviousPage} disabled={currentPage === 1}>
               <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 3.5-4.5 4.5 4.5 4.5" /></svg>
             </button>
-            <span aria-live="polite">
+            <span aria-live="polite" title={props.isPageApproximate ? t('reader.pageApproximate') : undefined}>
               {t('reader.page', { page: currentPage, total: pageCount })}
             </span>
             <button type="button" className={styles.iconButton} aria-label={t('toolbar.nextPage')} title={t('toolbar.nextPage')} onClick={props.onNextPage} disabled={currentPage >= pageCount}>

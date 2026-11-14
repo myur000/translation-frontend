@@ -55,6 +55,7 @@ import type { DocumentItem, LanguageCode } from '../types/document.ts'
 import { useDocumentLayout } from '../workspace/useDocumentLayout.ts'
 import { useReadingProgress } from '../reading/readingProgress.ts'
 import { useReadingTracker } from '../reading/useReadingTracker.ts'
+import { useFlowPages } from '../reading/useFlowPages.ts'
 import { useQuoteClicks } from '../hooks/useQuoteClicks.ts'
 import { notesPresentation, useNotesPanel } from '../workspace/useNotesPanel.ts'
 import {
@@ -195,7 +196,11 @@ function DocumentWorkspace({
   const pageCount = counts.length ? Math.max(...counts) : null
   const displayedPage = Math.min(currentPage, pageCount ?? 1)
   const navigatePage = (direction: number) => {
-    if (!pageCount) return
+    // Без PDF листаем страницы оригинала по прокрутке (useFlowPages ниже).
+    if (!pageCount) {
+      flowPages.goTo(flowPages.page + direction)
+      return
+    }
     setCurrentPage(Math.max(1, Math.min(pageCount, displayedPage + direction)))
     setNavigationRevision((value) => value + 1)
   }
@@ -266,6 +271,18 @@ function DocumentWorkspace({
     reading.email,
     readingJobId,
     showsPane(visibleLayout, 'translation') ? synchronizedScroll.translationRef : synchronizedScroll.originalRef,
+    markersLayoutKey,
+  )
+  // У DOCX и текста разметки страниц нет: счётчик в нижней панели ведёт по учётным
+  // страницам книги (их же списывает сервер, ≈1800 знаков; `pages` у задач с сервера
+  // всегда 0) по доле прокрутки той же колонки чтения.
+  const isTranslationRead = showsPane(visibleLayout, 'translation')
+  const readingView = isTranslationRead ? translationView : originalView
+  const bookPages = document.billedUnits || document.pages
+  const flowTotal = pageCount === null && readingView.status === 'ready' && bookPages > 0 ? bookPages : null
+  const flowPages = useFlowPages(
+    isTranslationRead ? synchronizedScroll.translationRef : synchronizedScroll.originalRef,
+    flowTotal,
     markersLayoutKey,
   )
   /**
@@ -676,8 +693,9 @@ function DocumentWorkspace({
               onTargetLanguageChange={handleTargetLanguageChange}
               onSwapLanguages={handleSwapLanguages}
               tools={tools}
-              currentPage={displayedPage}
-              pageCount={pageCount}
+              currentPage={pageCount !== null ? displayedPage : flowPages.page}
+              pageCount={pageCount ?? flowTotal}
+              isPageApproximate={pageCount === null && flowTotal !== null}
               onPreviousPage={() => navigatePage(-1)}
               onNextPage={() => navigatePage(1)}
               isTranslating={isTranslating}
