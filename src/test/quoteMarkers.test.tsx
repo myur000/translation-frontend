@@ -4,15 +4,19 @@ import { useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NoteResponse } from '../api/contracts/notes.ts'
 import { QuoteMarkers } from '../components/workspace/QuoteMarkers.tsx'
-import { loadBookQuotes, type BookQuote } from '../notes/bookQuotes.ts'
+import { loadBookNotes, loadBookQuotes, type BookQuote } from '../notes/bookQuotes.ts'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
 
 const api = vi.hoisted(() => ({ listNotes: vi.fn(), getNote: vi.fn() }))
 vi.mock('../api/notes.ts', () => api)
 
+const noteOf = (id: string, title: string): NoteResponse => ({
+  id, title, body: '', version: 1, created_at: '', updated_at: '', tags: [], links: [], quotes: [],
+})
 const quote = (overrides: Partial<BookQuote>): BookQuote => ({
   id: 'q-1', noteId: 'n-1', noteTitle: 'Шторм', side: 'TRANSLATION', paragraphIndex: 1,
-  quote: 'Ветер дул с северо-востока', pairedText: 'The wind came from the north-east.', ...overrides,
+  quote: 'Ветер дул с северо-востока', pairedText: 'The wind came from the north-east.',
+  note: noteOf(overrides.noteId ?? 'n-1', overrides.noteTitle ?? 'Шторм'), ...overrides,
 })
 
 /** Колонка книги в DOCX-виде: страница-article и абзацы без номеров, как после mammoth. */
@@ -96,7 +100,23 @@ describe('book quotes', () => {
     expect(api.listNotes).toHaveBeenCalledWith({ job_id: 'job-1', size: 100 }, { accessToken: 'jwt' })
     expect(api.getNote).toHaveBeenCalledTimes(1)
     expect(quotes).toEqual([{ id: 'q-job-1', noteId: 'n-1', noteTitle: 'Заметка n-1', side: 'SOURCE',
-      paragraphIndex: 3, quote: 'wind', pairedText: 'ветер' }])
+      paragraphIndex: 3, quote: 'wind', pairedText: 'ветер', note: expect.objectContaining({ id: 'n-1' }) }])
+  })
+
+  it('reads the summaries of the book: notes linked to it without a quote', async () => {
+    api.listNotes.mockResolvedValue({ items: [
+      { id: 'n-1', title: '', excerpt: '', tags: [], quote_count: 0, linked_job_ids: ['job-1'], version: 1, updated_at: '' },
+      { id: 'n-2', title: '', excerpt: '', tags: [], quote_count: 0, linked_job_ids: ['job-other'], version: 1, updated_at: '' },
+    ], page: 0, size: 100, total_elements: 2, total_pages: 1 })
+    api.getNote.mockResolvedValue({ ...note('n-1', []), title: 'Конспект', documents: [
+      { job_id: 'job-1', document_name: 'ledger.docx', document_available: true, linked_at: '' },
+    ] })
+
+    const notes = await loadBookNotes('job-1', { accessToken: 'jwt' })
+    // Заметка о другой книге не читается: ей нечего показать здесь.
+    expect(api.getNote).toHaveBeenCalledTimes(1)
+    expect(notes.quotes).toEqual([])
+    expect(notes.aboutBook.map((item) => item.title)).toEqual(['Конспект'])
   })
 
   it('fails as a whole so the caller can show the book without markers', async () => {

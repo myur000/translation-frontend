@@ -6,7 +6,7 @@ import {
   type KeyboardEventHandler,
   type PointerEventHandler,
 } from 'react'
-import { Link, NavLink, useMatch } from 'react-router'
+import { Link, NavLink, useMatch, useNavigate } from 'react-router'
 import { DocumentActionsMenu } from '../toolbar/DocumentActionsMenu.tsx'
 import { DeleteDocumentDialog } from '../workspace/DeleteDocumentDialog.tsx'
 import { CancelTranslationDialog } from '../workspace/CancelTranslationDialog.tsx'
@@ -48,17 +48,9 @@ interface SidebarProps {
   onResizeEnd: PointerEventHandler<HTMLDivElement>
   onResizeKeyDown: KeyboardEventHandler<HTMLDivElement>
   onResetWidth: () => void
-  /** Заметки открытой книги: в рабочей области иконка «Заметки» управляет их окном. */
-  workspaceNotes?: WorkspaceNotesControl | null
 }
 
 type SidebarSection = 'books' | 'notes'
-
-/** Окно заметок рабочей области, как его видит боковая панель. */
-export interface WorkspaceNotesControl {
-  isShown: boolean
-  toggle: () => void
-}
 
 export function Sidebar({
   documents,
@@ -77,7 +69,6 @@ export function Sidebar({
   onResizeEnd,
   onResizeKeyDown,
   onResetWidth,
-  workspaceNotes = null,
 }: SidebarProps) {
   const { t } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -89,6 +80,7 @@ export function Sidebar({
   const [query, setQuery] = useState('')
   const panelId = useId()
   const isNotesRoute = useMatch('/notes/*') !== null
+  const navigate = useNavigate()
   // Раздел панели; на странице заметок она открывается сразу с заметками.
   const [section, setSection] = useState<SidebarSection>(() => (isNotesRoute ? 'notes' : 'books'))
   const shown = documents.filter((document) => matchesBookQuery(document.name, query))
@@ -160,9 +152,7 @@ export function Sidebar({
     event.currentTarget.value = ''
   }
 
-  // В книге заметки — окно рядом с текстом, поэтому панель в боковой показывает книги:
-  // иначе один и тот же список стоял бы дважды, а книге не хватало бы места.
-  const visibleSection: SidebarSection = workspaceNotes ? 'books' : section
+  const visibleSection = section
   const isSectionOpen = (value: SidebarSection) => !isCollapsed && visibleSection === value
   const openSection = (value: SidebarSection) => {
     // Как в редакторах кода: клик по открытому разделу сворачивает панель, по другому — переключает.
@@ -193,31 +183,27 @@ export function Sidebar({
           <GlyphIcon name="books" />
           <span className={styles.visuallyHidden}>{t('sidebar.books')}</span>
         </button>
-        {workspaceNotes ? (
-          // В книге — то же, что кнопка «Заметки» внизу и клавиша N: окно заметок к этой книге.
-          <button
-            type="button"
-            className={`${styles.railItem} ${workspaceNotes.isShown ? styles.railItemOpen : ''}`}
-            onClick={workspaceNotes.toggle}
-            aria-pressed={workspaceNotes.isShown}
-            title={t('notesPanel.forBook')}
-          >
-            <GlyphIcon name="notes" />
-            <span className={styles.visuallyHidden}>{t('sidebar.modeNotes')}</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            className={`${styles.railItem} ${isSectionOpen('notes') ? styles.railItemOpen : ''} ${isNotesRoute ? styles.railItemActive : ''}`}
-            onClick={() => openSection('notes')}
-            aria-expanded={isSectionOpen('notes')}
-            aria-controls={panelId}
-            title={t('sidebar.modeNotes')}
-          >
-            <GlyphIcon name="notes" />
-            <span className={styles.visuallyHidden}>{t('sidebar.modeNotes')}</span>
-          </button>
-        )}
+        {/* Рельс — навигация, везде одинаково: «Заметки» ведёт в раздел заметок и из книги.
+            Заметки к открытой книге — кнопка «Заметки» в её нижней панели. */}
+        <button
+          type="button"
+          className={`${styles.railItem} ${isSectionOpen('notes') ? styles.railItemOpen : ''} ${isNotesRoute ? styles.railItemActive : ''}`}
+          onClick={() => {
+            if (!isNotesRoute) {
+              setSection('notes')
+              if (isCollapsed) onToggleCollapsed()
+              void navigate('/notes')
+              return
+            }
+            openSection('notes')
+          }}
+          aria-expanded={isSectionOpen('notes')}
+          aria-controls={panelId}
+          title={t('sidebar.modeNotes')}
+        >
+          <GlyphIcon name="notes" />
+          <span className={styles.visuallyHidden}>{t('sidebar.modeNotes')}</span>
+        </button>
         <NavLink
           to="/history"
           className={({ isActive }) => `${styles.railItem} ${isActive ? styles.railItemActive : ''}`}

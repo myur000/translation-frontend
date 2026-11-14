@@ -51,10 +51,6 @@
   display: flex;
 }
 
-.shell.notesOnLeft {
-  flex-direction: row-reverse;
-}
-
 .shell.resizing {
   cursor: col-resize;
   user-select: none;
@@ -64,86 +60,39 @@
   --book-min-width: 640px;
 }
 
-.notesDock {
-  position: relative;
-  /* Выбранная ширина, но книге остаётся минимум; уже 280px панель не становится. */
-  width: clamp(
+/* Колонка заметок: справа под шапкой. Шапка остаётся на всю ширину, а книга и
+   нижняя панель сужаются на ширину колонки (правила .withNotes ниже). */
+.withNotes {
+  /* Выбранная ширина, но книге остаётся минимум; уже 280px колонка не становится. */
+  --notes-column: clamp(
     280px,
     calc(100vw - var(--sidebar-current-width, 0px) - var(--book-min-width)),
     var(--notes-width)
   );
-  flex: none;
+}
+
+.withNotes .workArea {
+  margin-right: var(--notes-column);
+}
+
+.withNotes .bottomChrome {
+  right: var(--notes-column);
+}
+
+.notesDock {
+  position: absolute;
+  z-index: 9;
+  top: var(--chrome-top, 0px);
+  right: 0;
+  bottom: 0;
+  width: var(--notes-column, 340px);
   min-height: 0;
   background: var(--color-surface);
   border-left: 1px solid var(--color-border-strong);
 }
 
-.notesOnLeft .notesDock {
-  border-right: 1px solid var(--color-border-strong);
-  border-left: 0;
-}
-
 .notesDock[hidden] {
   display: none;
-}
-
-/* Окно заметок: лежит над книгой в пределах рабочей области. Место и размер
-   задаёт сама область (inline-стиль); здесь — место по умолчанию на первый кадр,
-   пока область ещё не измерена. Книга вокруг окна остаётся доступной. */
-.notesDock.notesWindow {
-  position: absolute;
-  z-index: 20;
-  top: 72px;
-  right: 12px;
-  width: 300px;
-  height: min(520px, calc(100% - 160px));
-  overflow: hidden;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-popover);
-}
-
-.notesWindow:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-/* Угол ресайза: две диагональные риски в правом нижнем углу. */
-.notesGrip {
-  position: absolute;
-  z-index: 2;
-  right: 0;
-  bottom: 0;
-  width: 18px;
-  height: 18px;
-  cursor: nwse-resize;
-  touch-action: none;
-  background: linear-gradient(
-    135deg,
-    transparent 0 52%,
-    var(--color-border-strong) 52% 58%,
-    transparent 58% 70%,
-    var(--color-border-strong) 70% 76%,
-    transparent 76%
-  );
-}
-
-.notesGrip:hover {
-  background: linear-gradient(
-    135deg,
-    transparent 0 52%,
-    var(--color-primary) 52% 58%,
-    transparent 58% 70%,
-    var(--color-primary) 70% 76%,
-    transparent 76%
-  );
-}
-
-/* Свёрнутое окно — пилюля справа над нижней панелью и кнопками масштаба (отступ задаёт inline-стиль). */
-.notesPill {
-  position: absolute;
-  z-index: 20;
-  right: 16px;
 }
 
 /* Ручка ширины на шве с книгой: узкая полоса, которая подсвечивается при наведении. */
@@ -156,11 +105,6 @@
   width: 8px;
   cursor: col-resize;
   touch-action: none;
-}
-
-.notesOnLeft .notesResizeHandle {
-  right: -4px;
-  left: auto;
 }
 
 .notesResizeHandle::after {
@@ -364,6 +308,7 @@
   .notesDock {
     position: fixed;
     z-index: 30;
+    top: auto;
     right: 0;
     bottom: 0;
     left: 0;

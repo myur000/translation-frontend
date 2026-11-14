@@ -1,12 +1,16 @@
-import { lazy, Suspense, useEffect, useEffectEvent, useId, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react'
+import { lazy, Suspense, useEffect, useEffectEvent, useId, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useOutletContext } from 'react-router'
 import { ApiClientError } from '../api/client.ts'
 import type { NoteQuoteResponse } from '../api/contracts/notes.ts'
 import type { ShowQuoteResult } from '../components/notes/PanelNoteView.tsx'
-import type { NotesFrame, NotesPanelRequest } from '../components/notes/WorkspaceNotesPanel.tsx'
-import { NotesPill } from '../components/notes/NotesPill.tsx'
+import type { NotesPanelRequest } from '../components/notes/WorkspaceNotesPanel.tsx'
+import type { MarginDraft } from '../components/notes/MarginNotes.tsx'
+import { draftAnchor } from '../notes/marginNotesLayout.ts'
+import { NOTE_PARAM, QUOTE_PARAM } from '../notes/noteBooks.ts'
+import { bookTitle } from '../documents/bookTitle.ts'
 import { QuoteMarkers } from '../components/workspace/QuoteMarkers.tsx'
-import { useBookQuotes } from '../notes/useBookQuotes.ts'
+import { useBookNotes } from '../notes/useBookQuotes.ts'
+import type { BookQuote } from '../notes/bookQuotes.ts'
 import { useNotes } from '../notes/useNotes.ts'
 import { QuoteSelectionButton } from '../components/notes/QuoteSelectionButton.tsx'
 import { useQuoteSelection } from '../hooks/useQuoteSelection.ts'
@@ -33,7 +37,6 @@ import { wantsFeedbackPrompt } from '../documents/documentRoutes.ts'
 import { OriginalPanel } from '../components/workspace/OriginalPanel.tsx'
 import { TranslationPanel } from '../components/workspace/TranslationPanel.tsx'
 import { useElementHeight } from '../hooks/useElementHeight.ts'
-import { useElementSize } from '../hooks/useElementSize.ts'
 import { useMediaQuery } from '../hooks/useMediaQuery.ts'
 import { useSynchronizedScroll } from '../hooks/useSynchronizedScroll.ts'
 import { useBookZoom } from '../hooks/useBookZoom.ts'
@@ -52,9 +55,8 @@ import type { DocumentItem, LanguageCode } from '../types/document.ts'
 import { useDocumentLayout } from '../workspace/useDocumentLayout.ts'
 import { useReadingProgress } from '../reading/readingProgress.ts'
 import { useReadingTracker } from '../reading/useReadingTracker.ts'
+import { useQuoteClicks } from '../hooks/useQuoteClicks.ts'
 import { notesPresentation, useNotesPanel } from '../workspace/useNotesPanel.ts'
-import { useNotesWindow } from '../workspace/useNotesWindow.ts'
-import { windowArea } from '../workspace/notesWindowGeometry.ts'
 import {
   isSinglePane,
   LAYOUT_PRESETS,
@@ -84,10 +86,6 @@ const NOTES_SHORTCUT_CODE = 'KeyN'
 const NOTES_SHORTCUT_KEYS = new Set(['n', 'т'])
 // Ширина, с которой рабочая область перестраивается под телефон (см. WorkspacePage.module.css).
 const NARROW_SCREEN = '(max-width: 680px)'
-// Отступ пилюли от нижней панели: над кнопками масштаба колонки (DocumentPreview.module.css).
-const NOTES_PILL_OFFSET = 56
-// Вкладка «Граф» в окне заметок: включится вместе с графом.
-const NOTES_GRAPH_TAB = false
 
 interface DocumentWorkspaceProps {
   document: DocumentItem
@@ -101,7 +99,6 @@ interface DocumentWorkspaceProps {
   onRetranslate: AppLayoutContextValue['retranslateDocument']
   onDelete: AppLayoutContextValue['deleteDocument']
   onCancelTranslation: AppLayoutContextValue['cancelTranslation']
-  onConnectNotes: AppLayoutContextValue['connectWorkspaceNotes']
 }
 
 type WorkspaceDialog = 'retranslate' | 'delete' | 'cancel' | null
@@ -118,7 +115,6 @@ function DocumentWorkspace({
   onRetranslate,
   onDelete,
   onCancelTranslation,
-  onConnectNotes,
 }: DocumentWorkspaceProps) {
   const { t } = useTranslation()
   const location = useLocation()
@@ -170,49 +166,22 @@ function DocumentWorkspace({
   const [layout, setLayout] = useDocumentLayout(document.jobId)
   const visibleLayout = fullscreenLayout ?? layout
   const isImmersiveMode = fullscreenLayout !== null
-  // Заметки — окно над книгой, пилюля или колонка у края. Панель монтируется при
-  // первом открытии и дальше только прячется: открытая заметка и начатая цитата
-  // переживают сворачивание, смену вида и полноэкранный режим.
+  // Заметки — колонка справа под шапкой (на телефоне — шторка). Панель монтируется
+  // при первом открытии и дальше только прячется: открытая заметка и начатая
+  // цитата переживают закрытие, смену вида и полноэкранный режим.
   const notesPanel = useNotesPanel()
   const notesPanelId = useId()
   const isNarrowScreen = useMediaQuery(NARROW_SCREEN)
-  const notesView = notesPresentation(notesPanel, { isImmersive: isImmersiveMode, isNarrow: isNarrowScreen })
-  const isNotesShown = notesView === 'docked' || notesView === 'floating' || notesView === 'sheet'
+  const notesView = notesPresentation(notesPanel, { isNarrow: isNarrowScreen })
+  const isNotesShown = notesView !== 'hidden'
   const [isNotesMounted, setNotesMounted] = useState(notesPanel.isOpen)
   if (notesPanel.isOpen && !isNotesMounted) setNotesMounted(true)
-  const [shellRef, shellSize] = useElementSize<HTMLDivElement>()
-  const notesWindow = useNotesWindow({
-    rect: notesPanel.floatRect,
-    // Окно лежит в рабочей области между верхней и нижней панелями.
-    area: shellSize.width > 0 ? windowArea(shellSize.width, shellSize.height, topChromeHeight, bottomChromeHeight) : null,
-    onChange: notesPanel.setFloatRect,
-    onInteractionChange: notesPanel.setInteracting,
-  })
-  const notesWindowRef = useRef<HTMLDivElement>(null)
-  const notesPillRef = useRef<HTMLButtonElement>(null)
-  // Куда перевести фокус, когда окно развернётся или свернётся в пилюлю.
-  const pendingNotesFocusRef = useRef<'window' | 'pill' | null>(null)
-  useEffect(() => {
-    const target = pendingNotesFocusRef.current
-    if (target === 'window' && notesView === 'floating') notesWindowRef.current?.focus()
-    else if (target === 'pill' && notesView === 'collapsed') notesPillRef.current?.focus()
-    else return
-    pendingNotesFocusRef.current = null
-  }, [notesView])
-  // Кнопка в доке и N: показанные заметки закрывают, иначе показывают в последнем виде.
+  // Кнопка в нижней панели и N: один переключатель.
   const toggleNotes = () => (isNotesShown ? notesPanel.close() : notesPanel.reveal())
-  // Иконка «Заметки» в рельсе боковой панели управляет этим же окном. Наверх уходит
-  // стабильная функция: свежий toggleNotes берётся из ref в момент клика.
-  const toggleNotesRef = useRef(toggleNotes)
-  useEffect(() => { toggleNotesRef.current = toggleNotes })
-  useEffect(() => {
-    onConnectNotes({ isShown: isNotesShown, toggle: () => toggleNotesRef.current() })
-  }, [isNotesShown, onConnectNotes])
-  useEffect(() => () => onConnectNotes(null), [onConnectNotes])
   const synchronizedScroll = useSynchronizedScroll(
     isScrollSyncEnabled,
-    // Колонка у края сужает книгу, окно лежит поверх и раскладку не меняет.
-    `${layoutPreset(visibleLayout)}:${isImmersiveMode}:${notesView === 'docked'}:${notesPanel.side}:${notesPanel.width}`,
+    // Колонка заметок сужает книгу: при её появлении и смене ширины закладки чтения пересчитываются.
+    `${layoutPreset(visibleLayout)}:${isImmersiveMode}:${notesView === 'column'}:${notesPanel.width}`,
   )
   const bookZoom = useBookZoom(isScrollSyncEnabled)
   const translationDownload = useTranslationDownload(document)
@@ -236,21 +205,60 @@ function DocumentWorkspace({
   const [pendingQuote, setPendingQuote] = useState<QuoteSelection | null>(null)
   // Метки на полях: цитаты этой книги, перечитываются после каждой правки заметок.
   const { revision: notesRevision } = useNotes()
-  const bookQuotes = useBookQuotes(canQuote ? document.jobId ?? null : null, notesRevision)
+  // Конспект можно начать, пока книга переводится: заметки о книге грузятся у любой отправленной.
+  const bookNotes = useBookNotes(document.jobId ?? null, notesRevision)
+  const bookQuotes = canQuote ? bookNotes.quotes : NO_BOOK_QUOTES
   const [notesRequest, setNotesRequest] = useState<NotesPanelRequest | null>(null)
-  // Пилюля и закрытые заметки разворачиваются. Колонку полноэкранный режим прячет —
-  // тогда выходим к раскладке документа; окно остаётся поверх книги.
-  const revealNotes = () => {
-    notesPanel.reveal()
-    if (fullscreenLayout && notesPanel.mode === 'docked') onFullscreenLayoutChange(null)
-  }
+  const revealNotes = () => notesPanel.reveal()
   const openNotesFromMarker = (noteIds: string[]) => {
     setNotesRequest((current) => ({ nonce: (current?.nonce ?? 0) + 1, noteIds }))
     revealNotes()
   }
-  // Пилюля считает заметки книги по цитатам, которые уже загружены для меток.
-  const bookNoteCount = new Set(bookQuotes.map((quote) => quote.noteId)).size
   const markersLayoutKey = `${layoutPreset(visibleLayout)}:${isImmersiveMode}`
+  // Одна колонка книги и готовый перевод — заметки на полях, напротив абзацев.
+  // В сравнении на полях места нет, а у неготового перевода нет цитат: тогда колонка.
+  const isMarginAvailable = canQuote && !isNarrowScreen && isSinglePane(visibleLayout)
+  const isMarginMode = notesPanel.isOpen && isMarginAvailable
+  const isNotesColumn = notesView === 'column' && !isMarginMode
+  const marginViewportRef = visibleLayout.primary === 'translation' ? synchronizedScroll.translationRef : synchronizedScroll.originalRef
+  const [marginDraft, setMarginDraft] = useState<MarginDraft | null>(null)
+  const nextNonce = (current: { nonce: number } | null) => (current?.nonce ?? 0) + 1
+  /** «Новая заметка» из меню «+»: черновик на полях или в колонке. */
+  // Клик по подсвеченной цитате в тексте — как по метке: открыть её заметку. Курсор над
+  // цитатой выделяет её карточку на полях.
+  const [textHoverNoteIds, setTextHoverNoteIds] = useState<string[]>([])
+  useQuoteClicks({
+    viewportRef: synchronizedScroll.originalRef, column: 'SOURCE', quotes: bookQuotes, layoutKey: markersLayoutKey,
+    onOpen: openNotesFromMarker, onHover: setTextHoverNoteIds,
+  })
+  useQuoteClicks({
+    viewportRef: synchronizedScroll.translationRef, column: 'TRANSLATION', quotes: bookQuotes, layoutKey: markersLayoutKey,
+    onOpen: openNotesFromMarker, onHover: setTextHoverNoteIds,
+  })
+  /**
+   * «Конспект книги»: заметка о книге целиком (T-67). Есть — открыть её (на полях —
+   * карточку вверху), нет — черновик с названием «Конспект — …», привязанный к книге.
+   */
+  const openSummary = () => {
+    const jobId = document.jobId
+    if (!jobId) return
+    const about = bookNotes.aboutBook
+    const viewport = marginViewportRef.current
+    if (about.length) {
+      setNotesRequest((current) => ({ nonce: nextNonce(current), noteIds: about.map((note) => note.id), about: true }))
+    } else {
+      const summary = { jobId, title: t('notes.summaryTitle', { book: bookTitle(document.name) }) }
+      if (isMarginAvailable && viewport) setMarginDraft((current) => ({ nonce: nextNonce(current), kind: 'new', anchor: draftAnchor(viewport), summary }))
+      else setNotesRequest((current) => ({ nonce: nextNonce(current), noteIds: [], summary }))
+    }
+    revealNotes()
+  }
+  const startNewNote = () => {
+    const viewport = marginViewportRef.current
+    if (isMarginAvailable && viewport) setMarginDraft((current) => ({ nonce: nextNonce(current), kind: 'new', anchor: draftAnchor(viewport) }))
+    else setNotesRequest((current) => ({ nonce: nextNonce(current), noteIds: [], create: true }))
+    revealNotes()
+  }
   const reading = useReadingProgress()
   const readingJobId = document.status === 'ready' ? document.jobId ?? null : null
   // Прогресс считается по переводу, когда он на экране, иначе — по оригиналу.
@@ -260,6 +268,39 @@ function DocumentWorkspace({
     showsPane(visibleLayout, 'translation') ? synchronizedScroll.translationRef : synchronizedScroll.originalRef,
     markersLayoutKey,
   )
+  /**
+   * Прокрутить книгу к цитате из заметки. Если её колонка скрыта раскладкой (цитата
+   * из оригинала, а на экране только перевод), ищется парный абзац в видимой колонке.
+   */
+  const revealBookQuote = (quote: BookQuote) => {
+    const own = quote.side === 'SOURCE' ? synchronizedScroll.originalRef.current : synchronizedScroll.translationRef.current
+    const other = quote.side === 'SOURCE' ? synchronizedScroll.translationRef.current : synchronizedScroll.originalRef.current
+    const element = own
+      ? findQuoteElement(own, quote.paragraphIndex, quote.quote)
+      : other && quote.pairedText ? findQuoteElement(other, quote.paragraphIndex, quote.pairedText) : null
+    if (element) revealQuoteElement(element)
+  }
+
+  // Переход «Открыть в книге» со страницы заметки: `?note=` (и `&quote=`). Когда заметки
+  // книги загружены — открыть заметку и прокрутить к цитате; параметры убираются из
+  // адреса, чтобы обновление страницы или «Назад» не повторяли переход.
+  const linkParams = new URLSearchParams(location.search)
+  const linkedNoteId = linkParams.get(NOTE_PARAM)
+  const linkedQuoteId = linkParams.get(QUOTE_PARAM)
+  useEffect(() => {
+    if (!linkedNoteId || !bookNotes.isLoaded) return
+    const isAbout = bookNotes.aboutBook.some((note) => note.id === linkedNoteId)
+    const quote = bookNotes.quotes.find((item) => item.id === linkedQuoteId)
+      ?? bookNotes.quotes.find((item) => item.noteId === linkedNoteId)
+    setNotesRequest((current) => ({ nonce: (current?.nonce ?? 0) + 1, noteIds: [linkedNoteId], about: isAbout && !quote }))
+    notesPanel.reveal()
+    void navigate({ pathname: location.pathname, search: '' }, { replace: true })
+    // Книга ещё раскладывается после открытия заметок: прокрутка — в следующем кадре.
+    if (quote) window.requestAnimationFrame(() => revealBookQuote(quote))
+    // Срабатывает один раз на переход: параметры сразу убираются из адреса.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedNoteId, linkedQuoteId, bookNotes.isLoaded])
+
   const showQuote = (quote: NoteQuoteResponse): ShowQuoteResult => {
     // Колонка скрыта раскладкой: её ref пуст.
     const viewport = quote.side === 'SOURCE' ? synchronizedScroll.originalRef.current : synchronizedScroll.translationRef.current
@@ -284,8 +325,6 @@ function DocumentWorkspace({
 
   // Обработчик горячих клавиш видит текущее состояние заметок, не переподписываясь на каждый рендер.
   const handleNotesShortcut = useEffectEvent((event: KeyboardEvent) => {
-    // В полноэкранном режиме колонки нет, и N её не вернёт; окно — вернёт.
-    if (fullscreenLayout && notesPanel.mode === 'docked') return
     event.preventDefault()
     toggleNotes()
   })
@@ -463,8 +502,14 @@ function DocumentWorkspace({
       : undefined,
     onDelete: () => document.jobId ? setDialog('delete') : void onDelete(document.id),
   })
-  // Меню «+» нижней панели: всё, что меняет сам перевод.
-  const tools: DocumentAction[] = []
+  // Меню «+» нижней панели: новая заметка и всё, что меняет сам перевод.
+  // У черновика заметкам не к чему относиться: пункт появляется у отправленной книги.
+  const tools: DocumentAction[] = document.jobId
+    ? [
+        { id: 'new-note', label: t('notesPanel.newNote'), icon: 'note', onSelect: startNewNote },
+        { id: 'summary', label: t(bookNotes.aboutBook.length ? 'notesPanel.summary' : 'notesPanel.newSummary'), icon: 'summary', onSelect: openSummary },
+      ]
+    : []
   if (canUploadFile && canTranslate && glossaryTermCount) {
     tools.push({
       id: 'glossary',
@@ -483,34 +528,20 @@ function DocumentWorkspace({
     })
   }
 
-  /** Esc в окне заметок возвращает к чтению: фокус в колонку книги, окно остаётся. */
+  /** Esc в заметках возвращает к чтению: фокус в колонку книги, заметки остаются. */
   const handleNotesKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Escape') return
-    // Полноэкранный режим слушает Esc на window: из окна он не выходит.
+    // Полноэкранный режим слушает Esc на window: из заметок он не выходит.
     event.stopPropagation()
     // Esc уже обработан внутри (закрыт редактор без правок) — фокус не трогаем.
     if (event.defaultPrevented) return
     event.preventDefault()
     readingViewport(visibleLayout, synchronizedScroll.originalRef, synchronizedScroll.translationRef)?.focus({ preventScroll: true })
   }
-  const collapseNotes = () => {
-    pendingNotesFocusRef.current = 'pill'
-    notesPanel.collapse()
-  }
-  const expandNotes = () => {
-    pendingNotesFocusRef.current = 'window'
-    notesPanel.reveal()
-  }
   const closeNotes = () => {
     notesPanel.close()
     setPendingQuote(null)
   }
-  const notesFrame: NotesFrame = notesView === 'docked'
-    ? { kind: 'docked', side: notesPanel.side, onSwitchSide: notesPanel.switchSide, onUndock: notesPanel.undock, onClose: closeNotes }
-    : notesView === 'sheet'
-      ? { kind: 'sheet', onClose: closeNotes }
-      : { kind: 'floating', handle: notesWindow.handle, onCollapse: collapseNotes, onDock: notesPanel.dock, onClose: closeNotes }
-  const isNotesWindow = notesView === 'floating'
 
   /** «Развернуть панель» — эта колонка на весь экран; повторное нажатие возвращает раскладку. */
   const handlePanelExpandToggle = (pane: ReadingPane) => {
@@ -523,14 +554,14 @@ function DocumentWorkspace({
 
   return (
     <div
-      ref={shellRef}
-      className={`${styles.shell} ${isSinglePane(visibleLayout) ? '' : styles.compareLayout} ${notesPanel.side === 'left' ? styles.notesOnLeft : ''} ${notesPanel.isResizing ? styles.resizing : ''}`}
+      className={`${styles.shell} ${isSinglePane(visibleLayout) ? '' : styles.compareLayout} ${notesPanel.isResizing ? styles.resizing : ''}`}
     >
       <div
-        className={`${styles.workspace} ${isImmersiveMode ? styles.immersiveWorkspace : ''}`}
+        className={`${styles.workspace} ${isImmersiveMode ? styles.immersiveWorkspace : ''} ${isNotesColumn ? styles.withNotes : ''}`}
         style={{
-          '--chrome-top': `${topChromeHeight}px`,
+          '--chrome-top': `${isImmersiveMode ? 0 : topChromeHeight}px`,
           '--chrome-bottom': `${bottomChromeHeight}px`,
+          '--notes-width': `${notesPanel.width}px`,
         } as CSSProperties}
       >
         {/* Панели плавают над колонками чтения; текст прокручивается под ними. */}
@@ -617,6 +648,22 @@ function DocumentWorkspace({
             <QuoteMarkers viewportRef={synchronizedScroll.translationRef} column="TRANSLATION" quotes={bookQuotes}
               layoutKey={markersLayoutKey} onOpen={openNotesFromMarker} />
           ) : null}
+          {isMarginMode && document.jobId ? (
+            <Suspense fallback={null}>
+              <MarginNotes
+                viewportRef={marginViewportRef}
+                column={visibleLayout.primary === 'translation' ? 'TRANSLATION' : 'SOURCE'}
+                jobId={document.jobId}
+                quotes={bookQuotes}
+                aboutBook={bookNotes.aboutBook}
+                layoutKey={markersLayoutKey}
+                request={notesRequest}
+                linkedNoteIds={textHoverNoteIds}
+                draft={marginDraft}
+                onDraftDone={() => { setMarginDraft(null); quoteSelection.clear() }}
+              />
+            </Suspense>
+          ) : null}
         </div>
 
         {!isImmersiveMode ? (
@@ -680,83 +727,75 @@ function DocumentWorkspace({
           />
         ) : null}
         {/* Пока цитата оформляется в панели, кнопка над старым выделением только мешает. */}
-        {quoteSelection.selection && !pendingQuote ? (
+        {quoteSelection.selection && !pendingQuote && !marginDraft ? (
           <QuoteSelectionButton
             selection={quoteSelection.selection}
             onQuote={() => {
-              const { rect: _rect, ...selection } = quoteSelection.selection!
-              setPendingQuote(selection)
+              const { rect, ...selection } = quoteSelection.selection!
+              // На полях черновик встаёт у выделения, в колонке — открывается в ней.
+              const viewport = marginViewportRef.current
+              if (isMarginAvailable && viewport) {
+                setMarginDraft((current) => ({ nonce: nextNonce(current), kind: 'quote', selection, anchor: draftAnchor(viewport, rect.top) }))
+              } else {
+                setPendingQuote(selection)
+              }
               revealNotes()
             }}
           />
         ) : null}
+        {isNotesMounted ? (
+          // Колонка лежит в рабочей области под шапкой: шапка остаётся на всю ширину,
+          // а книга и нижняя панель сужаются на ширину колонки.
+          <div
+            id={notesPanelId}
+            className={styles.notesDock}
+            hidden={!isNotesShown || isMarginMode}
+            onKeyDown={handleNotesKeyDown}
+          >
+            {notesView === 'column' ? (
+              <div
+                className={styles.notesResizeHandle}
+                role="separator"
+                aria-label={t('notes.resize')}
+                aria-orientation="vertical"
+                aria-valuemin={notesPanel.resizeHandle.minWidth}
+                aria-valuemax={notesPanel.resizeHandle.maxWidth}
+                aria-valuenow={notesPanel.width}
+                aria-valuetext={t('sidebar.pixels', { value: notesPanel.width })}
+                tabIndex={0}
+                title={t('sidebar.resizeHint')}
+                onPointerDown={notesPanel.resizeHandle.onPointerDown}
+                onPointerMove={notesPanel.resizeHandle.onPointerMove}
+                onPointerUp={notesPanel.resizeHandle.onPointerUp}
+                onPointerCancel={notesPanel.resizeHandle.onPointerUp}
+                onKeyDown={notesPanel.resizeHandle.onKeyDown}
+                onDoubleClick={notesPanel.resizeHandle.onDoubleClick}
+              />
+            ) : null}
+            <Suspense fallback={<p className={styles.notesLoading} role="status">{t('notes.loading')}</p>}>
+              <WorkspaceNotesPanel
+                document={document}
+                bookQuotes={bookQuotes}
+                pendingQuote={pendingQuote}
+                request={notesRequest}
+                onQuoteFinished={() => { setPendingQuote(null); quoteSelection.clear() }}
+                onShowQuote={showQuote}
+                onClose={closeNotes}
+              />
+            </Suspense>
+          </div>
+        ) : null}
       </div>
-      {isNotesMounted ? (
-        // Одна оболочка на все виды: меняются класс, роль и кнопки заголовка, а
-        // содержимое внутри не перемонтируется.
-        <div
-          ref={notesWindowRef}
-          id={notesPanelId}
-          className={`${styles.notesDock} ${isNotesWindow ? styles.notesWindow : ''}`}
-          hidden={!isNotesShown}
-          role={isNotesWindow ? 'dialog' : undefined}
-          aria-modal={isNotesWindow ? false : undefined}
-          aria-label={isNotesWindow ? t('notes.title') : undefined}
-          tabIndex={isNotesWindow ? -1 : undefined}
-          style={isNotesWindow
-            ? (notesWindow.pixel ?? undefined)
-            : { '--notes-width': `${notesPanel.width}px` } as CSSProperties}
-          onKeyDown={notesView === 'floating' || notesView === 'sheet' ? handleNotesKeyDown : undefined}
-        >
-          {notesView === 'docked' ? (
-            <div
-              className={styles.notesResizeHandle}
-              role="separator"
-              aria-label={t('notes.resize')}
-              aria-orientation="vertical"
-              aria-valuemin={notesPanel.resizeHandle.minWidth}
-              aria-valuemax={notesPanel.resizeHandle.maxWidth}
-              aria-valuenow={notesPanel.width}
-              aria-valuetext={t('sidebar.pixels', { value: notesPanel.width })}
-              tabIndex={0}
-              title={t('sidebar.resizeHint')}
-              onPointerDown={notesPanel.resizeHandle.onPointerDown}
-              onPointerMove={notesPanel.resizeHandle.onPointerMove}
-              onPointerUp={notesPanel.resizeHandle.onPointerUp}
-              onPointerCancel={notesPanel.resizeHandle.onPointerUp}
-              onKeyDown={notesPanel.resizeHandle.onKeyDown}
-              onDoubleClick={notesPanel.resizeHandle.onDoubleClick}
-            />
-          ) : null}
-          <Suspense fallback={<p className={styles.notesLoading} role="status">{t('notes.loading')}</p>}>
-            <WorkspaceNotesPanel
-              document={document}
-              frame={notesFrame}
-              showGraphTab={NOTES_GRAPH_TAB}
-              pendingQuote={pendingQuote}
-              request={notesRequest}
-              onQuoteFinished={() => { setPendingQuote(null); quoteSelection.clear() }}
-              onShowQuote={showQuote}
-            />
-          </Suspense>
-          {/* Угол для мыши; с клавиатуры размер меняют Shift и стрелки на ручке. */}
-          {isNotesWindow ? <div className={styles.notesGrip} aria-hidden="true" {...notesWindow.grip} /> : null}
-        </div>
-      ) : null}
-      {notesView === 'collapsed' ? (
-        <NotesPill
-          ref={notesPillRef}
-          className={styles.notesPill}
-          // Над кнопками масштаба колонки, которые стоят в том же углу.
-          style={{ bottom: `${bottomChromeHeight + NOTES_PILL_OFFSET}px` }}
-          count={bookNoteCount || null}
-          controlsId={notesPanelId}
-          onExpand={expandNotes}
-        />
-      ) : null}
     </div>
   )
 }
+
+/** Цитаты есть только у готового перевода; один и тот же пустой список не сбрасывает мемоизацию. */
+const NO_BOOK_QUOTES: BookQuote[] = []
+
+// Заметки на полях с тем же парсером Markdown — тоже отдельно.
+const MarginNotes = lazy(() => import('../components/notes/MarginNotes.tsx')
+  .then((module) => ({ default: module.MarginNotes })))
 
 // Панель заметок с парсером Markdown нужна, только когда её открыли: грузится отдельно.
 const WorkspaceNotesPanel = lazy(() => import('../components/notes/WorkspaceNotesPanel.tsx')
@@ -799,7 +838,6 @@ export function WorkspacePage() {
     retranslateDocument,
     deleteDocument,
     cancelTranslation,
-    connectWorkspaceNotes,
   } = useOutletContext<AppLayoutContextValue>()
   const { t } = useTranslation()
   // Синхронная прокрутка — настройка пользователя: по умолчанию включена и запоминается.
@@ -869,7 +907,6 @@ export function WorkspacePage() {
       onRetranslate={retranslateDocument}
       onDelete={deleteDocument}
       onCancelTranslation={cancelTranslation}
-      onConnectNotes={connectWorkspaceNotes}
     />
   )
 }

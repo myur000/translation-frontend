@@ -5,6 +5,8 @@ import { useTranslation } from '../../i18n/useTranslation.ts'
 import type { BookQuote } from '../../notes/bookQuotes.ts'
 import { placeMarkers, quoteRanges, sameMarkers, type QuoteMarker } from '../../notes/quoteMarkerLayout.ts'
 import { setQuoteHighlightRanges } from '../../notes/quoteRanges.ts'
+import { useLayoutSettling } from '../../hooks/useLayoutSettling.ts'
+import { usePreferences } from '../../preferences/usePreferences.ts'
 import styles from './QuoteMarkers.module.css'
 
 interface QuoteMarkersProps {
@@ -28,6 +30,10 @@ export function QuoteMarkers({ viewportRef, column, quotes, layoutKey, onOpen }:
   const { t } = useTranslation()
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   // Метки привязаны к элементу колонки: после смены раскладки старые не показываются.
+  // Во время масштабирования метки отстают от страницы на кадр — слой прячется до конца.
+  const isSettling = useLayoutSettling(host)
+  // Тихую подсветку цитат можно выключить в меню «Вид»; метки при этом остаются.
+  const { isQuoteHighlightEnabled } = usePreferences()
   const [placed, setPlaced] = useState<{ host: HTMLElement; markers: QuoteMarker[] } | null>(null)
 
   // Колонка монтируется вместе с раскладкой: берём её элемент после отрисовки.
@@ -43,7 +49,7 @@ export function QuoteMarkers({ viewportRef, column, quotes, layoutKey, onOpen }:
     const recompute = () => {
       window.cancelAnimationFrame(frame)
       frame = window.requestAnimationFrame(() => {
-        setQuoteHighlightRanges(owner, quoteRanges(host, column, quotes))
+        setQuoteHighlightRanges(owner, isQuoteHighlightEnabled ? quoteRanges(host, column, quotes) : [])
         const next = placeMarkers(host, column, quotes)
         setPlaced((current) => (current?.host === host && sameMarkers(current.markers, next) ? current : { host, markers: next }))
       })
@@ -63,12 +69,12 @@ export function QuoteMarkers({ viewportRef, column, quotes, layoutKey, onOpen }:
       resizes?.disconnect()
       setQuoteHighlightRanges(owner, [])
     }
-  }, [column, host, quotes])
+  }, [column, host, isQuoteHighlightEnabled, quotes])
 
   const markers = placed?.host === host && quotes.length ? placed.markers : []
   if (!host || !markers.length) return null
   return createPortal(
-    <div className={styles.layer} data-quote-markers="" data-quote-ignore="">
+    <div className={`${styles.layer} ${isSettling ? styles.settling : ''}`} data-quote-markers="" data-quote-ignore="">
       {markers.map((marker) => {
         const label = t('quoteMarkers.label', { count: marker.noteIds.length, titles: marker.titles.join(', ') })
         return (

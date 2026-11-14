@@ -1322,29 +1322,32 @@ describe('document route', () => {
     const notesSection = within(rail).getByRole('button', { name: 'Заметки' })
     await user.click(notesSection)
     expect(notesSection.getAttribute('aria-expanded')).toBe('true')
-    const book = await screen.findByRole('button', { name: /Lighthouse keepers ledger/, expanded: false })
+    // Рельс ведёт в раздел заметок; дальше проверяем саму панель, у страницы свой список и поиск.
+    const panelElement = document.getElementById(notesSection.getAttribute('aria-controls')!)!
+    const panel = within(panelElement)
+    const book = await panel.findByRole('button', { name: /Lighthouse keepers ledger/, expanded: false })
     expect(book.textContent).toContain('2')
     await user.click(book)
-    expect(screen.getByRole('link', { name: /^Маяк/ }).getAttribute('href')).toBe('/notes/n-2')
-    expect(screen.getByRole('link', { name: /^Шторм/ }).getAttribute('href')).toBe('/notes/n-1')
+    expect(panel.getByRole('link', { name: /^Маяк/ }).getAttribute('href')).toBe('/notes/n-2')
+    expect(panel.getByRole('link', { name: /^Шторм/ }).getAttribute('href')).toBe('/notes/n-1')
     // Заметка без цитат — в «Без книги»; ссылка на несозданную заметку её создаёт.
-    expect(screen.getByRole('button', { name: /Без книги/ })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Создать заметку «Морская лексика»' }).getAttribute('href'))
+    expect(panel.getByRole('button', { name: /Без книги/ })).toBeTruthy()
+    expect(panel.getByRole('link', { name: 'Создать заметку «Морская лексика»' }).getAttribute('href'))
       .toBe('/notes/new?title=%D0%9C%D0%BE%D1%80%D1%81%D0%BA%D0%B0%D1%8F%20%D0%BB%D0%B5%D0%BA%D1%81%D0%B8%D0%BA%D0%B0')
 
-    await user.click(screen.getByRole('button', { name: 'Недавние' }))
-    expect(screen.getByRole('link', { name: /^Идеи/ })).toBeTruthy()
+    await user.click(panel.getByRole('button', { name: 'Недавние' }))
+    expect(panel.getByRole('link', { name: /^Идеи/ })).toBeTruthy()
 
     // Тег сужает список, крестик возвращает дерево.
-    await user.click(screen.getByRole('button', { name: /#сюжет/ }))
-    expect(await screen.findByRole('link', { name: /^Шторм/ })).toBeTruthy()
-    expect(screen.queryByRole('link', { name: /^Маяк/ })).toBeNull()
-    await user.click(screen.getByRole('button', { name: 'Сбросить фильтр #сюжет' }))
+    await user.click(panel.getByRole('button', { name: /#сюжет/ }))
+    expect(await panel.findByRole('link', { name: /^Шторм/ })).toBeTruthy()
+    expect(panel.queryByRole('link', { name: /^Маяк/ })).toBeNull()
+    await user.click(panel.getByRole('button', { name: 'Сбросить фильтр #сюжет' }))
 
-    await user.type(screen.getByRole('searchbox', { name: 'Поиск по заметкам' }), 'маяк')
+    await user.type(panel.getByRole('searchbox', { name: 'Поиск по заметкам' }), 'маяк')
     // Поиск ждёт паузу во вводе и показывает найденное сервером, а не дерево.
-    expect(await screen.findByRole('link', { name: /^Маяк/ })).toBeTruthy()
-    expect(screen.queryByRole('link', { name: /^Идеи/ })).toBeNull()
+    expect(await panel.findByRole('link', { name: /^Маяк/ })).toBeTruthy()
+    expect(panel.queryByRole('link', { name: /^Идеи/ })).toBeNull()
 
     // Второй клик по открытому разделу сворачивает панель, как в редакторах кода.
     await user.click(notesSection)
@@ -1573,222 +1576,117 @@ describe('workspace notes', () => {
     '/api/notes/n-1/backlinks': () => jsonResponse([]),
   }
   const notesButton = () => within(screen.getByRole('group', { name: 'Вид документа' })).getByRole('button', { name: 'Заметки' })
-  const notesWindow = () => screen.queryByRole('dialog', { name: 'Заметки' })
   const notesColumn = () => screen.queryByRole('complementary', { name: 'Заметки' })
-  // У пилюли видимое имя «Заметки · N»; от кнопки в доке её отличает aria-expanded.
-  const pill = () => screen.queryByRole('button', { name: /^Заметки/, expanded: false })
 
-  it('opens the notes window of the book from the sidebar rail', async () => {
+  it('shows notes as one column under the header, toggled by the dock button and N', async () => {
     const user = userEvent.setup()
     renderWithNotes()
     await findWorkspaceRegion('Оригинал')
-    const rail = screen.getByRole('navigation', { name: 'Разделы' })
-    const railNotes = within(rail).getByRole('button', { name: 'Заметки' })
-    expect(railNotes.getAttribute('aria-pressed')).toBe('false')
+    expect(notesColumn()).toBeNull()
 
-    await user.click(railNotes)
-    expect(await screen.findByRole('dialog', { name: 'Заметки' })).toBeTruthy()
-    expect(within(rail).getByRole('button', { name: 'Заметки' }).getAttribute('aria-pressed')).toBe('true')
-    expect(notesButton().getAttribute('aria-pressed')).toBe('true')
-    // Боковая панель продолжает показывать книги: второго списка заметок рядом с окном нет.
-    expect(screen.getByRole('navigation', { name: 'Мои книги' })).toBeTruthy()
-
-    await user.click(within(rail).getByRole('button', { name: 'Заметки' }))
-    expect(notesWindow()).toBeNull()
-  })
-
-  it('switches between the window, the pill and the column', async () => {
-    const user = userEvent.setup()
-    renderWithNotes()
-    await findWorkspaceRegion('Оригинал')
-    expect(notesWindow()).toBeNull()
-
-    // Новый аккаунт: заметки открываются окном над книгой, а не колонкой.
     await user.click(notesButton())
-    const dialog = await screen.findByRole('dialog', { name: 'Заметки' })
-    expect(dialog.getAttribute('aria-modal')).toBe('false')
+    const column = await screen.findByRole('complementary', { name: 'Заметки' })
     expect(notesButton().getAttribute('aria-pressed')).toBe('true')
-    expect(await within(dialog).findByRole('button', { name: /Шторм/ })).toBeTruthy()
-    // Окно лежит поверх книги: обе колонки на месте.
-    expect(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' })).toBeTruthy()
-    expect(screen.getByRole('region', { name: 'Прокрутка панели «Перевод»' })).toBeTruthy()
+    expect(await within(column).findByRole('button', { name: /Шторм/ })).toBeTruthy()
+    // Окна, пилюли и переноса на другую сторону больше нет.
+    expect(screen.queryByRole('dialog', { name: 'Заметки' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Свернуть заметки|Закрепить колонкой|Перенести панель/ })).toBeNull()
+    // Колонка лежит в рабочей области, поэтому шапка документа остаётся над ней на всю ширину.
+    expect(column.closest('[style*="--chrome-top"]')).toBeTruthy()
 
-    await user.click(within(dialog).getByRole('button', { name: 'Свернуть заметки' }))
-    expect(notesWindow()).toBeNull()
-    expect(document.activeElement).toBe(pill())
+    await user.keyboard('n')
+    expect(notesColumn()).toBeNull()
+    await user.keyboard('n')
+    expect(notesColumn()).toBeTruthy()
+    await user.click(within(notesColumn()!).getByRole('button', { name: 'Закрыть заметки' }))
+    expect(notesColumn()).toBeNull()
     expect(notesButton().getAttribute('aria-pressed')).toBe('false')
 
-    await user.click(pill()!)
-    expect(notesWindow()).toBeTruthy()
-    expect(document.activeElement).toBe(notesWindow())
-    expect(pill()).toBeNull()
-
-    await user.click(screen.getByRole('button', { name: 'Закрепить колонкой' }))
-    expect(notesWindow()).toBeNull()
-    expect(notesColumn()).toBeTruthy()
-    expect(screen.getByRole('separator', { name: 'Изменить ширину панели заметок' })).toBeTruthy()
-
-    await user.click(screen.getByRole('button', { name: 'Открепить в окно' }))
-    expect(notesColumn()).toBeNull()
-    expect(notesWindow()).toBeTruthy()
-
-    // Вид и место переживают перезагрузку.
-    cleanup()
-    renderWithNotes()
-    expect(await screen.findByRole('dialog', { name: 'Заметки' })).toBeTruthy()
-  })
-
-  it('opens notes in the last chosen view with N and the dock button', async () => {
-    const user = userEvent.setup()
-    renderWithNotes()
-    await findWorkspaceRegion('Оригинал')
-
-    await user.keyboard('n')
-    expect(notesWindow()).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'Закрепить колонкой' }))
-    // N закрывает показанные заметки и возвращает их в том виде, в каком их оставили.
-    await user.keyboard('n')
-    expect(notesColumn()).toBeNull()
-    await user.keyboard('n')
-    expect(notesColumn()).toBeTruthy()
-    expect(notesWindow()).toBeNull()
-
+    // Открытые заметки запоминаются для аккаунта.
     await user.click(notesButton())
-    expect(notesColumn()).toBeNull()
-    await user.click(notesButton())
-    expect(notesColumn()).toBeTruthy()
-
     cleanup()
     renderWithNotes()
     expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
   })
 
-  it('expands the pill from a margin marker and opens the note', async () => {
+  it('leads from the sidebar rail to the Notes section even inside a book', async () => {
+    const user = userEvent.setup()
+    const { router } = renderWithNotes()
+    await findWorkspaceRegion('Оригинал')
+    const rail = screen.getByRole('navigation', { name: 'Разделы' })
+    await user.click(within(rail).getByRole('button', { name: 'Заметки' }))
+    // Рельс — навигация: тот самый «переход в рабочую область заметок», а не колонка у книги.
+    await waitFor(() => expect(router.state.location.pathname).toBe('/notes'))
+    expect(within(rail).getByRole('button', { name: 'Заметки' }).getAttribute('aria-expanded')).toBe('true')
+    expect(notesColumn()).toBeNull()
+  })
+
+  it('opens the note from the «Open in the book» link and clears the link from the address', async () => {
+    const { router } = renderDocumentRoute(`/documents/${firstJob}?note=n-1&quote=q-1`, {
+      [`/api/notes?job_id=${firstJob}&size=50`]: bookNotes,
+      ...withBookQuotes,
+    })
+    // В сравнении заметки — колонкой: она открывается сразу на заметке из ссылки.
+    const column = await screen.findByRole('complementary', { name: 'Заметки' })
+    expect(await within(column).findByRole('heading', { name: 'Шторм' })).toBeTruthy()
+    await waitFor(() => expect(router.state.location.search).toBe(''))
+    expect(router.state.location.pathname).toBe(`/documents/${firstJob}`)
+  })
+
+  it('opens the note of a paragraph from its margin marker', async () => {
     const user = userEvent.setup()
     renderWithNotes(withBookQuotes)
     await findWorkspaceRegion('Оригинал')
-    await user.keyboard('n')
-    await user.click(screen.getByRole('button', { name: 'Свернуть заметки' }))
-    // Пилюля считает заметки книги.
-    expect((await screen.findByRole('button', { name: 'Заметки · 1', expanded: false }))).toBeTruthy()
-
+    expect(notesColumn()).toBeNull()
     await user.click(await screen.findByRole('button', { name: 'Метка на полях' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Заметки' })
-    expect(await within(dialog).findByRole('heading', { name: 'Шторм' })).toBeTruthy()
-    expect(pill()).toBeNull()
+    expect(await within(await screen.findByRole('complementary', { name: 'Заметки' })).findByRole('heading', { name: 'Шторм' })).toBeTruthy()
   })
 
-  it('opens closed notes from a margin marker', async () => {
-    const user = userEvent.setup()
-    renderWithNotes(withBookQuotes)
-    await findWorkspaceRegion('Оригинал')
-    expect(notesWindow()).toBeNull()
-    await user.click(await screen.findByRole('button', { name: 'Метка на полях' }))
-    expect(await within(await screen.findByRole('dialog', { name: 'Заметки' })).findByRole('heading', { name: 'Шторм' })).toBeTruthy()
-  })
-
-  it('moves and resizes the window from the keyboard inside the workspace', async () => {
-    // jsdom не считает раскладку: рабочая область 1000×700 без верхней и нижней панелей.
-    const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000)
-    const height = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(700)
-    try {
-      const user = userEvent.setup()
-      renderWithNotes()
-      await findWorkspaceRegion('Оригинал')
-      await user.keyboard('n')
-      const dialog = await screen.findByRole('dialog', { name: 'Заметки' })
-      // По умолчанию — правый верхний угол: 12px от краёв.
-      expect(dialog.style).toMatchObject({ left: '688px', top: '12px', width: '300px', height: '520px' })
-
-      const handle = within(dialog).getByRole('button', { name: 'Переместить окно заметок' })
-      handle.focus()
-      await user.keyboard('{ArrowLeft}{ArrowDown}')
-      expect(dialog.style).toMatchObject({ left: '672px', top: '28px' })
-      // Вправо дальше края не уйти.
-      await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}')
-      expect(dialog.style.left).toBe('688px')
-      await user.keyboard('{Shift>}{ArrowLeft}{ArrowDown}{/Shift}')
-      expect(dialog.style).toMatchObject({ width: '284px', height: '536px', left: '688px' })
-      // Вниз окно растёт только до нижнего края области.
-      await user.keyboard('{Shift>}' + '{ArrowDown}'.repeat(20) + '{/Shift}')
-      expect(dialog.style.height).toBe(`${700 - 12 - 28}px`)
-
-      cleanup()
-      renderWithNotes()
-      expect((await screen.findByRole('dialog', { name: 'Заметки' })).style).toMatchObject({ left: '688px', top: '28px', width: '284px' })
-    } finally {
-      width.mockRestore()
-      height.mockRestore()
-    }
-  })
-
-  it('keeps the window in fullscreen and returns to the book with Esc', async () => {
+  it('keeps the notes column in fullscreen comparison and returns to the book with Esc', async () => {
     const user = userEvent.setup()
     renderWithNotes()
     await findWorkspaceRegion('Оригинал')
-    await user.keyboard('n')
-    expect(notesWindow()).toBeTruthy()
+    await user.click(notesButton())
+    expect(notesColumn()).toBeTruthy()
 
-    await user.keyboard('g')
+    // Сравнение на весь экран: заметки остаются колонкой (на полях двух колонок места нет).
+    await user.keyboard('f')
     expect(screen.queryByText('Мои книги')).toBeNull()
-    // «Читаю только перевод и заметки»: окно остаётся поверх книги.
-    expect(notesWindow()).toBeTruthy()
-    // N в полноэкранном режиме прячет и возвращает окно.
+    expect(notesColumn()).toBeTruthy()
     await user.keyboard('n')
-    expect(notesWindow()).toBeNull()
+    expect(notesColumn()).toBeNull()
     await user.keyboard('n')
-    expect(notesWindow()).toBeTruthy()
+    expect(notesColumn()).toBeTruthy()
 
-    // Esc в окне возвращает фокус в книгу, не закрывая окно и не выходя из режима.
-    within(notesWindow()!).getByRole('button', { name: 'Переместить окно заметок' }).focus()
+    // Esc в заметках возвращает фокус в книгу, не закрывая их и не выходя из режима.
+    within(notesColumn()!).getByRole('button', { name: 'Новая заметка' }).focus()
     await user.keyboard('{Escape}')
-    expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Прокрутка панели «Перевод»' }))
-    expect(notesWindow()).toBeTruthy()
+    // В сравнении чтение возвращается в оригинал (как при входе в режим).
+    expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }))
+    expect(notesColumn()).toBeTruthy()
     expect(screen.queryByText('Мои книги')).toBeNull()
     // Esc в книге, как и раньше, выходит из полноэкранного режима.
     await user.keyboard('{Escape}')
     expect(screen.getByText('Мои книги')).toBeTruthy()
-    expect(notesWindow()).toBeTruthy()
+    expect(notesColumn()).toBeTruthy()
   })
 
-  it('hides the column in fullscreen and brings it back afterwards', async () => {
+  it('resizes the column from the keyboard and keeps its width', async () => {
     const user = userEvent.setup()
     renderWithNotes()
     await findWorkspaceRegion('Оригинал')
     await user.click(notesButton())
-    await user.click(await screen.findByRole('button', { name: 'Закрепить колонкой' }))
-    expect(notesColumn()).toBeTruthy()
 
-    await user.keyboard('f')
-    expect(notesColumn()).toBeNull()
-    // Колонка — часть раскладки: в полноэкранном режиме N её не возвращает.
-    await user.keyboard('n')
-    expect(notesColumn()).toBeNull()
-    expect(notesWindow()).toBeNull()
-
-    await user.keyboard('{Escape}')
-    expect(notesColumn()).toBeTruthy()
-  })
-
-  it('moves the column to the other edge and keeps its width', async () => {
-    const user = userEvent.setup()
-    renderWithNotes()
-    await findWorkspaceRegion('Оригинал')
-    await user.click(notesButton())
-    await user.click(await screen.findByRole('button', { name: 'Закрепить колонкой' }))
-    await user.click(await screen.findByRole('button', { name: 'Перенести панель заметок влево' }))
-
-    // У левого края «к книге» — стрелка вправо: колонка становится шире.
-    const handle = screen.getByRole('separator', { name: 'Изменить ширину панели заметок' })
-    expect(handle.getAttribute('aria-valuenow')).toBe('360')
+    // Колонка всегда справа: «к книге» — стрелка влево, она расширяет колонку.
+    const handle = await screen.findByRole('separator', { name: 'Изменить ширину панели заметок' })
+    expect(handle.getAttribute('aria-valuenow')).toBe('340')
     handle.focus()
-    await user.keyboard('{ArrowRight}{ArrowRight}')
-    expect(handle.getAttribute('aria-valuenow')).toBe('392')
+    await user.keyboard('{ArrowLeft}{ArrowLeft}')
+    expect(handle.getAttribute('aria-valuenow')).toBe('372')
 
     cleanup()
     renderWithNotes()
-    expect(await screen.findByRole('button', { name: 'Перенести панель заметок вправо' })).toBeTruthy()
-    expect(screen.getByRole('separator', { name: 'Изменить ширину панели заметок' }).getAttribute('aria-valuenow')).toBe('392')
+    expect((await screen.findByRole('separator', { name: 'Изменить ширину панели заметок' })).getAttribute('aria-valuenow')).toBe('372')
   })
 })
 

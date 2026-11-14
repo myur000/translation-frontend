@@ -10,40 +10,30 @@ import {
   rememberNotesPanel,
   type NotesPanelSettings,
 } from './notesPanelStorage.ts'
-import type { FloatRect } from './notesWindowGeometry.ts'
 
 const KEYBOARD_RESIZE_STEP = 16
 
 /**
- * Состояние заметок в рабочей области: открыты ли, вид (окно или колонка),
- * свёрнуто ли окно, ширина колонки и место окна. Запоминается для аккаунта;
- * пока окно или колонку тянут мышью, сохраняется только итог.
+ * Состояние заметок в рабочей области: показаны ли и ширина колонки.
+ * Запоминается для аккаунта; пока колонку тянут мышью, сохраняется только итог.
  */
 export function useNotesPanel() {
   const { session } = useAuth()
   const email = session?.email ?? null
   const [settings, setSettings] = useState<NotesPanelSettings>(() =>
     email ? readNotesPanel(email) : DEFAULT_NOTES_PANEL)
-  // Перетаскивание окна, его угла или края колонки.
-  const [isInteracting, setInteracting] = useState(false)
   const [isResizing, setResizing] = useState(false)
   // Внешний край колонки, от которого считается ширина при перетаскивании.
   const outerEdgeRef = useRef(0)
 
   useEffect(() => {
-    if (email && !isInteracting && !isResizing) rememberNotesPanel(email, settings)
-  }, [email, settings, isInteracting, isResizing])
+    if (email && !isResizing) rememberNotesPanel(email, settings)
+  }, [email, settings, isResizing])
 
   const update = useCallback((patch: Partial<NotesPanelSettings>) =>
     setSettings((current) => ({ ...current, ...patch })), [])
-  const isRight = settings.side === 'right'
-  /** Показать заметки в выбранном виде: из закрытого состояния и из пилюли. */
-  const reveal = useCallback(() => update({ isOpen: true, isCollapsed: false }), [update])
-  const close = useCallback(() => update({ isOpen: false, isCollapsed: false }), [update])
-  const collapse = useCallback(() => update({ isCollapsed: true }), [update])
-  const dock = useCallback(() => update({ mode: 'docked', isCollapsed: false }), [update])
-  const undock = useCallback(() => update({ mode: 'floating', isCollapsed: false }), [update])
-  const setFloatRect = useCallback((floatRect: FloatRect) => update({ floatRect }), [update])
+  const reveal = useCallback(() => update({ isOpen: true }), [update])
+  const close = useCallback(() => update({ isOpen: false }), [update])
 
   return {
     ...settings,
@@ -51,25 +41,20 @@ export function useNotesPanel() {
     isResizing,
     reveal,
     close,
-    collapse,
-    dock,
-    undock,
-    setFloatRect,
-    setInteracting,
-    switchSide: () => update({ side: isRight ? 'left' : 'right' }),
     resizeHandle: {
       minWidth: NOTES_MIN_WIDTH,
       maxWidth: NOTES_MAX_WIDTH,
       onPointerDown: (event: PointerEvent<HTMLElement>) => {
         event.preventDefault()
         const panel = event.currentTarget.parentElement?.getBoundingClientRect()
-        outerEdgeRef.current = panel ? (isRight ? panel.right : panel.left) : (isRight ? window.innerWidth : 0)
+        // Колонка всегда справа: ширина считается от её правого края.
+        outerEdgeRef.current = panel ? panel.right : window.innerWidth
         event.currentTarget.setPointerCapture(event.pointerId)
         setResizing(true)
       },
       onPointerMove: (event: PointerEvent<HTMLElement>) => {
         if (!isResizing) return
-        update({ width: clampNotesWidth(isRight ? outerEdgeRef.current - event.clientX : event.clientX - outerEdgeRef.current) })
+        update({ width: clampNotesWidth(outerEdgeRef.current - event.clientX) })
       },
       onPointerUp: (event: PointerEvent<HTMLElement>) => {
         if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -78,11 +63,9 @@ export function useNotesPanel() {
         setResizing(false)
       },
       onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
-        // Стрелка «к книге» расширяет колонку, «к краю» — сужает, с какой бы стороны она ни стояла.
-        const towardBook = isRight ? 'ArrowLeft' : 'ArrowRight'
-        const towardEdge = isRight ? 'ArrowRight' : 'ArrowLeft'
-        const next = event.key === towardBook ? settings.width + KEYBOARD_RESIZE_STEP
-          : event.key === towardEdge ? settings.width - KEYBOARD_RESIZE_STEP
+        // Стрелка «к книге» (влево) расширяет колонку, «к краю» (вправо) — сужает.
+        const next = event.key === 'ArrowLeft' ? settings.width + KEYBOARD_RESIZE_STEP
+          : event.key === 'ArrowRight' ? settings.width - KEYBOARD_RESIZE_STEP
             : event.key === 'Home' ? NOTES_MIN_WIDTH
               : event.key === 'End' ? NOTES_MAX_WIDTH
                 : null
@@ -98,19 +81,12 @@ export function useNotesPanel() {
 export type NotesPanelController = ReturnType<typeof useNotesPanel>
 
 /**
- * Как заметки показаны прямо сейчас. Колонка — часть раскладки, и полноэкранный
- * режим её прячет; окно и пилюля остаются, ради сценария «только перевод и
- * заметки». На узком экране места ни для окна, ни для колонки нет: всё — шторка.
+ * Как заметки показаны прямо сейчас: колонка справа под шапкой (и в полноэкранном
+ * режиме — ради сценария «только перевод и заметки») или, на узком экране, шторка.
  */
-export type NotesPresentation = 'hidden' | 'docked' | 'floating' | 'collapsed' | 'sheet'
+export type NotesPresentation = 'hidden' | 'column' | 'sheet'
 
-export function notesPresentation(
-  settings: Pick<NotesPanelSettings, 'isOpen' | 'mode' | 'isCollapsed'>,
-  { isImmersive, isNarrow }: { isImmersive: boolean; isNarrow: boolean },
-): NotesPresentation {
+export function notesPresentation(settings: Pick<NotesPanelSettings, 'isOpen'>, { isNarrow }: { isNarrow: boolean }): NotesPresentation {
   if (!settings.isOpen) return 'hidden'
-  if (settings.mode === 'docked' && isImmersive) return 'hidden'
-  if (isNarrow) return 'sheet'
-  if (settings.mode === 'docked') return 'docked'
-  return settings.isCollapsed ? 'collapsed' : 'floating'
+  return isNarrow ? 'sheet' : 'column'
 }

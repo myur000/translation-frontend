@@ -10,7 +10,7 @@
 }
 
 .header {
-  min-height: 58px;
+  min-height: 48px;
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -23,87 +23,14 @@
 .title {
   min-width: 0;
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .title h2 {
   margin: 0;
   font-size: 14px;
-}
-
-.title span {
-  display: block;
-  margin-top: 1px;
-  color: var(--color-text-muted);
-  font-size: 11px;
-}
-
-/* Заголовок окна — его ручка: за него окно перетаскивают. */
-.windowHeader {
-  min-height: 48px;
-  gap: 6px;
-  padding: 6px 8px 6px 4px;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-}
-
-.windowHeader:active {
-  cursor: grabbing;
-}
-
-.moveHandle {
-  width: 24px;
-  height: 30px;
-  display: grid;
-  flex: none;
-  place-items: center;
-  padding: 0;
-  color: var(--color-text-soft);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-sm);
-  cursor: inherit;
-}
-
-.moveHandle:hover {
-  color: var(--color-text);
-}
-
-.moveHandle:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
-
-.moveHandle svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: 2.4;
-}
-
-/* Вкладки окна: «Заметки | Граф». */
-.sections {
-  min-width: 0;
-  display: flex;
-  flex: 1;
-  gap: 2px;
-}
-
-.sections button {
-  padding: 5px 10px;
-  color: var(--color-text-muted);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.sections button[aria-selected='true'] {
-  color: var(--color-text);
-  background: var(--color-surface-subtle);
 }
 
 /* Содержимое под заголовком: занимает остаток высоты и прокручивается само. */
@@ -128,7 +55,7 @@
   gap: 2px;
 }
 
-.headerActions button {
+.headerActions :is(button, a) {
   width: 30px;
   height: 30px;
   display: grid;
@@ -140,13 +67,12 @@
   border-radius: var(--radius-sm);
 }
 
-.headerActions button:hover {
+.headerActions :is(button, a):hover {
   color: var(--color-text);
   background: var(--color-bg);
 }
 
-.headerActions button:focus-visible,
-.sections button:focus-visible {
+.headerActions :is(button, a):focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: -2px;
 }
@@ -172,43 +98,6 @@
   overflow-y: auto;
   padding: 14px;
 }
-
-.listTools {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
-}
-
-.tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px;
-  padding: 3px;
-  background: var(--color-surface-subtle);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-}
-
-.tabs button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 5px 8px;
-  color: var(--color-text-muted);
-  background: transparent;
-  border: 0;
-  border-radius: 5px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.tabs button[aria-selected='true'] {
-  color: var(--color-text);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-raised);
-}
-
 .body input {
   width: 100%;
   min-height: 34px;
@@ -228,7 +117,6 @@
 }
 
 .primary,
-.create,
 .secondary {
   min-height: 34px;
   display: inline-flex;
@@ -251,18 +139,6 @@
   background: var(--color-accent-hover);
 }
 
-/* «Новая заметка» — вход в создание, а не подтверждение: остаётся тёмно-синей,
-   оранжевая только кнопка, которая сохраняет. */
-.create {
-  gap: 6px;
-  color: var(--color-on-primary);
-  background: var(--color-primary);
-  border: 1px solid var(--color-primary);
-}
-
-.create:hover {
-  background: var(--color-primary-hover);
-}
 
 .secondary {
   color: var(--color-text);
@@ -314,49 +190,63 @@
 
 .list {
   display: grid;
-  gap: 6px;
-  margin: 0;
+  margin: 0 -8px;
   padding: 0;
   list-style: none;
 }
 
+/* Строка без рамки: номер абзаца слева, название и одна строка текста. */
 .item {
   width: 100%;
-  display: grid;
-  gap: 3px;
-  padding: 10px 11px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px;
   color: inherit;
   text-align: left;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background: transparent;
+  border: 0;
   border-radius: var(--radius-sm);
 }
 
 .item:hover {
-  border-color: var(--color-primary-border);
   background: var(--color-surface-subtle);
 }
 
-.item strong {
+.item:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.paragraph {
+  min-width: 28px;
+  flex: none;
+  color: var(--color-text-soft);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.itemText {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.itemText strong,
+.itemText span {
   overflow: hidden;
-  font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.item span {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--color-text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+.itemText strong {
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.item small {
-  color: var(--color-text-soft);
-  font-size: 11px;
+.itemText span {
+  color: var(--color-text-muted);
+  font-size: 12px;
 }
 
 .back {

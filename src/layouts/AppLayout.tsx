@@ -19,7 +19,7 @@ import { getTranslationStatus } from '../api/translations.ts'
 import { ApiClientError, hasApiErrorCode } from '../api/client.ts'
 import { useAuth } from '../auth/useAuth.ts'
 import { EmailVerificationBanner } from '../components/auth/EmailVerificationBanner.tsx'
-import { Sidebar, type WorkspaceNotesControl } from '../components/sidebar/Sidebar.tsx'
+import { Sidebar } from '../components/sidebar/Sidebar.tsx'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
 import { historyItemsToDocuments } from '../documents/documentHistory.ts'
 import { isFinalTranslationStatus, toDocumentStatus } from '../documents/translationStatus.ts'
@@ -59,11 +59,7 @@ import styles from './AppLayout.module.css'
 export type HistoryLoadState = 'loading' | 'ready' | 'error'
 
 export interface AppLayoutContextValue {
-  /**
-   * Рабочая область сообщает, открыто ли окно заметок, и даёт его переключатель:
-   * иконка «Заметки» в рельсе боковой панели в книге управляет им. `null` — книги на экране нет.
-   */
-  connectWorkspaceNotes: (control: WorkspaceNotesControl | null) => void
+
   activeDocument: DocumentItem | null
   /** Результат разрешения `/documents/:jobId`; `none` на обычном маршруте рабочей области. */
   routeDocumentState: RouteDocumentState
@@ -131,7 +127,6 @@ function AppLayoutContent() {
   const [fullscreenLayout, setFullscreenLayout] = useState<WorkspaceLayout | null>(null)
   const [fullscreenLocationKey, setFullscreenLocationKey] = useState(location.key)
   const sidebar = useResizableSidebar()
-  const [workspaceNotes, setWorkspaceNotes] = useState<WorkspaceNotesControl | null>(null)
   // Адрес — единственный источник открытого документа: `/` — главный экран,
   // у загруженных задач и локальных черновиков свои пути.
   const routeJobId = useMatch('/documents/:jobId')?.params.jobId ?? null
@@ -591,7 +586,6 @@ function AppLayoutContent() {
             onResizeEnd={sidebar.handleResizeEnd}
             onResizeKeyDown={sidebar.handleResizeKeyDown}
             onResetWidth={sidebar.resetWidth}
-            workspaceNotes={isWorkspaceRoute ? workspaceNotes : null}
           />
         ) : null}
         <main className={styles.content}>
@@ -614,7 +608,6 @@ function AppLayoutContent() {
                 deleteDocument,
                 cancelTranslation,
                 prepareDocument,
-                connectWorkspaceNotes: setWorkspaceNotes,
               } satisfies AppLayoutContextValue}
             />
           </div>

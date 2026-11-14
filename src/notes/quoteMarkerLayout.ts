@@ -69,21 +69,51 @@ function firstLineRect(element: HTMLElement): DOMRect | null {
   return [...range.getClientRects()].find((rect) => rect.width > 0 && rect.height > 0) ?? null
 }
 
-/**
- * Диапазоны цитат этой колонки для постоянной подсветки. Цитаты другой колонки
- * не подсвечиваются: у их парного абзаца известен только абзац целиком.
- */
-export function quoteRanges(host: HTMLElement, column: NoteQuoteSide, quotes: BookQuote[]): Range[] {
-  const own = quotes.filter((quote) => quote.side === column)
+/** Цитата этой колонки и её место в тексте. */
+export interface QuoteHit {
+  noteId: string
+  range: Range
+}
+
+/** Цитаты колонки с их диапазонами в тексте (`noteIds` — только этих заметок). */
+export function quoteHits(host: HTMLElement, column: NoteQuoteSide, quotes: BookQuote[], noteIds?: ReadonlySet<string>): QuoteHit[] {
+  const own = quotes.filter((quote) => quote.side === column && (!noteIds || noteIds.has(quote.noteId)))
   if (!own.length) return []
   const index = indexQuoteBlocks(host)
-  const ranges: Range[] = []
+  const hits: QuoteHit[] = []
   for (const quote of own) {
     const element = locateQuote(index, quote.paragraphIndex, quote.quote)
     const range = element ? findQuoteRange(element, quote.quote) : null
-    if (range) ranges.push(range)
+    if (range) hits.push({ noteId: quote.noteId, range })
   }
-  return ranges
+  return hits
+}
+
+/**
+ * Диапазоны цитат этой колонки для подсветки. Цитаты другой колонки не
+ * подсвечиваются: у их парного абзаца известен только абзац целиком.
+ */
+export function quoteRanges(host: HTMLElement, column: NoteQuoteSide, quotes: BookQuote[], noteIds?: ReadonlySet<string>): Range[] {
+  return quoteHits(host, column, quotes, noteIds).map((hit) => hit.range)
+}
+
+/**
+ * Заметки, чьи цитаты лежат под точкой экрана. Проверяются прямоугольники строк
+ * самой цитаты, а не «ближайший символ»: клик по пустому месту справа от короткой
+ * строки не должен открывать заметку.
+ */
+export function notesAtPoint(hits: readonly QuoteHit[], x: number, y: number): string[] {
+  const found = new Set<string>()
+  for (const hit of hits) {
+    if (typeof hit.range.getClientRects !== 'function') continue
+    for (const rect of hit.range.getClientRects()) {
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        found.add(hit.noteId)
+        break
+      }
+    }
+  }
+  return [...found]
 }
 
 export function sameMarkers(current: QuoteMarker[], next: QuoteMarker[]) {

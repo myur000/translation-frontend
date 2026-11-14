@@ -4,7 +4,8 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NoteResponse, NoteSummary } from '../api/contracts/notes.ts'
 import type { DocumentText } from '../api/documentText.ts'
-import { WorkspaceNotesPanel, type NotesFrame } from '../components/notes/WorkspaceNotesPanel.tsx'
+import { WorkspaceNotesPanel } from '../components/notes/WorkspaceNotesPanel.tsx'
+import type { BookQuote } from '../notes/bookQuotes.ts'
 import { DeleteDocumentDialog } from '../components/workspace/DeleteDocumentDialog.tsx'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
 import type { QuoteSelection } from '../notes/quoteLocator.ts'
@@ -45,28 +46,21 @@ const summary = (note: NoteResponse): NoteSummary => ({ id: note.id, title: note
   quote_count: note.quotes.length, version: note.version, updated_at: note.updated_at })
 const page = (items: NoteSummary[]) => ({ items, page: 0, size: 50, total_elements: items.length, total_pages: 1 })
 
-const dockedFrame = (): NotesFrame => ({ kind: 'docked', side: 'right', onSwitchSide: vi.fn(), onUndock: vi.fn(), onClose: vi.fn() })
-const windowFrame = (): NotesFrame => ({
-  kind: 'floating',
-  handle: { header: { onPointerDown: vi.fn(), onPointerMove: vi.fn(), onPointerUp: vi.fn(), onPointerCancel: vi.fn() }, onHandleKeyDown: vi.fn() },
-  onCollapse: vi.fn(),
-  onDock: vi.fn(),
-  onClose: vi.fn(),
-})
+const bookQuote = (noteId: string, paragraphIndex: number): BookQuote => ({ id: `q-${noteId}`, noteId, noteTitle: '', side: 'TRANSLATION',
+  paragraphIndex, quote: '', pairedText: null, note: storm })
 
 function renderPanel(props: Partial<Parameters<typeof WorkspaceNotesPanel>[0]> = {}) {
-  const handlers = { onQuoteFinished: vi.fn(), onShowQuote: vi.fn(() => 'shown' as const) }
-  const tree = (frame: NotesFrame) => (
+  const handlers = { onQuoteFinished: vi.fn(), onShowQuote: vi.fn(() => 'shown' as const), onClose: vi.fn() }
+  render(
     <PreferencesProvider>
       <MemoryRouter>
         <NotesProvider>
-          <WorkspaceNotesPanel document={book} frame={frame} pendingQuote={null} {...handlers} {...props} />
+          <WorkspaceNotesPanel document={book} bookQuotes={[bookQuote('n-1', 1)]} pendingQuote={null} {...handlers} {...props} />
         </NotesProvider>
       </MemoryRouter>
-    </PreferencesProvider>
+    </PreferencesProvider>,
   )
-  const { rerender } = render(tree(props.frame ?? dockedFrame()))
-  return Object.assign(handlers, { setFrame: (frame: NotesFrame) => rerender(tree(frame)) })
+  return handlers
 }
 const selection: QuoteSelection = { side: 'TRANSLATION', text: 'дул с северо-востока', blockText: 'Ветер дул с северо-востока.', paragraphIndex: null }
 
@@ -85,14 +79,26 @@ afterEach(() => {
 })
 
 describe('notes next to the book', () => {
-  it('lists the notes quoting this book and all notes on request', async () => {
+  it('lists the notes of this book in reading order with the paragraph number', async () => {
     const user = userEvent.setup()
-    renderPanel()
-    expect(await screen.findByRole('button', { name: /Шторм/ })).toBeTruthy()
+    api.listNotes.mockResolvedValue(page([summary(storm), summary({ ...storm, id: 'n-2', title: 'Маяк' }),
+      summary({ ...storm, id: 'n-3', title: 'Конспект', quotes: [] })]))
+    const handlers = renderPanel({ bookQuotes: [bookQuote('n-1', 4), bookQuote('n-2', 1), bookQuote('n-1', 7)] })
+
+    const panel = screen.getByRole('complementary', { name: 'Заметки' })
+    await within(panel).findByRole('button', { name: /Шторм/ })
     expect(api.listNotes).toHaveBeenCalledWith({ job_id: 'job-1', size: 50 }, expect.objectContaining({ accessToken: 'jwt' }))
-    expect(screen.getByText('К этой книге: 1')).toBeTruthy()
-    await user.click(screen.getByRole('tab', { name: 'Все заметки' }))
-    expect(await screen.findByRole('button', { name: /Общая/ })).toBeTruthy()
+    // Сначала заметка о книге целиком, затем по первому процитированному абзацу (с единицы).
+    expect(within(panel).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      '§КонспектВетер — важная деталь.', '¶2МаякВетер — важная деталь.', '¶5ШтормВетер — важная деталь.',
+    ])
+    // Вкладок и поиска больше нет: все заметки — в разделе «Заметки».
+    expect(within(panel).queryByRole('tab')).toBeNull()
+    expect(within(panel).getByRole('link', { name: 'Открыть раздел «Заметки»' }).getAttribute('href')).toBe('/notes')
+    await user.click(within(panel).getByRole('button', { name: 'Закрыть заметки' }))
+    expect(handlers.onClose).toHaveBeenCalledOnce()
+    await user.click(within(panel).getByRole('button', { name: 'Новая заметка' }))
+    expect(await screen.findByRole('textbox', { name: 'Название' })).toBeTruthy()
   })
 
   it('turns a selection into a bilingual quote in a new note', async () => {
@@ -161,54 +167,6 @@ describe('opening notes from a margin marker', () => {
 
     await user.click(screen.getByRole('button', { name: 'Все заметки книги' }))
     expect(screen.getByRole('button', { name: /Маяк/ })).toBeTruthy()
-  })
-})
-
-describe('notes frames', () => {
-  it('keeps the open note when the column becomes a window', async () => {
-    const handlers = renderPanel({ request: { nonce: 1, noteIds: ['n-1'] } })
-    expect(await screen.findByRole('heading', { name: 'Шторм' })).toBeTruthy()
-    expect(screen.getByRole('complementary', { name: 'Заметки' })).toBeTruthy()
-
-    const frame = windowFrame()
-    handlers.setFrame(frame)
-    // Оболочка сменилась, содержимое — нет: заметка открыта и не перечитывалась.
-    expect(screen.getByRole('heading', { name: 'Шторм' })).toBeTruthy()
-    expect(api.getNote).toHaveBeenCalledTimes(1)
-    // Имя и роль окну даёт его оболочка в рабочей области.
-    expect(screen.queryByRole('complementary')).toBeNull()
-
-    const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Свернуть заметки' }))
-    await user.click(screen.getByRole('button', { name: 'Закрепить колонкой' }))
-    await user.click(screen.getByRole('button', { name: 'Закрыть заметки' }))
-    if (frame.kind !== 'floating') throw new Error('ожидалось окно')
-    expect(frame.onCollapse).toHaveBeenCalledOnce()
-    expect(frame.onDock).toHaveBeenCalledOnce()
-    expect(frame.onClose).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: 'Переместить окно заметок' }).getAttribute('aria-describedby')).toBeTruthy()
-  })
-
-  it('offers to undock the column into a window', async () => {
-    const user = userEvent.setup()
-    const frame = dockedFrame()
-    renderPanel({ frame })
-    await user.click(screen.getByRole('button', { name: 'Открепить в окно' }))
-    if (frame.kind !== 'docked') throw new Error('ожидалась колонка')
-    expect(frame.onUndock).toHaveBeenCalledOnce()
-    expect(screen.queryByRole('button', { name: 'Свернуть заметки' })).toBeNull()
-  })
-
-  it('switches the window between notes and the graph placeholder', async () => {
-    const user = userEvent.setup()
-    renderPanel({ frame: windowFrame(), showGraphTab: true })
-    expect(await screen.findByRole('button', { name: /Шторм/ })).toBeTruthy()
-
-    await user.click(screen.getByRole('tab', { name: 'Граф' }))
-    expect(screen.getByRole('tabpanel', { name: 'Граф' }).textContent).toContain('граф связей')
-    expect(screen.queryByRole('button', { name: /Шторм/ })).toBeNull()
-    await user.click(screen.getByRole('tab', { name: 'Заметки' }))
-    expect(screen.getByRole('button', { name: /Шторм/ })).toBeTruthy()
   })
 })
 

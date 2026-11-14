@@ -1,0 +1,292 @@
+/* Слой в начале прокручиваемого содержимого колонки: карточки едут вместе с текстом. */
+.layer {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  transition: opacity 120ms ease;
+}
+
+/* Всплывающая карточка — над текстом и метками. */
+.popoverLayer {
+  z-index: 6;
+}
+
+.card {
+  position: absolute;
+  display: grid;
+  /* Колонка сетки не шире карточки: длинное название не растягивает содержимое за рамку. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  padding: 10px 12px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  /* Свёрнутые карточки тихие, чтобы открытая с акцентной рамкой выделялась. */
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  transition: top 160ms ease, border-color 120ms ease;
+}
+
+.card:focus {
+  outline: none;
+}
+
+.card:hover {
+  border-color: var(--color-border-strong);
+}
+
+/* Курсор над цитатой карточки в тексте: связь видна и со стороны книги. */
+.linkedCard,
+.linkedCard:hover {
+  border-color: var(--color-accent-highlight-line);
+}
+
+/* Раскрытая карточка — акцентная рамка: видно, какая заметка открыта. */
+.activeCard,
+.activeCard:hover {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.popover {
+  box-shadow: var(--shadow-popover), 0 0 0 1px var(--color-accent);
+}
+
+/* Свёрнутая карточка целиком — кнопка: название и три строки текста. */
+.summary {
+  display: grid;
+  gap: 2px;
+  margin: -10px -12px;
+  padding: 10px 12px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: inherit;
+}
+
+.summary:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+/* Название — до двух строк: названия из цитат длинные, одна строка превращала их в обрывки. */
+.cardTitle,
+.title {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.title {
+  display: block;
+}
+
+.excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.excerptLine {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-text-soft);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.metaIcon {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+/* Шапка раскрытой карточки: где заметка и две иконки — правка и раздел заметок. */
+.cardHeader {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardActions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.iconButton {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+
+.iconButton:hover,
+.iconButton[aria-pressed='true'] {
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.iconButton svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+/* Несколько заметок абзаца — ветка, как комментарии: тонкая линия слева. */
+.thread {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0 0 0 10px;
+  list-style: none;
+  border-left: 2px solid var(--color-border);
+}
+
+.threadItem {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+
+.threadItem:hover {
+  background: var(--color-surface-subtle);
+}
+
+.threadItem:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 0;
+}
+
+.open {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+/* Масштаб или ширина меняются: карточки скрыты сразу (без затухания) и не анимируют
+   сдвиг, пока страница не встанет на место; появляются плавно уже на новом месте. */
+.layer.settling {
+  opacity: 0;
+  transition: none;
+}
+
+.settling .card {
+  transition: none;
+}
+
+.title {
+  margin: 0;
+  white-space: normal;
+}
+
+/* Длинная заметка не растягивает поля: не выше половины экрана, дальше — своя прокрутка.
+   Текст — размером интерфейса: книжный кегль заметки в узкой карточке слишком крупный. */
+.body {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.body > * {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Клик по тексту открывает правку. */
+.editable {
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  cursor: text;
+}
+
+.editable:hover {
+  background: var(--color-surface-subtle);
+}
+
+
+
+
+/* «Дописать…» выглядит как поле ввода; по клику становится им. */
+.appendField {
+  padding: 6px 8px;
+  color: var(--color-text-soft);
+  text-align: left;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.appendField:hover {
+  border-color: var(--color-border-strong);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}

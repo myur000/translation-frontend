@@ -7,6 +7,13 @@
   width: 0;
   height: 0;
   user-select: none;
+  transition: opacity 120ms ease;
+}
+
+/* Масштаб или ширина меняются: метки скрыты, пока страница не встанет на место. */
+.settling {
+  opacity: 0;
+  transition: none;
 }
 
 /* Кружок с числом заметок на поле страницы — мягкий оранжевый акцент. Метка

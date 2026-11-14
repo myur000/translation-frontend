@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { findQuoteRange, NOTE_QUOTE_HIGHLIGHT, setQuoteHighlightRanges } from '../notes/quoteRanges.ts'
+import { findQuoteRange, NOTE_QUOTE_ACTIVE_HIGHLIGHT, NOTE_QUOTE_HIGHLIGHT, setActiveQuoteHighlight, setQuoteHighlightRanges } from '../notes/quoteRanges.ts'
 
 function paragraph(html: string) {
   const element = document.createElement('p')
@@ -53,5 +53,17 @@ describe('shared quote highlight', () => {
     expect(highlights.get(NOTE_QUOTE_HIGHLIGHT)?.ranges).toHaveLength(2)
     setQuoteHighlightRanges(translation, [])
     expect(highlights.has(NOTE_QUOTE_HIGHLIGHT)).toBe(false)
+  })
+
+  it('keeps the quotes of the open note in a separate, stronger layer', () => {
+    const highlights = new Map<string, { ranges: Range[]; priority: number }>()
+    vi.stubGlobal('CSS', { highlights })
+    vi.stubGlobal('Highlight', class { ranges: Range[]; priority = 0; constructor(...ranges: Range[]) { this.ranges = ranges } })
+
+    setActiveQuoteHighlight([document.createRange()])
+    expect(highlights.get(NOTE_QUOTE_ACTIVE_HIGHLIGHT)).toMatchObject({ priority: 1 })
+    expect(highlights.has(NOTE_QUOTE_HIGHLIGHT)).toBe(false)
+    setActiveQuoteHighlight([])
+    expect(highlights.has(NOTE_QUOTE_ACTIVE_HIGHLIGHT)).toBe(false)
   })
 })

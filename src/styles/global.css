@@ -46,10 +46,15 @@ a {
 }
 
 /* Цитаты из заметок в тексте книги (CSS Custom Highlight API, см. notes/quoteRanges.ts).
-   Страница книги белая в обеих темах, поэтому цвет один. Подсветка спокойнее, чем
-   вспышка при переходе из заметки (data-quote-highlight), чтобы не мешать чтению:
-   мягкий оранжевый фон и линия снизу, по которой цитата видна и без цвета фона. */
+   Страница книги белая в обеих темах, поэтому цвет один. Обычно — едва заметный тёплый
+   фон без подчёркивания: цитатой часто бывает целый абзац, и яркая заливка мешала читать. */
 ::highlight(note-quote) {
+  background-color: color-mix(in srgb, var(--color-accent-highlight) 55%, transparent);
+}
+
+/* Цитаты открытой или наведённой заметки на полях — ярче и с линией снизу:
+   видно, к какому тексту относится карточка. */
+::highlight(note-quote-active) {
   background-color: var(--color-accent-highlight);
   text-decoration: underline 2px var(--color-accent-highlight-line);
   text-underline-offset: 3px;

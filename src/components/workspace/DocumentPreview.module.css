@@ -16,13 +16,20 @@
   min-height: 0;
   flex: 1;
   overflow: auto;
-  padding: calc(var(--chrome-top, 0px) + 44px) 24px calc(var(--chrome-bottom, 0px) + 64px);
+  /* Справа к отступу добавляется место под заметки на полях (MarginNotes): страница
+     центрируется в оставшемся и сдвигается влево. */
+  padding: calc(var(--chrome-top, 0px) + 44px) calc(24px + var(--margin-notes-space, 0px)) calc(var(--chrome-bottom, 0px) + 64px) 24px;
   background: var(--color-canvas);
   /* Тонкая полоса в цветах палитры: системная полоса во всю высоту выглядит как разделитель. */
   scrollbar-color: var(--color-border-strong) transparent;
   scrollbar-width: thin;
   scroll-padding-top: calc(var(--chrome-top, 0px) + 12px);
   scroll-padding-bottom: calc(var(--chrome-bottom, 0px) + 12px);
+}
+
+/* Курсор над цитатой из заметки (useQuoteClicks): клик откроет её заметку. */
+.viewport[data-over-quote] {
+  cursor: pointer;
 }
 
 /* Кольцо при переходе по Tab рисуется внутри колонки: снаружи его обрезает overflow панели. */

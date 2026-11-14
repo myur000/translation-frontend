@@ -2,6 +2,8 @@ import { normalizeQuoteText } from './quoteLocator.ts'
 
 /** Имя подсветки для `::highlight(note-quote)` в global.css. */
 export const NOTE_QUOTE_HIGHLIGHT = 'note-quote'
+/** Цитаты открытой или наведённой заметки на полях — ярче остальных (`::highlight(note-quote-active)`). */
+export const NOTE_QUOTE_ACTIVE_HIGHLIGHT = 'note-quote-active'
 /**
  * По стольким первым символам ищется начало цитаты, если целиком она в абзаце не
  * нашлась. Короткие пробы — для цитаты, которая начинается в самом конце абзаца.
@@ -88,4 +90,17 @@ export function setQuoteHighlightRanges(owner: object, ranges: Range[]) {
   const all = [...rangesByOwner.values()].flat()
   if (all.length) CSS.highlights.set(NOTE_QUOTE_HIGHLIGHT, new Highlight(...all))
   else CSS.highlights.delete(NOTE_QUOTE_HIGHLIGHT)
+}
+
+/** Цитаты открытой заметки: отдельный слой поверх обычного; пустой список убирает его. */
+export function setActiveQuoteHighlight(ranges: Range[]) {
+  if (!supportsQuoteHighlight()) return
+  if (!ranges.length) {
+    CSS.highlights.delete(NOTE_QUOTE_ACTIVE_HIGHLIGHT)
+    return
+  }
+  const highlight = new Highlight(...ranges)
+  // Выше обычной подсветки: там, где слои пересекаются, видна яркая.
+  highlight.priority = 1
+  CSS.highlights.set(NOTE_QUOTE_ACTIVE_HIGHLIGHT, highlight)
 }

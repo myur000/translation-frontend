@@ -3,10 +3,13 @@ import { createPortal } from 'react-dom'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import styles from './DocumentActionsMenu.module.css'
 
-export type DocumentActionIcon = 'download' | 'pin' | 'unpin' | 'read' | 'unread' | 'star' | 'language' | 'cancel' | 'trash'
+export type DocumentActionIcon = 'note' | 'summary' | 'download' | 'pin' | 'unpin' | 'read' | 'unread' | 'star' | 'language' | 'cancel' | 'trash'
 
 /** Контуры иконок пунктов меню в сетке 16×16, рисуются линией. */
 const ACTION_ICON_PATHS: Record<DocumentActionIcon, string> = {
+  note: 'M4 2.5h5.2L12 5.3v8.2H4zM9.2 2.5v2.8H12M6.2 8.2h3.6M6.2 10.7h2.4',
+  // Тетрадь с корешком — конспект книги.
+  summary: 'M4 2.5h8.5v11H4zM4 2.5v11M2.5 5h3M2.5 8h3M2.5 11h3M7 6h3.5',
   download: 'M8 2.5v8m0 0 3-3m-3 3-3-3M3 12.5h10',
   pin: 'M6 2.5h4l-.6 4 2.1 2.2H4.5l2.1-2.2zM8 8.7v4.8',
   unpin: 'M6 2.5h4l-.6 4 2.1 2.2H4.5l2.1-2.2zM8 8.7v4.8M2.5 2.5l11 11',
