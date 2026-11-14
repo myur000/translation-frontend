@@ -6,6 +6,7 @@ import { AuthField } from '../components/auth/AuthField.tsx'
 import { useTranslation } from '../i18n/useTranslation.ts'
 import type { TranslationKey } from '../i18n/translations.ts'
 import styles from './AuthPage.module.css'
+import { GlyphIcon } from '../components/ui/GlyphIcon.tsx'
 
 interface RegisterErrors { email?: string; password?: string; passwordConfirmation?: string }
 type T = (key: TranslationKey, variables?: Record<string, string | number>) => string
@@ -45,7 +46,7 @@ export function RegisterPage() {
 
   if (registeredEmail) return (
     <section className={styles.success} role="status">
-      <div className={styles.successIcon} aria-hidden="true">✓</div>
+      <div className={styles.successIcon} aria-hidden="true"><GlyphIcon name="check" /></div>
       <h1>{t('register.successTitle')}</h1>
       <p>{t('register.successDescription', { email: registeredEmail })}</p>
       <Link to="/login">{t('register.goToLogin')}</Link>

@@ -1,0 +1,21 @@
+/* Размер и базовая линия как у буквы, рядом с которой стоит значок. */
+.glyph {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  vertical-align: -0.125em;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+/* Значок предупреждения чуть крупнее буквы и своего цвета: рядом с текстом он
+   говорит «внимание» без опоры на цвет фона. */
+.warning {
+  width: 1.25em;
+  height: 1.25em;
+  vertical-align: -0.25em;
+  color: var(--color-warning);
+}

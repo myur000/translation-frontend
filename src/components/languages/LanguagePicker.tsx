@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { useTranslation } from '../../i18n/useTranslation.ts'
-import { POPULAR_LANGUAGES } from '../../languages/languageCatalog.ts'
+import { POPULAR_LANGUAGES, shortLanguageCode } from '../../languages/languageCatalog.ts'
 import { useLanguageCatalog } from '../../languages/useLanguageCatalog.ts'
 import styles from './LanguagePicker.module.css'
 
@@ -21,8 +21,8 @@ interface LanguagePickerProps {
   disabled?: boolean
   /** Куда открывается список: вниз по умолчанию, вверх — из нижней панели. */
   placement?: 'bottom' | 'top'
-  /** Раскрыть список сразу при появлении: окно, открытое ради выбора языка. */
-  autoOpen?: boolean
+  /** Показывать код («EN») вместо названия: для тесной нижней панели. Название — в подсказке. */
+  compact?: boolean
   onChange: (code: string) => void
 }
 
@@ -91,7 +91,7 @@ export function LanguagePicker({
   prefix,
   disabled = false,
   placement = 'bottom',
-  autoOpen = false,
+  compact = false,
   onChange,
 }: LanguagePickerProps) {
   const { t } = useTranslation()
@@ -209,16 +209,6 @@ export function LanguagePicker({
     setOpen(true)
   }
 
-  // Эффект ребёнка срабатывает раньше эффекта окна-родителя, поэтому список
-  // раскрывается после того, как окно поставит фокус, и фокус уходит в поиск.
-  const openRef = useRef(open)
-  useLayoutEffect(() => {
-    openRef.current = open
-  })
-  useEffect(() => {
-    if (autoOpen) openRef.current()
-  }, [autoOpen])
-
   const close = (restoreFocus: boolean) => {
     setOpen(false)
     if (restoreFocus) triggerRef.current?.focus()
@@ -295,13 +285,17 @@ export function LanguagePicker({
         className={styles.trigger}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        aria-label={t('languagePicker.value', { label, language: currentLabel })}
+        // В компактном виде имя содержит и название, и видимый код (WCAG 2.5.3).
+        aria-label={compact
+          ? t('languagePicker.valueCompact', { label, language: currentLabel, code: shortLanguageCode(value) })
+          : t('languagePicker.value', { label, language: currentLabel })}
+        title={compact ? currentLabel : undefined}
         disabled={disabled}
         onPointerEnter={() => void load()}
         onClick={() => (isOpen ? close(false) : open())}
       >
         {prefix ? <span className={styles.prefix}>{prefix}</span> : null}
-        <span className={styles.value}>{currentLabel}</span>
+        <span className={styles.value}>{compact ? shortLanguageCode(value) : currentLabel}</span>
         <svg className={styles.chevron} viewBox="0 0 16 16" aria-hidden="true">
           <path d="m4 6 4 4 4-4" />
         </svg>

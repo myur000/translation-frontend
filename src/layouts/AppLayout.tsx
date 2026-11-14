@@ -19,9 +19,8 @@ import { getTranslationStatus } from '../api/translations.ts'
 import { ApiClientError, hasApiErrorCode } from '../api/client.ts'
 import { useAuth } from '../auth/useAuth.ts'
 import { EmailVerificationBanner } from '../components/auth/EmailVerificationBanner.tsx'
-import { Sidebar } from '../components/sidebar/Sidebar.tsx'
+import { Sidebar, type WorkspaceNotesControl } from '../components/sidebar/Sidebar.tsx'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
-import { isNotesPath } from '../notes/notesQuery.ts'
 import { historyItemsToDocuments } from '../documents/documentHistory.ts'
 import { isFinalTranslationStatus, toDocumentStatus } from '../documents/translationStatus.ts'
 import {
@@ -54,20 +53,29 @@ import {
 } from '../languages/languageCatalog.ts'
 import { ProfileProvider } from '../profile/ProfileProvider.tsx'
 import type { DocumentItem, LanguageCode } from '../types/document.ts'
+import type { WorkspaceLayout } from '../workspace/workspaceLayout.ts'
 import styles from './AppLayout.module.css'
 
 export type HistoryLoadState = 'loading' | 'ready' | 'error'
 
 export interface AppLayoutContextValue {
+  /**
+   * Рабочая область сообщает, открыто ли окно заметок, и даёт его переключатель:
+   * иконка «Заметки» в рельсе боковой панели в книге управляет им. `null` — книги на экране нет.
+   */
+  connectWorkspaceNotes: (control: WorkspaceNotesControl | null) => void
   activeDocument: DocumentItem | null
   /** Результат разрешения `/documents/:jobId`; `none` на обычном маршруте рабочей области. */
   routeDocumentState: RouteDocumentState
   documents: DocumentItem[]
   historyState: HistoryLoadState
-  expandedPanel: ExpandedPanel
-  isDualPanelFullscreen: boolean
-  setExpandedPanel: (panel: ExpandedPanel) => void
-  setDualPanelFullscreen: (isFullscreen: boolean) => void
+  /**
+   * Полноэкранный режим: временная раскладка поверх сохранённой. Боковая панель
+   * и плавающие панели скрыты; Esc и переход на другую страницу его закрывают,
+   * и документ возвращается к своей раскладке.
+   */
+  fullscreenLayout: WorkspaceLayout | null
+  setFullscreenLayout: (layout: WorkspaceLayout | null) => void
   selectDocument: (documentId: string) => void
   retryHistory: () => void
   attachOriginal: (documentId: string, file: File) => string | null
@@ -99,7 +107,6 @@ export interface AppLayoutContextValue {
    */
   prepareDocument: (file: File, languages?: { source: LanguageCode; target: LanguageCode }) => string | null
 }
-export type ExpandedPanel = 'original' | 'translation' | null
 
 const MAX_DOCUMENT_SIZE = 20 * 1024 * 1024
 /** При живом потоке событий опрос — лишь страховка на случай пропущенных событий. */
@@ -121,32 +128,21 @@ function AppLayoutContent() {
   const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [historyState, setHistoryState] = useState<HistoryLoadState>('loading')
   const [historyRevision, setHistoryRevision] = useState(0)
-  const [expandedPanel, setExpandedPanel] = useState<ExpandedPanel>(null)
-  const [isDualPanelFullscreen, setDualPanelFullscreen] = useState(false)
+  const [fullscreenLayout, setFullscreenLayout] = useState<WorkspaceLayout | null>(null)
   const [fullscreenLocationKey, setFullscreenLocationKey] = useState(location.key)
   const sidebar = useResizableSidebar()
+  const [workspaceNotes, setWorkspaceNotes] = useState<WorkspaceNotesControl | null>(null)
   // Адрес — единственный источник открытого документа: `/` — главный экран,
   // у загруженных задач и локальных черновиков свои пути.
   const routeJobId = useMatch('/documents/:jobId')?.params.jobId ?? null
   const routeDraftId = useMatch('/drafts/:draftId')?.params.draftId ?? null
   const isWorkspaceRoute = routeJobId !== null || routeDraftId !== null
-  const isNotesRoute = isNotesPath(location.pathname)
-  // Последнее место в каждом разделе: переключатель «Книги | Заметки» возвращает туда.
-  // Страницы аккаунта (настройки, профиль, тарифы) к разделам не относятся.
-  const [sectionPaths, setSectionPaths] = useState({ books: '/', notes: '/notes' })
-  const currentSection = isNotesRoute ? 'notes'
-    : isWorkspaceRoute || location.pathname === '/' || location.pathname === '/history' ? 'books' : null
-  const currentPath = `${location.pathname}${location.search}`
-  if (currentSection && sectionPaths[currentSection] !== currentPath) {
-    setSectionPaths((paths) => ({ ...paths, [currentSection]: currentPath }))
-  }
 
   // AppLayout переживает навигацию. React повторяет этот рендер до фиксации
   // дочерних элементов, поэтому устаревший полноэкранный режим не попадает на новую страницу.
   if (fullscreenLocationKey !== location.key) {
     setFullscreenLocationKey(location.key)
-    setExpandedPanel(null)
-    setDualPanelFullscreen(false)
+    setFullscreenLayout(null)
   }
 
   const addFoundDocument = useCallback((document: DocumentItem) => {
@@ -340,19 +336,15 @@ function AppLayoutContent() {
   })
 
   useEffect(() => {
-    if (expandedPanel === null && !isDualPanelFullscreen) return
+    if (fullscreenLayout === null) return
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setExpandedPanel(null)
-        setDualPanelFullscreen(false)
-      }
+      if (event.key === 'Escape') setFullscreenLayout(null)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [expandedPanel, isDualPanelFullscreen])
+  }, [fullscreenLayout])
 
-  const isFullscreenMode =
-    isWorkspaceRoute && (expandedPanel !== null || isDualPanelFullscreen)
+  const isFullscreenMode = isWorkspaceRoute && fullscreenLayout !== null
 
   const handleSelectDocument = (documentId: string) => {
     const document = documents.find((item) => item.id === documentId)
@@ -583,9 +575,6 @@ function AppLayoutContent() {
       >
         {!isFullscreenMode ? (
           <Sidebar
-            mode={isNotesRoute ? 'notes' : 'books'}
-            booksPath={sectionPaths.books}
-            notesPath={sectionPaths.notes}
             documents={documents}
             activeDocumentId={isWorkspaceRoute ? activeDocument?.id : undefined}
             onSelectDocument={handleSelectDocument}
@@ -602,6 +591,7 @@ function AppLayoutContent() {
             onResizeEnd={sidebar.handleResizeEnd}
             onResizeKeyDown={sidebar.handleResizeKeyDown}
             onResetWidth={sidebar.resetWidth}
+            workspaceNotes={isWorkspaceRoute ? workspaceNotes : null}
           />
         ) : null}
         <main className={styles.content}>
@@ -613,10 +603,8 @@ function AppLayoutContent() {
                 routeDocumentState,
                 documents,
                 historyState,
-                expandedPanel,
-                isDualPanelFullscreen,
-                setExpandedPanel,
-                setDualPanelFullscreen,
+                fullscreenLayout,
+                setFullscreenLayout,
                 selectDocument: handleSelectDocument,
                 retryHistory: handleRetryHistory,
                 attachOriginal,
@@ -626,6 +614,7 @@ function AppLayoutContent() {
                 deleteDocument,
                 cancelTranslation,
                 prepareDocument,
+                connectWorkspaceNotes: setWorkspaceNotes,
               } satisfies AppLayoutContextValue}
             />
           </div>

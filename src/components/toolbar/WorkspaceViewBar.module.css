@@ -1,0 +1,12 @@
+/* Группа внутри нижней панели: карточку рисует сама панель. */
+.bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.separator {
+  width: 1px;
+  height: 20px;
+  background: var(--color-border);
+}

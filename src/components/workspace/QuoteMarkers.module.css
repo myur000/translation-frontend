@@ -1,0 +1,51 @@
+/* Слой в начале прокручиваемого содержимого: метки едут вместе с текстом. */
+.layer {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  user-select: none;
+}
+
+/* Кружок с числом заметок на поле страницы — мягкий оранжевый акцент. Метка
+   стоит то на фоне за страницей, то на белой бумаге (узкое поле), поэтому у неё
+   своя заливка, а кольцо фокуса отделено от фона подложкой цвета поверхности. */
+.marker {
+  position: absolute;
+  min-width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0 6px;
+  color: var(--color-accent-soft-text);
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 35%, transparent);
+  border: none;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.marker:hover {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+
+/* Подложка под кольцом даёт контраст и на тёмном фоне, и на белой бумаге. */
+.marker:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px var(--color-surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marker {
+    transition: none;
+  }
+}

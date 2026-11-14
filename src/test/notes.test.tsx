@@ -1,11 +1,9 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiClientError } from '../api/client.ts'
 import type { NoteResponse, NoteSummary } from '../api/contracts/notes.ts'
-import { NotesSidebar } from '../components/notes/NotesSidebar.tsx'
-import { SidebarModeSwitch } from '../components/sidebar/SidebarModeSwitch.tsx'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
 import { NotesPage } from '../pages/NotesPage.tsx'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
@@ -51,7 +49,6 @@ function renderNotes(path: string) {
     <PreferencesProvider>
       <MemoryRouter initialEntries={[path]}>
         <NotesProvider>
-          <NotesSidebar isCollapsed={false} />
           <Routes>
             <Route path="/notes" element={<NotesPage />} />
             <Route path="/notes/new" element={<NotesPage isNew />} />
@@ -85,7 +82,7 @@ describe('notes section', () => {
   it('lists notes with readable excerpts and tag counts, and keeps the search in the address', async () => {
     const user = userEvent.setup()
     renderNotes('/notes')
-    const list = await screen.findByRole('navigation', { name: 'Мои заметки' })
+    const list = await screen.findByRole('list', { name: 'Мои заметки' })
     expect(within(list).getByRole('link', { name: /Сроки/ }).textContent).toContain('Срок — десять дней. #договор')
     expect(screen.getByRole('link', { name: /#договор\s*1/ })).toBeTruthy()
 
@@ -180,10 +177,12 @@ describe('notes section', () => {
     await user.click(await screen.findByRole('button', { name: 'Редактировать' }))
     await user.type(screen.getByLabelText('Текст заметки'), ' Дополнение')
 
-    const list = screen.getByRole('navigation', { name: 'Мои заметки' })
-    await user.click(within(list).getByRole('link', { name: /Штрафы/ }))
+    // Другая заметка открывается из списка раздела; правка первой не теряется.
+    await user.click(screen.getByRole('link', { name: 'К списку заметок' }))
+    await user.click(within(await screen.findByRole('list', { name: 'Мои заметки' })).getByRole('link', { name: /Штрафы/ }))
     expect(await screen.findByRole('heading', { name: 'Штрафы', level: 1 })).toBeTruthy()
-    await user.click(within(list).getByRole('link', { name: /Сроки/ }))
+    await user.click(screen.getByRole('link', { name: 'К списку заметок' }))
+    await user.click(within(await screen.findByRole('list', { name: 'Мои заметки' })).getByRole('link', { name: /Сроки/ }))
 
     expect(await screen.findByText('Восстановлен несохранённый черновик.')).toBeTruthy()
     expect((screen.getByLabelText('Текст заметки') as HTMLTextAreaElement).value).toBe('Срок — **десять дней**. #договор Дополнение')
@@ -211,25 +210,9 @@ describe('notes section', () => {
     api.getNoteBacklinks.mockResolvedValue([{ id: 'n-4', title: 'Договор' }])
     renderNotes('/notes/n-1')
     const article = (await screen.findByRole('heading', { name: 'Сроки', level: 1 })).closest('article')!
-    expect(await screen.findByRole('link', { name: '← Договор' })).toBeTruthy()
+    expect(await screen.findByRole('link', { name: 'Договор' })).toBeTruthy()
     await user.click(within(article).getByRole('link', { name: 'Штрафы' }))
     expect(location()).toBe('/notes/new?title=%D0%A8%D1%82%D1%80%D0%B0%D1%84%D1%8B')
     expect(((await screen.findByLabelText('Название')) as HTMLInputElement).value).toBe('Штрафы')
-  })
-})
-
-describe('sidebar section switch', () => {
-  it('marks the current section and returns to the last place of the other one', async () => {
-    render(
-      <PreferencesProvider>
-        <MemoryRouter>
-          <SidebarModeSwitch mode="notes" booksPath="/documents/job-1" notesPath="/notes/n-1" isCollapsed={false} />
-        </MemoryRouter>
-      </PreferencesProvider>,
-    )
-    const nav = screen.getByRole('navigation', { name: 'Раздел' })
-    expect(within(nav).getByRole('link', { name: 'Заметки' }).getAttribute('aria-current')).toBe('page')
-    expect(within(nav).getByRole('link', { name: 'Книги' }).getAttribute('href')).toBe('/documents/job-1')
-    await act(async () => undefined)
   })
 })

@@ -22,8 +22,6 @@ interface RetranslateDialogProps {
   document: DocumentItem
   onSubmit: (request: RetranslateSubmit) => Promise<unknown>
   onClose: () => void
-  /** Открыто нажатием на пару языков: список языков раскрыт сразу. */
-  openLanguageList?: boolean
 }
 
 type T = ReturnType<typeof useTranslation>['t']
@@ -45,7 +43,7 @@ function suggestTarget(source: string, current: string) {
   return POPULAR_LANGUAGES.find((code) => code !== source && code !== current) ?? current
 }
 
-export function RetranslateDialog({ document, onSubmit, onClose, openLanguageList = false }: RetranslateDialogProps) {
+export function RetranslateDialog({ document, onSubmit, onClose }: RetranslateDialogProps) {
   const { t } = useTranslation()
   const { getLabel } = useLanguageCatalog()
   const id = useId()
@@ -124,7 +122,6 @@ export function RetranslateDialog({ document, onSubmit, onClose, openLanguageLis
             value={targetLanguage}
             label={t('toolbar.targetLanguage')}
             disabled={isBusy}
-            autoOpen={openLanguageList}
             onChange={(code) => {
               setTargetLanguage(code)
               setError(null)

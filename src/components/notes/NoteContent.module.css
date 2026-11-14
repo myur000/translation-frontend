@@ -1,6 +1,8 @@
 .markdown {
   min-width: 0;
   color: var(--color-text);
+  /* Заметка читается рядом с книгой — тем же книжным шрифтом. */
+  font-family: var(--font-serif);
   font-size: 15px;
   line-height: 1.7;
   overflow-wrap: anywhere;
@@ -30,7 +32,7 @@
   background: var(--color-surface-subtle);
   border: 1px solid var(--color-border);
   border-radius: 5px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 0.88em;
 }
 
@@ -49,21 +51,24 @@
 
 .markdown a { color: var(--color-primary); text-underline-offset: 3px; }
 
-/* Ссылка на заметку — как в Obsidian: без подчёркивания, акцентным цветом. */
+/* Ссылка на заметку — как в Obsidian: без подчёркивания, оранжевым акцентом. */
 .markdown :global(.wikilink) {
-  color: var(--color-primary);
+  color: var(--color-accent);
   font-weight: 550;
   text-decoration: none;
 }
 
-.markdown a:global(.wikilink):hover { text-decoration: underline; }
+.markdown a:global(.wikilink):hover { color: var(--color-accent-hover); text-decoration: underline; }
 
-/* Заготовка: заметки ещё нет — бледнее и с пунктиром. */
+/* Заготовка: заметки ещё нет — пунктир снизу. Цвет тот же: бледный текст не
+   прошёл бы по контрасту, а отличие держится на линии, а не на цвете. */
 .markdown :global(.wikilink-missing) {
-  opacity: 0.6;
   text-decoration: underline dashed;
   text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
 }
+
+.markdown a:global(.wikilink-missing):hover { text-decoration-style: dashed; }
 
 .markdown :global(.note-tag) {
   display: inline-block;

@@ -4,6 +4,7 @@ import { ApiClientError } from '../../api/client.ts'
 import { useAuth } from '../../auth/useAuth.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import styles from './EmailVerificationBanner.module.css'
+import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 
 type RequestState = 'idle' | 'loading' | 'success' | 'error'
 
@@ -70,7 +71,7 @@ export function EmailVerificationBanner() {
   return (
     <section className={styles.banner} aria-label={t('auth.verifyLabel')}>
       <div className={styles.message}>
-        <strong>{t('auth.verifyTitle')}</strong>
+        <strong><GlyphIcon name="warning" /> {t('auth.verifyTitle')}</strong>
         <span>{t('auth.verifyDescription', { email: session.email })}</span>
         {requestState === 'success' ? <small role="status">{t('auth.verifySent')}</small> : null}
         {requestState === 'error' ? <small role="alert">{t('auth.verifyError')}</small> : null}

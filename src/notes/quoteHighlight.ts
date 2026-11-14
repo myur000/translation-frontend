@@ -4,26 +4,40 @@ const BLOCKS = 'p, li, h1, h2, h3, h4, h5, h6, td, th, blockquote'
 /** Сколько держится подсветка найденного фрагмента. */
 export const QUOTE_HIGHLIGHT_MS = 2400
 
+/** Текст колонки, разобранный один раз: метки ищут в нём много цитат подряд. */
+export interface QuoteBlockIndex {
+  viewport: HTMLElement
+  blocks: { element: HTMLElement; text: string }[]
+  lines: { element: HTMLElement; text: string }[]
+}
+
+export function indexQuoteBlocks(viewport: HTMLElement): QuoteBlockIndex {
+  const blocks = [...viewport.querySelectorAll<HTMLElement>(BLOCKS)]
+    .filter((element) => !element.closest('[data-quote-ignore]'))
+    .map((element) => ({ element, text: normalizeQuoteText(element.textContent ?? '') }))
+  // PDF: текстовый слой разбит на строки.
+  const lines = [...viewport.querySelectorAll<HTMLElement>('[data-document-page] span')]
+    .map((element) => ({ element, text: normalizeQuoteText(element.textContent ?? '') }))
+  return { viewport, blocks, lines }
+}
+
 /**
- * Элемент колонки, где стоит цитата: в текстовом виде — по номеру абзаца,
- * в DOCX — блок с этим текстом, в PDF — строка текстового слоя с началом цитаты.
+ * Элемент колонки, где стоит фрагмент: в текстовом виде — по номеру абзаца,
+ * в DOCX — блок с этим текстом, в PDF — строка текстового слоя с его началом.
  */
-export function findQuoteElement(viewport: HTMLElement, paragraphIndex: number, quote: string): HTMLElement | null {
-  const indexed = viewport.querySelector<HTMLElement>(`[data-paragraph-index="${paragraphIndex}"]`)
+export function locateQuote(index: QuoteBlockIndex, paragraphIndex: number, text: string): HTMLElement | null {
+  const indexed = index.viewport.querySelector<HTMLElement>(`[data-paragraph-index="${paragraphIndex}"]`)
   if (indexed) return indexed
-  const needle = normalizeQuoteText(quote).replace(/…$/, '').slice(0, 120)
+  const needle = normalizeQuoteText(text).replace(/…$/, '').slice(0, 120)
   if (!needle) return null
-  for (const block of viewport.querySelectorAll<HTMLElement>(BLOCKS)) {
-    if (block.closest('[data-quote-ignore]')) continue
-    if (normalizeQuoteText(block.textContent ?? '').includes(needle)) return block
-  }
-  // PDF: текстовый слой разбит на строки — ищем строку, с которой цитата начинается.
+  const block = index.blocks.find((candidate) => candidate.text.includes(needle))
+  if (block) return block.element
   const start = needle.slice(0, 40)
-  for (const line of viewport.querySelectorAll<HTMLElement>('[data-document-page] span')) {
-    const text = normalizeQuoteText(line.textContent ?? '')
-    if (text.length >= 8 && (text.includes(start) || start.startsWith(text))) return line
-  }
-  return null
+  return index.lines.find(({ text: line }) => line.length >= 8 && (line.includes(start) || start.startsWith(line)))?.element ?? null
+}
+
+export function findQuoteElement(viewport: HTMLElement, paragraphIndex: number, quote: string): HTMLElement | null {
+  return locateQuote(indexQuoteBlocks(viewport), paragraphIndex, quote)
 }
 
 /** Прокручивает колонку к фрагменту и ненадолго подсвечивает его. */

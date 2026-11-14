@@ -132,15 +132,15 @@
   left: calc(100% + 14px);
 }
 
+/* Узкий экран: рельс боковой панели — строка сверху, поэтому меню открывается вниз,
+   а кнопка остаётся аватаром: имя и тариф не помещаются в строку разделов. */
 @media (max-width: 840px) {
   .root { min-width: 0; margin-top: 0; }
   .popover, .collapsed .popover {
+    top: calc(100% + 8px);
     right: 0;
-    bottom: calc(100% + 8px);
+    bottom: auto;
     left: auto;
     width: min(226px, calc(100vw - 28px));
   }
-  .collapsed .identity { display: grid; }
-  .collapsed .chevron { display: inline; }
-  .collapsed .trigger { width: 100%; height: auto; justify-content: flex-start; margin: 0; padding: 8px 9px; }
 }

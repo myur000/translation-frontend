@@ -6,6 +6,7 @@ import { useTranslation } from '../../i18n/useTranslation.ts'
 import { useProfile } from '../../profile/useProfile.ts'
 import { UserAvatar } from './UserAvatar.tsx'
 import styles from './UserMenu.module.css'
+import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 
 interface UserMenuProps {
   isCollapsed: boolean
@@ -137,7 +138,7 @@ export function UserMenu({ isCollapsed }: UserMenuProps) {
           <strong>{displayName}</strong>
           <small>{planLabel}</small>
         </span>
-        <span className={styles.chevron} aria-hidden="true">⌃</span>
+        <GlyphIcon name="chevronUp" className={styles.chevron} />
       </button>
     </div>
   )

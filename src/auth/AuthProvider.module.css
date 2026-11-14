@@ -29,6 +29,10 @@
   background: var(--color-surface);
 }
 
+.noticeText {
+  flex: 1;
+}
+
 .notice button {
   width: 24px;
   height: 24px;
@@ -43,5 +47,5 @@
 }
 
 .notice button:hover {
-  background: rgb(146 64 14 / 8%);
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
 }

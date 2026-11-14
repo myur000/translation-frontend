@@ -32,14 +32,25 @@ select {
   cursor: pointer;
 }
 
+/* Кольцо фокуса с клавиатуры — акцентного цвета, чтобы его было видно на любой поверхности. */
 button:focus-visible,
 a:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* Цитаты из заметок в тексте книги (CSS Custom Highlight API, см. notes/quoteRanges.ts).
+   Страница книги белая в обеих темах, поэтому цвет один. Подсветка спокойнее, чем
+   вспышка при переходе из заметки (data-quote-highlight), чтобы не мешать чтению:
+   мягкий оранжевый фон и линия снизу, по которой цитата видна и без цвета фона. */
+::highlight(note-quote) {
+  background-color: var(--color-accent-highlight);
+  text-decoration: underline 2px var(--color-accent-highlight-line);
+  text-underline-offset: 3px;
 }

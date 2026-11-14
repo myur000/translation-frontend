@@ -1,0 +1,121 @@
+/* Сегменты в утопленной дорожке; выбранный — приподнятая карточка с оранжевой
+   полоской снизу: акцент отмечает режим, но не заливает его. */
+.switcher {
+  min-width: 0;
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+  border-radius: 11px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.option {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+/* Сама радиокнопка невидима, но остаётся в порядке фокуса и в дереве доступности. */
+.input {
+  position: absolute;
+  /* Выше лицевой части (у неё position: relative ради полоски): клик попадает в радиокнопку. */
+  z-index: 1;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.face {
+  position: relative;
+  height: 38px;
+  min-width: 44px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 8px;
+  color: var(--color-text-muted);
+  border-radius: 9px;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.option:hover .face {
+  color: var(--color-text);
+}
+
+.input:checked + .face {
+  color: var(--color-primary);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-raised), 0 0 0 1px var(--color-border);
+}
+
+.input:checked + .face::after {
+  position: absolute;
+  right: 30%;
+  bottom: 3px;
+  left: 30%;
+  height: 3px;
+  content: '';
+  background: var(--color-accent);
+  border-radius: 999px;
+}
+
+.input:focus-visible + .face {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+/* Иконки рисуются линией цвета текста; выбранная страница слегка подкрашена. */
+.page {
+  width: 25px;
+  height: 30px;
+}
+
+.book {
+  width: 46px;
+  height: 30px;
+}
+
+.sheet,
+.line {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+.input:checked + .face .sheet {
+  fill: var(--color-primary-soft);
+}
+
+.line {
+  opacity: 0.55;
+}
+
+.code {
+  fill: currentColor;
+  font-family: inherit;
+  font-size: 7.6px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .face {
+    transition: none;
+  }
+}

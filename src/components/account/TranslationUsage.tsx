@@ -1,6 +1,7 @@
 import { useAccount } from '../../account/useAccount.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import styles from '../../pages/PlansPage.module.css'
+import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 
 export function TranslationUsage() {
   const { usage } = useAccount()
@@ -29,7 +30,7 @@ export function TranslationUsage() {
         <p className={styles.muted}>{t('plans.resets', { date: reset! })}</p>
         <p className={styles.muted}>{t('plans.reservedDescription')}</p>
         {!data.unlimited && data.remaining_units === 0 ? (
-          <p className={styles.warning} role="status">{t('plans.exhausted')}</p>
+          <p className={styles.warning} role="status"><GlyphIcon name="warning" /><span>{t('plans.exhausted')}</span></p>
         ) : null}
       </> : null}
     </section>

@@ -1,6 +1,7 @@
 import type { DocumentAction } from '../components/toolbar/DocumentActionsMenu.tsx'
 import type { TranslationKey } from '../i18n/translations.ts'
 import type { DocumentItem } from '../types/document.ts'
+import type { useReadingProgress } from '../reading/readingProgress.ts'
 import { canCancelTranslation } from './translationStatus.ts'
 
 interface DocumentMenuOptions {
@@ -9,10 +10,14 @@ interface DocumentMenuOptions {
   isPinned: boolean
   onTogglePin: () => void
   onRate: () => void
+  /** Ручная отметка прочтения; только у готового перевода. */
+  reading?: { isRead: boolean; onToggle: () => void }
   /** Перевод на другой язык; без него пункт не показывается. */
   onRetranslate?: () => void
   /** Отмена идущего перевода; пункт есть только у задач в `PENDING`/`PROCESSING`. */
   onCancelTranslation: () => void
+  /** Скачать готовый перевод; без него пункта нет (в боковой панели скачивания нет). */
+  download?: { isBusy: boolean; onSelect: () => void }
   onDelete: () => void
 }
 
@@ -26,8 +31,10 @@ export function documentMenuActions({
   isPinned,
   onTogglePin,
   onRate,
+  reading,
   onRetranslate,
   onCancelTranslation,
+  download,
   onDelete,
 }: DocumentMenuOptions): DocumentAction[] {
   if (!document.jobId) {
@@ -35,12 +42,30 @@ export function documentMenuActions({
   }
   const isProcessing = document.status === 'processing'
   return [
+    // Главное действие с готовым переводом — первым пунктом.
+    ...(download && document.status === 'ready'
+      ? [{
+          id: 'download',
+          label: t(download.isBusy ? 'toolbar.downloading' : 'documentActions.download'),
+          icon: 'download' as const,
+          disabledReason: download.isBusy ? t('toolbar.downloading') : undefined,
+          onSelect: download.onSelect,
+        }]
+      : []),
     {
       id: 'pin',
       label: t(isPinned ? 'documentActions.unpin' : 'documentActions.pin'),
       icon: isPinned ? 'unpin' : 'pin',
       onSelect: onTogglePin,
     },
+    ...(reading
+      ? [{
+          id: 'reading',
+          label: t(reading.isRead ? 'reading.markUnread' : 'reading.markRead'),
+          icon: reading.isRead ? 'unread' as const : 'read' as const,
+          onSelect: reading.onToggle,
+        }]
+      : []),
     ...(document.status === 'ready'
       ? [{ id: 'rate', label: t('documentActions.rate'), icon: 'star' as const, onSelect: onRate }]
       : []),
@@ -71,4 +96,10 @@ export function documentMenuActions({
       onSelect: onDelete,
     },
   ]
+}
+
+/** Пункт «Отметить прочитанной / непрочитанной» для меню книги. */
+export function readingToggle(reading: ReturnType<typeof useReadingProgress>, jobId: string) {
+  const isRead = reading.stateOf(jobId).status === 'read'
+  return { isRead, onToggle: () => reading.markRead(jobId, !isRead) }
 }

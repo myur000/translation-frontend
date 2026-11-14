@@ -15,11 +15,14 @@ export const PREFERENCES_STORAGE_KEY = 'doctranslate.preferences.v1'
 interface StoredPreferences {
   theme: ThemePreference
   language: InterfaceLanguage
+  isScrollSyncEnabled: boolean
 }
 
 const DEFAULT_PREFERENCES: StoredPreferences = {
   theme: 'light',
   language: 'ru',
+  // Сравнение читают параллельно, поэтому колонки по умолчанию прокручиваются вместе.
+  isScrollSyncEnabled: true,
 }
 
 function readPreferences(): StoredPreferences {
@@ -34,6 +37,8 @@ function readPreferences(): StoredPreferences {
     return {
       theme: preferences.theme === 'dark' ? 'dark' : 'light',
       language: preferences.language === 'en' ? 'en' : 'ru',
+      // Сохранённые до появления настройки значения её не содержат — тогда включена.
+      isScrollSyncEnabled: preferences.isScrollSyncEnabled !== false,
     }
   } catch {
     return DEFAULT_PREFERENCES
@@ -56,6 +61,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         setPreferences((current) => ({ ...current, theme })),
       setLanguage: (language: InterfaceLanguage) =>
         setPreferences((current) => ({ ...current, language })),
+      setScrollSyncEnabled: (isScrollSyncEnabled: boolean) =>
+        setPreferences((current) => ({ ...current, isScrollSyncEnabled })),
     }),
     [preferences],
   )

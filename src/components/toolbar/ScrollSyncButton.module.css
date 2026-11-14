@@ -1,29 +1,36 @@
+/* Тихая иконка внутри пилюли вида; включённая — подсвечена, как выбранная раскладка. */
 .button {
-  width: 30px;
-  height: 30px;
+  width: 38px;
+  height: 38px;
   display: grid;
   flex: 0 0 auto;
   place-items: center;
   padding: 0;
-  color: var(--color-text-soft);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
 }
 
-.button:hover {
-  color: var(--color-text-muted);
+.button:hover:not([aria-disabled='true']) {
+  color: var(--color-text);
   background: var(--color-surface-subtle);
 }
 
-.button:active {
+.button:active:not([aria-disabled='true']) {
   transform: translateY(1px);
 }
 
 .button[aria-pressed='true'] {
   color: var(--color-primary);
   background: var(--color-primary-soft);
-  border-color: var(--color-primary-border);
+}
+
+.button[aria-disabled='true'] {
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: default;
+  opacity: 0.4;
 }
 
 .button svg {

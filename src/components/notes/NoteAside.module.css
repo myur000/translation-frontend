@@ -90,8 +90,10 @@
   border-radius: var(--radius-md);
 }
 
+/* Цитата и её пара — текст книги, поэтому набраны книжным шрифтом. */
 .quote blockquote {
   margin: 0;
+  font-family: var(--font-serif);
   padding-left: 10px;
   color: var(--color-text);
   border-left: 3px solid var(--color-primary-border);
@@ -101,6 +103,7 @@
 
 .paired {
   margin: 8px 0 0;
+  font-family: var(--font-serif);
   padding-left: 13px;
   color: var(--color-text-muted);
   font-size: 12px;

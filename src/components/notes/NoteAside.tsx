@@ -4,6 +4,7 @@ import { useTranslation } from '../../i18n/useTranslation.ts'
 import { notesSearch } from '../../notes/notesQuery.ts'
 import { useNoteDateFormat } from '../../notes/useNoteDateFormat.ts'
 import styles from './NoteAside.module.css'
+import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 
 interface NoteAsideProps {
   note: NoteResponse
@@ -37,7 +38,7 @@ export function NoteAside({ note, backlinks, search }: NoteAsideProps) {
             <ul className={styles.links}>
               {backlinks.map((reference) => (
                 <li key={reference.id}>
-                  <Link to={`/notes/${encodeURIComponent(reference.id)}${search}`}>← {reference.title}</Link>
+                  <Link to={`/notes/${encodeURIComponent(reference.id)}${search}`}><GlyphIcon name="arrowLeft" /> {reference.title}</Link>
                 </li>
               ))}
             </ul>

@@ -3,7 +3,7 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border-strong);
   border-radius: 16px;
-  box-shadow: 0 6px 24px rgb(9 20 35 / 10%), 0 1px 3px rgb(9 20 35 / 6%);
+  box-shadow: var(--shadow-dock);
   /* Слой под панелью прозрачен для кликов; сама панель их принимает. */
   pointer-events: auto;
 }
@@ -15,7 +15,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 7px 8px;
+  /* Кнопки вида — 38px, как и «+»: панель одной высоты в любом состоянии. */
+  padding: 6px;
 }
 
 .tools {
@@ -23,49 +24,15 @@
 }
 
 .tools button[aria-haspopup] {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
 }
 
 .languages {
   display: flex;
   align-items: center;
   gap: 2px;
-}
-
-/* Плашка пары языков — того же вида, что кнопки выбора языка у черновика. */
-.languagePair {
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 8px 0 10px;
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  white-space: nowrap;
-  transition: border-color 120ms ease, background-color 120ms ease;
-}
-
-.languagePair:hover:not(:disabled) {
-  background: var(--color-surface-subtle);
-}
-
-.languagePair:disabled {
-  color: var(--color-text-muted);
-  cursor: default;
-}
-
-.languagePair .chevron {
-  width: 14px;
-  height: 14px;
-}
-
-.languagePair:disabled .chevron {
-  display: none;
 }
 
 .separator {
@@ -89,12 +56,6 @@
   min-width: 82px;
   text-align: center;
   white-space: nowrap;
-}
-
-.view {
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
 
 .primary {
@@ -128,7 +89,6 @@
   opacity: 0.35;
 }
 
-.languagePair svg,
 .iconButton svg,
 .primaryButton svg {
   fill: none;
@@ -138,15 +98,10 @@
   stroke-width: 1.5;
 }
 
-.languagePair svg,
 .iconButton svg,
 .primaryButton svg {
   width: 15px;
   height: 15px;
-}
-
-.languagePair svg {
-  color: var(--color-text-soft);
 }
 
 .primaryButton,
@@ -163,14 +118,14 @@
 }
 
 .primaryButton {
-  color: var(--color-on-primary);
-  background: var(--color-primary);
-  border: 1px solid var(--color-primary);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
 }
 
 .primaryButton:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
 }
 
 .primaryButton:disabled {

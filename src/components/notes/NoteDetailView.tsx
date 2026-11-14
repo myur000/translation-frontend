@@ -13,6 +13,7 @@ import { NoteContent } from './NoteContent.tsx'
 import { NoteEditSession } from './NoteEditSession.tsx'
 import { NoteErrorText } from './NoteErrorText.tsx'
 import styles from './NotesPage.module.css'
+import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 
 /** `/notes/:noteId`: просмотр и правка заметки. Монтируется заново для каждой заметки (key). */
 export function NoteDetailView({ noteId }: { noteId: string }) {
@@ -64,6 +65,10 @@ export function NoteDetailView({ noteId }: { noteId: string }) {
 
   return (
     <section className={styles.page}>
+      {/* Списка в боковой панели больше нет: обратно — с теми же поиском и тегом. */}
+      <Link className={styles.backLink} to={`/notes${search}`}>
+        <GlyphIcon name="arrowLeft" /> {t('notes.backToList')}
+      </Link>
       <div className={styles.detail}>
         <article className={styles.main}>
           {isEditing ? (

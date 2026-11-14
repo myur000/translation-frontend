@@ -112,9 +112,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       retry: notesChanged,
       tags: tags?.tags ?? [],
       notesChanged,
+      revision,
       drafts,
     }
-  }, [drafts, enabled, list, listKey, loadMore, loadingMoreKey, notesChanged, query, tags])
+  }, [drafts, enabled, list, listKey, loadMore, loadingMoreKey, notesChanged, query, revision, tags])
 
   return <NotesContext.Provider value={value}>{children}</NotesContext.Provider>
 }

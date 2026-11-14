@@ -37,6 +37,8 @@ export interface NotesContextValue {
   tags: NoteTagCount[]
   /** Вызывается после создания, изменения или удаления: список и теги перечитываются. */
   notesChanged: () => void
+  /** Растёт при каждом `notesChanged`: по нему перечитывают заметки и вне раздела (метки на полях). */
+  revision: number
   /** Черновики по ключу заметки (`new` или id): правка не теряется при переходе к другой заметке. */
   drafts: NoteDrafts
 }

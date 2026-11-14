@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router'
 import App from '../App.tsx'
+import { PREFERENCES_STORAGE_KEY } from '../preferences/PreferencesProvider.tsx'
 import { AUTH_SESSION_STORAGE_KEY } from '../auth/authStorage.ts'
 import { resetLanguageCatalogForTests } from '../languages/languageCatalog.ts'
 import { installBrowserSessionMock } from './browserSessionMock.ts'
@@ -10,6 +11,14 @@ import { installDialogPolyfill } from './dialogPolyfill.ts'
 
 // Эти тесты проверяют раскладку, загрузку и навигацию, а не движок отрисовки PDF.
 vi.mock('../viewer/pdfEngine.ts', () => ({ openPdf: async () => { throw new Error('Invalid test PDF') } }))
+// Настоящие метки ищут абзацы в отрисованной книге, а PDF в jsdom не рисуется (их
+// проверяет quoteMarkers.test.tsx). Здесь метка — кнопка с тем же обработчиком.
+vi.mock('../components/workspace/QuoteMarkers.tsx', () => ({
+  QuoteMarkers: ({ column, quotes, onOpen }: { column: string; quotes: { noteId: string }[]; onOpen: (ids: string[]) => void }) =>
+    column === 'TRANSLATION' && quotes.length
+      ? <button type="button" onClick={() => onOpen([...new Set(quotes.map((quote) => quote.noteId))])}>Метка на полях</button>
+      : null,
+}))
 
 afterEach(() => {
   cleanup()
@@ -175,6 +184,14 @@ function seedDocumentMetadata() {
 /** `/` — главный экран; тесты рабочей области открывают первый документ из истории. */
 const FIRST_DOCUMENT = '/documents/00000000-0000-0000-0000-000000000101'
 
+/**
+ * Синхронная прокрутка по умолчанию включена. Тесты, которые проверяют ручное
+ * переключение и независимый масштаб, начинают с выключенной.
+ */
+function startWithScrollSyncOff() {
+  localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify({ theme: 'light', language: 'ru', isScrollSyncEnabled: false }))
+}
+
 function renderApp(path = FIRST_DOCUMENT, emailVerified = true) {
   seedAuthenticatedSession(emailVerified)
   seedDocumentMetadata()
@@ -190,7 +207,7 @@ function renderApp(path = FIRST_DOCUMENT, emailVerified = true) {
 
 /** Добавляет локальный черновик: выбор языков есть только у черновиков (и неудачных задач). */
 async function addDraft(user: ReturnType<typeof userEvent.setup>, name = 'draft.pdf') {
-  await screen.findByRole('button', { name: /^english_course_book\.pdf/ })
+  await screen.findByRole('button', { name: /^English course book/ })
   const input = document.querySelector<HTMLInputElement>('input[type="file"]')
   await user.upload(input as HTMLInputElement, new File(['%PDF'], name, { type: 'application/pdf' }))
 }
@@ -295,6 +312,7 @@ describe('workspace interactions', () => {
   })
 
   it('retains independent zoom and both scroll axes when fullscreen panels are remounted', async () => {
+    startWithScrollSyncOff()
     mockBookViewportGeometry()
     renderApp()
     const original = await findWorkspaceRegion('Прокрутка панели «Оригинал»')
@@ -332,6 +350,7 @@ describe('workspace interactions', () => {
   })
 
   it('updates the hidden fullscreen panel bookmark when synchronized zoom and scrolling are enabled', async () => {
+    startWithScrollSyncOff()
     const user = userEvent.setup()
     mockBookViewportGeometry()
     renderApp()
@@ -378,7 +397,7 @@ describe('workspace interactions', () => {
     original.scrollLeft = 200
     fireEvent.scroll(original)
     fireEvent.keyDown(window, { key: 'Escape' })
-    await user.click(screen.getByRole('button', { name: /^project_report.docx/ }))
+    await user.click(screen.getByRole('button', { name: /^Project report/ }))
     const nextOriginal = screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' })
     expect(nextOriginal.dataset.zoom).toBe('100')
     expect(nextOriginal.scrollTop).toBe(0)
@@ -458,15 +477,16 @@ describe('workspace interactions', () => {
       initialEntries: [FIRST_DOCUMENT],
     })
     render(<RouterProvider router={router} />)
-    await user.click(await screen.findByRole('button', { name: /^project_report.docx/ }))
+    await user.click(await screen.findByRole('button', { name: /^Project report/ }))
     fireEvent.keyDown(window, { key: 'g' })
 
     await act(async () => { await router.navigate('/settings') })
     expect(screen.getByText('Мои книги')).toBeTruthy()
     await act(async () => { await router.navigate(-1) })
     expect(screen.getByRole('button', { name: 'Открыть оригинал и перевод на весь экран' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /^project_report.docx/ }).getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getAllByText('project_report.docx')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: /^Project report/ }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getAllByText('project_report.docx')).toHaveLength(1)
+    expect(within(sidebarList()).getByText('Project report')).toBeTruthy()
 
     fireEvent.keyDown(window, { key: 'f' })
     await act(async () => { await router.navigate('/history', { replace: true }) })
@@ -482,19 +502,20 @@ describe('workspace interactions', () => {
 
     expect(screen.getByText('Мои книги')).toBeTruthy()
     expect(layout.style.getPropertyValue('--sidebar-current-width')).toBe(
-      '244px',
+      '304px',
     )
 
     await user.click(
       screen.getByRole('button', { name: 'Свернуть боковую панель' }),
     )
     expect(layout.style.getPropertyValue('--sidebar-current-width')).toBe(
-      '72px',
+      '56px',
     )
-
-    await user.click(
-      screen.getByRole('button', { name: 'Развернуть боковую панель' }),
-    )
+    // Свёрнутая панель — один рельс; иконка «Книги» разворачивает её обратно.
+    const booksSection = screen.getByRole('button', { name: 'Книги' })
+    expect(booksSection.getAttribute('aria-expanded')).toBe('false')
+    await user.click(booksSection)
+    expect(booksSection.getAttribute('aria-expanded')).toBe('true')
 
     const resizeHandle = screen.getByRole('separator', {
       name: 'Изменить ширину боковой панели',
@@ -502,9 +523,9 @@ describe('workspace interactions', () => {
     resizeHandle.focus()
     await user.keyboard('{ArrowRight}')
 
-    expect(resizeHandle.getAttribute('aria-valuenow')).toBe('260')
+    expect(resizeHandle.getAttribute('aria-valuenow')).toBe('320')
     expect(layout.style.getPropertyValue('--sidebar-current-width')).toBe(
-      '260px',
+      '320px',
     )
   })
 
@@ -536,6 +557,7 @@ describe('workspace interactions', () => {
   })
 
   it('zooms independently and uses the last changed panel when sync is enabled', async () => {
+    startWithScrollSyncOff()
     const user = userEvent.setup()
     renderApp()
     const original = await findWorkspaceRegion('Прокрутка панели «Оригинал»')
@@ -565,6 +587,7 @@ describe('workspace interactions', () => {
   })
 
   it('supports zoom gestures and switching fullscreen between one or both panels', async () => {
+    startWithScrollSyncOff()
     const user = userEvent.setup()
     renderApp()
     const original = await findWorkspaceRegion('Прокрутка панели «Оригинал»')
@@ -625,11 +648,6 @@ describe('workspace interactions', () => {
     expect(
       screen.queryByRole('button', { name: 'Развернуть панель «Оригинал»' }),
     ).toBeNull()
-    expect(
-      screen.queryByRole('button', {
-        name: 'Выйти из полноэкранного режима документов',
-      }),
-    ).toBeNull()
 
     await user.keyboard('{Escape}')
 
@@ -646,10 +664,11 @@ describe('workspace interactions', () => {
     renderApp()
 
     await user.click(
-      await screen.findByRole('button', { name: /^project_report\.docx/i }),
+      await screen.findByRole('button', { name: /^Project report/i }),
     )
 
-    expect(screen.getAllByText('project_report.docx')).toHaveLength(2)
+    expect(screen.getAllByText('project_report.docx')).toHaveLength(1)
+    expect(within(sidebarList()).getByText('Project report')).toBeTruthy()
     expect(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }).getAttribute('lang')).toBe('en-Latn')
     expect(screen.queryByRole('heading', { name: 'Translation service progress' })).toBeNull()
   })
@@ -659,31 +678,29 @@ describe('workspace interactions', () => {
     renderApp()
 
     await user.click(
-      await screen.findByRole('button', { name: /^research_notes\.doc/i }),
+      await screen.findByRole('button', { name: /^Research notes/i }),
     )
 
     // research_notes.doc старше кодов NLLB: старые `de`/`ru` сопоставляются с каталогом.
     expect(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }).getAttribute('lang')).toBe('de-Latn')
     expect(screen.getByRole('region', { name: 'Прокрутка панели «Перевод»' }).getAttribute('lang')).toBe('ru-Cyrl')
-    expect(screen.getByText(/Языки перевода/).parentElement?.textContent).toMatch(/Немецкий.*Русский/)
+    // Коды языков написаны на страницах переключателя вида.
+    expect(screen.getByRole('radio', { name: 'Оригинал DE' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: 'Перевод RU' })).toBeTruthy()
   })
 
-  it('disables page navigation until real PDF metadata is available', async () => {
+  it('hides page navigation until real PDF metadata is available', async () => {
     renderApp()
+    await findWorkspaceRegion('Оригинал')
 
-    const previousButton = (await screen.findByRole('button', {
-      name: 'Предыдущая страница',
-    })) as HTMLButtonElement
-    const nextButton = screen.getByRole('button', {
-      name: 'Следующая страница',
-    }) as HTMLButtonElement
-
-    expect(previousButton.disabled).toBe(true)
-    expect(nextButton.disabled).toBe(true)
+    // Пока число страниц неизвестно, стрелкам нечего листать — их нет вовсе.
+    expect(screen.queryByRole('button', { name: 'Предыдущая страница' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Следующая страница' })).toBeNull()
     expect(screen.queryByText('1 / 2')).toBeNull()
   })
 
   it('toggles proportional synchronized scrolling for both document panels', async () => {
+    startWithScrollSyncOff()
     const user = userEvent.setup()
     renderApp()
 
@@ -741,6 +758,7 @@ describe('workspace interactions', () => {
   })
 
   it('synchronizes horizontal and vertical scroll without feedback between different page sizes', async () => {
+    startWithScrollSyncOff()
     const user = userEvent.setup()
     renderApp()
     const original = await findWorkspaceRegion('Прокрутка панели «Оригинал»')
@@ -864,6 +882,7 @@ describe('workspace interactions', () => {
   })
 
   it('keeps synchronized scrolling enabled when another book is selected', async () => {
+    startWithScrollSyncOff()
     const user = userEvent.setup()
     renderApp()
 
@@ -871,7 +890,7 @@ describe('workspace interactions', () => {
       await screen.findByRole('button', { name: 'Включить синхронную прокрутку' }),
     )
     await user.click(
-      await screen.findByRole('button', { name: /^project_report\.docx/i }),
+      await screen.findByRole('button', { name: /^Project report/i }),
     )
 
     expect(
@@ -887,19 +906,19 @@ describe('workspace interactions', () => {
     await addDraft(user)
 
     await user.click(
-      await screen.findByRole('button', { name: 'Исходный язык: Английский' }),
+      await screen.findByRole('button', { name: 'Исходный язык: Английский (EN)' }),
     )
     await user.click(
       within(screen.getByRole('listbox', { name: 'Исходный язык' })).getAllByRole('option', { name: 'Русский' })[0],
     )
 
-    expect(screen.getByRole('button', { name: 'Исходный язык: Русский' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Язык перевода: Английский' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Исходный язык: Русский (RU)' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Язык перевода: Английский (EN)' })).toBeTruthy()
     expect(screen.queryByRole('listbox')).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'Поменять языки местами' }))
-    expect(screen.getByRole('button', { name: 'Исходный язык: Английский' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Язык перевода: Русский' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Исходный язык: Английский (EN)' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Язык перевода: Русский (RU)' })).toBeTruthy()
   })
 
   it('loads the NLLB catalog into the language picker and searches it', async () => {
@@ -908,7 +927,7 @@ describe('workspace interactions', () => {
     await addDraft(user)
 
     await user.click(
-      await screen.findByRole('button', { name: 'Язык перевода: Русский' }),
+      await screen.findByRole('button', { name: 'Язык перевода: Русский (RU)' }),
     )
     const listbox = screen.getByRole('listbox', { name: 'Язык перевода' })
     expect(await within(listbox).findByText('Все языки · 5')).toBeTruthy()
@@ -923,7 +942,7 @@ describe('workspace interactions', () => {
     await user.type(search, 'deu_')
     expect(within(listbox).getAllByRole('option').map((option) => option.textContent)).toEqual(['Немецкий'])
     await user.keyboard('{Enter}')
-    const trigger = screen.getByRole('button', { name: 'Язык перевода: Немецкий' })
+    const trigger = screen.getByRole('button', { name: 'Язык перевода: Немецкий (DE)' })
     expect(document.activeElement).toBe(trigger)
 
     await user.click(trigger)
@@ -935,7 +954,7 @@ describe('workspace interactions', () => {
     const user = userEvent.setup()
     renderApp()
     await addDraft(user)
-    const trigger = await screen.findByRole('button', { name: 'Язык перевода: Русский' })
+    const trigger = await screen.findByRole('button', { name: 'Язык перевода: Русский (RU)' })
     vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(
       DOMRect.fromRect({ x: window.innerWidth - 140, y: 10, width: 120, height: 30 }),
     )
@@ -956,7 +975,7 @@ describe('workspace interactions', () => {
     const user = userEvent.setup()
     renderApp()
     await addDraft(user)
-    const trigger = await screen.findByRole('button', { name: 'Язык перевода: Русский' })
+    const trigger = await screen.findByRole('button', { name: 'Язык перевода: Русский (RU)' })
     const height = window.innerHeight
 
     // Кнопка у нижнего края: снизу места нет, список раскрывается вверх.
@@ -994,7 +1013,7 @@ describe('workspace interactions', () => {
     ))
 
     await user.click(
-      await screen.findByRole('button', { name: 'Исходный язык: Английский' }),
+      await screen.findByRole('button', { name: 'Исходный язык: Английский (EN)' }),
     )
 
     expect(await screen.findByText('Не удалось загрузить все языки.')).toBeTruthy()
@@ -1007,7 +1026,8 @@ describe('workspace interactions', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(await screen.findByRole('button', { name: 'Скачать' }))
+    await user.click(await screen.findByRole('button', { name: 'Действия с документом' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Скачать перевод' }))
     expect(await screen.findByText(/Не удалось скачать перевод/)).toBeTruthy()
   })
 
@@ -1168,12 +1188,13 @@ describe('workspace interactions', () => {
     expect(input).toBeTruthy()
     await user.upload(input as HTMLInputElement, file)
 
-    expect(screen.getAllByText('new_document.pdf').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText('new_document.pdf').length).toBeGreaterThanOrEqual(1)
+    expect(within(sidebarList()).getByText('New document')).toBeTruthy()
     expect(
       screen.getByText(/готов к отправке.*нажмите «Перевести»/),
     ).toBeTruthy()
 
-    await user.click(screen.getByRole('button', { name: 'Исходный язык: Английский' }))
+    await user.click(screen.getByRole('button', { name: 'Исходный язык: Английский (EN)' }))
     await user.type(screen.getByRole('combobox', { name: 'Найти язык' }), 'немец{Enter}')
     await user.click(screen.getByRole('button', { name: 'Перевести' }))
 
@@ -1181,13 +1202,16 @@ describe('workspace interactions', () => {
       await screen.findByText(/«new_document\.pdf» отправлен на перевод/),
     ).toBeTruthy()
     await waitFor(() => {
+      // Готовую книгу ещё не открывали для чтения: вместо «Готов» — прогресс чтения.
       expect(within(sidebarList()).getByTitle('new_document.pdf').textContent).toContain(
-        'Готов',
+        'Не начата',
       )
     })
-    // Готовый перевод делает скачивание главным действием.
-    expect(screen.getByRole('button', { name: 'Скачать' })).toBeTruthy()
+    // У готового перевода нечего запускать: «Перевести» уходит, скачивание — в меню «⋯».
     expect(screen.queryByRole('button', { name: 'Перевести' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Действия с документом' }))
+    expect(screen.getByRole('menuitem', { name: 'Скачать перевод' })).toBeTruthy()
+    await user.keyboard('{Escape}')
     expect(
       fetchMock.mock.calls.some(
         ([url]) =>
@@ -1213,7 +1237,8 @@ describe('history integration', () => {
   it('restores backend jobs, statuses and job ids', async () => {
     renderApp('/history')
 
-    expect(await screen.findAllByText('english_course_book.pdf')).toHaveLength(2)
+    expect(await screen.findAllByText('english_course_book.pdf')).toHaveLength(1)
+    expect(within(sidebarList()).getByText('English course book')).toBeTruthy()
     expect(screen.getByText('00000000-0000-0000-0000-000000000101')).toBeTruthy()
     expect(screen.getAllByText(/Готов · 100%/).length).toBeGreaterThan(0)
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -1257,15 +1282,80 @@ describe('document route', () => {
   it('opens a document by its link', async () => {
     renderDocumentRoute('/documents/00000000-0000-0000-0000-000000000102')
 
-    expect(await screen.findAllByText('project_report.docx')).toHaveLength(2)
-    expect(screen.getByRole('button', { name: /^project_report\.docx/ }).getAttribute('aria-pressed')).toBe('true')
+    expect(await screen.findAllByText('project_report.docx')).toHaveLength(1)
+    expect(within(sidebarList()).getByText('Project report')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Project report/ }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('shows notes as a tree by book in the sidebar outside a book', async () => {
+    const user = userEvent.setup()
+    const graph = {
+      truncated: false,
+      nodes: [
+        { id: 'note:n-1', type: 'note', label: 'Шторм', ref: 'n-1', deleted: false },
+        { id: 'note:n-2', type: 'note', label: 'Маяк', ref: 'n-2', deleted: false },
+        { id: 'note:n-3', type: 'note', label: 'Идеи', ref: 'n-3', deleted: false },
+        { id: 'document:j-1', type: 'document', label: 'lighthouse-keepers-ledger.docx', ref: 'j-1', deleted: false },
+        { id: 'tag:сюжет', type: 'tag', label: 'сюжет', ref: null, deleted: false },
+        { id: 'missing:морская лексика', type: 'missing', label: 'Морская лексика', ref: null, deleted: false },
+      ],
+      edges: [
+        { source: 'note:n-1', target: 'document:j-1', type: 'quotes', weight: 2 },
+        { source: 'note:n-2', target: 'document:j-1', type: 'quotes', weight: 1 },
+        { source: 'note:n-1', target: 'tag:сюжет', type: 'tagged', weight: 1 },
+        { source: 'note:n-3', target: 'missing:морская лексика', type: 'links', weight: 1 },
+      ],
+    }
+    const summary = (id: string, title: string) =>
+      ({ id, title, excerpt: `Текст «${title}»`, tags: [], quote_count: 0, version: 1, updated_at: '2026-11-10T10:00:00Z' })
+    const page = (items: unknown[]) => () => jsonResponse({ items, page: 0, size: 100, total_elements: items.length, total_pages: 1 })
+    const { fetchMock } = renderDocumentRoute('/history', {
+      '/api/notes/graph?types=document%2Ctag%2Cmissing': () => jsonResponse(graph),
+      '/api/notes?page=0&size=100': page([summary('n-3', 'Идеи'), summary('n-1', 'Шторм'), summary('n-2', 'Маяк')]),
+      [`/api/notes?${new URLSearchParams({ q: 'маяк', page: '0', size: '100' })}`]: page([summary('n-2', 'Маяк')]),
+      [`/api/notes?${new URLSearchParams({ tag: 'сюжет', page: '0', size: '100' })}`]: page([summary('n-1', 'Шторм')]),
+    })
+    const rail = await screen.findByRole('navigation', { name: 'Разделы' })
+    // Граф не запрашивается, пока раздел заметок ни разу не открыли.
+    expect(callsTo(fetchMock, '/api/notes/graph?types=document%2Ctag%2Cmissing', 'GET')).toHaveLength(0)
+
+    const notesSection = within(rail).getByRole('button', { name: 'Заметки' })
+    await user.click(notesSection)
+    expect(notesSection.getAttribute('aria-expanded')).toBe('true')
+    const book = await screen.findByRole('button', { name: /Lighthouse keepers ledger/, expanded: false })
+    expect(book.textContent).toContain('2')
+    await user.click(book)
+    expect(screen.getByRole('link', { name: /^Маяк/ }).getAttribute('href')).toBe('/notes/n-2')
+    expect(screen.getByRole('link', { name: /^Шторм/ }).getAttribute('href')).toBe('/notes/n-1')
+    // Заметка без цитат — в «Без книги»; ссылка на несозданную заметку её создаёт.
+    expect(screen.getByRole('button', { name: /Без книги/ })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Создать заметку «Морская лексика»' }).getAttribute('href'))
+      .toBe('/notes/new?title=%D0%9C%D0%BE%D1%80%D1%81%D0%BA%D0%B0%D1%8F%20%D0%BB%D0%B5%D0%BA%D1%81%D0%B8%D0%BA%D0%B0')
+
+    await user.click(screen.getByRole('button', { name: 'Недавние' }))
+    expect(screen.getByRole('link', { name: /^Идеи/ })).toBeTruthy()
+
+    // Тег сужает список, крестик возвращает дерево.
+    await user.click(screen.getByRole('button', { name: /#сюжет/ }))
+    expect(await screen.findByRole('link', { name: /^Шторм/ })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /^Маяк/ })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Сбросить фильтр #сюжет' }))
+
+    await user.type(screen.getByRole('searchbox', { name: 'Поиск по заметкам' }), 'маяк')
+    // Поиск ждёт паузу во вводе и показывает найденное сервером, а не дерево.
+    expect(await screen.findByRole('link', { name: /^Маяк/ })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /^Идеи/ })).toBeNull()
+
+    // Второй клик по открытому разделу сворачивает панель, как в редакторах кода.
+    await user.click(notesSection)
+    expect(notesSection.getAttribute('aria-expanded')).toBe('false')
   })
 
   it('gives a selected document its own address', async () => {
     const user = userEvent.setup()
     const { router } = renderDocumentRoute('/')
 
-    await user.click(await screen.findByRole('button', { name: /^research_notes\.doc/ }))
+    await user.click(await screen.findByRole('button', { name: /^Research notes/ }))
 
     expect(router.state.location.pathname).toBe('/documents/00000000-0000-0000-0000-000000000103')
   })
@@ -1296,7 +1386,8 @@ describe('document route', () => {
       }),
     })
 
-    expect(await screen.findAllByText('Архивный договор.pdf')).toHaveLength(2)
+    expect(await screen.findAllByText('Архивный договор.pdf')).toHaveLength(1)
+    expect(within(sidebarList()).getByText('Архивный договор')).toBeTruthy()
   })
 
   it('prefers the file name stored by the backend', async () => {
@@ -1308,7 +1399,367 @@ describe('document route', () => {
       }),
     })
 
-    expect(await screen.findAllByText('Договор поставки.pdf')).toHaveLength(2)
+    expect(await screen.findAllByText('Договор поставки.pdf')).toHaveLength(1)
+    expect(within(sidebarList()).getByText('Договор поставки')).toBeTruthy()
+  })
+})
+
+describe('workspace layout', () => {
+  const firstJob = '00000000-0000-0000-0000-000000000101'
+  // Имя кнопки — раскладка и видимый на картинке код языка: «Перевод RU».
+  const layoutRadio = (layout: string) =>
+    screen.getByRole('radio', { name: new RegExp(`^${layout} `) }) as HTMLInputElement
+  const region = (name: string) => screen.queryByRole('region', { name })
+
+  it('opens in comparison and remembers the chosen layout for each document', async () => {
+    const user = userEvent.setup()
+    renderDocumentRoute(`/documents/${firstJob}`)
+    await findWorkspaceRegion('Оригинал')
+
+    // Первое открытие — сравнение: оригинал и перевод рядом.
+    expect(screen.getByRole('group', { name: 'Раскладка' })).toBeTruthy()
+    expect(layoutRadio('Сравнение').checked).toBe(true)
+    // На картинках — языки этого документа: страница перевода, книга «оригинал | перевод», страница оригинала.
+    expect(screen.getByRole('radio', { name: 'Перевод RU' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: 'Сравнение EN и RU' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: 'Оригинал EN' })).toBeTruthy()
+    expect(region('Перевод')).toBeTruthy()
+
+    await user.click(layoutRadio('Перевод'))
+    expect(region('Оригинал')).toBeNull()
+    expect(region('Перевод')).toBeTruthy()
+    // Синхронной прокрутке нечего связывать, а полный экран откроет то, что видно.
+    expect(screen.getByRole('button', { name: /синхронную прокрутку/ }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Открыть перевод на весь экран' })).toBeTruthy()
+
+    // У другого документа своя раскладка: он, как новый, открывается в сравнении.
+    await user.click(within(sidebarList()).getByRole('button', { name: /^Project report/ }))
+    expect(layoutRadio('Сравнение').checked).toBe(true)
+    expect(await findWorkspaceRegion('Оригинал')).toBeTruthy()
+
+    await user.click(within(sidebarList()).getByRole('button', { name: /^English course book/ }))
+    expect(layoutRadio('Перевод').checked).toBe(true)
+    expect(region('Оригинал')).toBeNull()
+  })
+
+  it('scrolls the compared columns together by default and remembers turning it off', async () => {
+    const user = userEvent.setup()
+    renderDocumentRoute(`/documents/${firstJob}`)
+    await findWorkspaceRegion('Оригинал')
+
+    // Кнопка — в группе вида, рядом с раскладкой.
+    const viewBar = screen.getByRole('group', { name: 'Вид документа' })
+    await user.click(within(viewBar).getByRole('button', { name: 'Выключить синхронную прокрутку' }))
+
+    cleanup()
+    renderDocumentRoute(`/documents/${firstJob}`)
+    await findWorkspaceRegion('Оригинал')
+    const toggle = () => screen.getByRole('button', { name: /синхронную прокрутку/ })
+    expect(toggle().getAttribute('aria-pressed')).toBe('false')
+
+    // В одной колонке связывать нечего: кнопка остаётся на месте, чтобы панель
+    // не сдвигалась, но недоступна и не меняет настройку.
+    await user.click(layoutRadio('Перевод'))
+    expect(toggle().getAttribute('aria-disabled')).toBe('true')
+    expect(toggle().title).toBe('Синхронная прокрутка доступна в сравнении')
+    await user.click(toggle())
+    expect(toggle().getAttribute('aria-pressed')).toBe('false')
+
+    await user.click(layoutRadio('Сравнение'))
+    expect(toggle().getAttribute('aria-disabled')).toBeNull()
+    expect(toggle().getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('keeps the dock of a finished document short', async () => {
+    renderDocumentRoute(`/documents/${firstJob}`)
+    await findWorkspaceRegion('Оригинал')
+    const dock = within(screen.getByRole('toolbar'))
+
+    // Языки уже написаны на страницах переключателя вида — второй раз их не повторяем.
+    // Запускать нечего, а скачивание — в меню «⋯».
+    expect(dock.getByRole('group', { name: 'Вид документа' })).toBeTruthy()
+    expect(dock.queryByRole('button', { name: /Языки перевода|Исходный язык|Язык перевода/ })).toBeNull()
+    expect(dock.queryByRole('button', { name: /Скачать/ })).toBeNull()
+    expect(dock.queryByRole('button', { name: 'Перевести' })).toBeNull()
+  })
+
+  it('keeps the chosen layout after a reload', async () => {
+    const user = userEvent.setup()
+    renderDocumentRoute(`/documents/${firstJob}`)
+    await findWorkspaceRegion('Оригинал')
+    await user.click(layoutRadio('Оригинал'))
+    expect(region('Перевод')).toBeNull()
+
+    cleanup()
+    renderDocumentRoute(`/documents/${firstJob}`)
+
+    expect(await findWorkspaceRegion('Оригинал')).toBeTruthy()
+    expect(layoutRadio('Оригинал').checked).toBe(true)
+    expect(region('Перевод')).toBeNull()
+  })
+
+  it('returns to the document layout when fullscreen ends', async () => {
+    const user = userEvent.setup()
+    renderDocumentRoute(`/documents/${firstJob}`)
+    await findWorkspaceRegion('Оригинал')
+    await user.click(layoutRadio('Перевод'))
+
+    // D временно показывает оригинал на весь экран, не трогая выбор документа.
+    await user.keyboard('d')
+    expect(screen.queryByText('Мои книги')).toBeNull()
+    expect(region('Оригинал')).toBeTruthy()
+    expect(region('Перевод')).toBeNull()
+
+    await user.keyboard('{Escape}')
+    expect(screen.getByText('Мои книги')).toBeTruthy()
+    expect(region('Оригинал')).toBeNull()
+    expect(layoutRadio('Перевод').checked).toBe(true)
+
+    // Кнопка в нижней панели открывает на весь экран именно текущую раскладку.
+    await user.click(screen.getByRole('button', { name: 'Открыть перевод на весь экран' }))
+    expect(screen.queryByText('Мои книги')).toBeNull()
+    expect(region('Перевод')).toBeTruthy()
+    expect(region('Оригинал')).toBeNull()
+  })
+})
+
+describe('workspace notes', () => {
+  const firstJob = '00000000-0000-0000-0000-000000000101'
+  const stormSummary = { id: 'n-1', title: 'Шторм', excerpt: 'Ветер — важная деталь.', tags: [], quote_count: 1, version: 1, updated_at: '2026-11-10T10:00:00Z' }
+  const bookNotes = () => jsonResponse({ items: [stormSummary], page: 0, size: 50, total_elements: 1, total_pages: 1 })
+  const stormNote = () => jsonResponse({
+    ...stormSummary, body: 'Ветер — важная деталь.', created_at: '2026-11-10T10:00:00Z', links: [],
+    quotes: [{ id: 'q-1', job_id: firstJob, document_name: 'english_course_book.pdf', document_available: true,
+      side: 'TRANSLATION', paragraph_index: 1, quote: 'Ветер дул с северо-востока.', paired_text: 'The wind came from the north-east.',
+      source_lang: 'eng_Latn', target_lang: 'rus_Cyrl', created_at: '2026-11-10T10:00:00Z' }],
+  })
+  const renderWithNotes = (overrides: Record<string, ApiOverride> = {}) => renderDocumentRoute(`/documents/${firstJob}`, {
+    [`/api/notes?job_id=${firstJob}&size=50`]: bookNotes,
+    ...overrides,
+  })
+  // Заметки, на которые ссылаются метки на полях: список книги и сами заметки с цитатами.
+  const withBookQuotes = {
+    [`/api/notes?job_id=${firstJob}&size=100`]: bookNotes,
+    '/api/notes/n-1': stormNote,
+    '/api/notes/n-1/backlinks': () => jsonResponse([]),
+  }
+  const notesButton = () => within(screen.getByRole('group', { name: 'Вид документа' })).getByRole('button', { name: 'Заметки' })
+  const notesWindow = () => screen.queryByRole('dialog', { name: 'Заметки' })
+  const notesColumn = () => screen.queryByRole('complementary', { name: 'Заметки' })
+  // У пилюли видимое имя «Заметки · N»; от кнопки в доке её отличает aria-expanded.
+  const pill = () => screen.queryByRole('button', { name: /^Заметки/, expanded: false })
+
+  it('opens the notes window of the book from the sidebar rail', async () => {
+    const user = userEvent.setup()
+    renderWithNotes()
+    await findWorkspaceRegion('Оригинал')
+    const rail = screen.getByRole('navigation', { name: 'Разделы' })
+    const railNotes = within(rail).getByRole('button', { name: 'Заметки' })
+    expect(railNotes.getAttribute('aria-pressed')).toBe('false')
+
+    await user.click(railNotes)
+    expect(await screen.findByRole('dialog', { name: 'Заметки' })).toBeTruthy()
+    expect(within(rail).getByRole('button', { name: 'Заметки' }).getAttribute('aria-pressed')).toBe('true')
+    expect(notesButton().getAttribute('aria-pressed')).toBe('true')
+    // Боковая панель продолжает показывать книги: второго списка заметок рядом с окном нет.
+    expect(screen.getByRole('navigation', { name: 'Мои книги' })).toBeTruthy()
+
+    await user.click(within(rail).getByRole('button', { name: 'Заметки' }))
+    expect(notesWindow()).toBeNull()
+  })
+
+  it('switches between the window, the pill and the column', async () => {
+    const user = userEvent.setup()
+    renderWithNotes()
+    await findWorkspaceRegion('Оригинал')
+    expect(notesWindow()).toBeNull()
+
+    // Новый аккаунт: заметки открываются окном над книгой, а не колонкой.
+    await user.click(notesButton())
+    const dialog = await screen.findByRole('dialog', { name: 'Заметки' })
+    expect(dialog.getAttribute('aria-modal')).toBe('false')
+    expect(notesButton().getAttribute('aria-pressed')).toBe('true')
+    expect(await within(dialog).findByRole('button', { name: /Шторм/ })).toBeTruthy()
+    // Окно лежит поверх книги: обе колонки на месте.
+    expect(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Прокрутка панели «Перевод»' })).toBeTruthy()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Свернуть заметки' }))
+    expect(notesWindow()).toBeNull()
+    expect(document.activeElement).toBe(pill())
+    expect(notesButton().getAttribute('aria-pressed')).toBe('false')
+
+    await user.click(pill()!)
+    expect(notesWindow()).toBeTruthy()
+    expect(document.activeElement).toBe(notesWindow())
+    expect(pill()).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Закрепить колонкой' }))
+    expect(notesWindow()).toBeNull()
+    expect(notesColumn()).toBeTruthy()
+    expect(screen.getByRole('separator', { name: 'Изменить ширину панели заметок' })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Открепить в окно' }))
+    expect(notesColumn()).toBeNull()
+    expect(notesWindow()).toBeTruthy()
+
+    // Вид и место переживают перезагрузку.
+    cleanup()
+    renderWithNotes()
+    expect(await screen.findByRole('dialog', { name: 'Заметки' })).toBeTruthy()
+  })
+
+  it('opens notes in the last chosen view with N and the dock button', async () => {
+    const user = userEvent.setup()
+    renderWithNotes()
+    await findWorkspaceRegion('Оригинал')
+
+    await user.keyboard('n')
+    expect(notesWindow()).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Закрепить колонкой' }))
+    // N закрывает показанные заметки и возвращает их в том виде, в каком их оставили.
+    await user.keyboard('n')
+    expect(notesColumn()).toBeNull()
+    await user.keyboard('n')
+    expect(notesColumn()).toBeTruthy()
+    expect(notesWindow()).toBeNull()
+
+    await user.click(notesButton())
+    expect(notesColumn()).toBeNull()
+    await user.click(notesButton())
+    expect(notesColumn()).toBeTruthy()
+
+    cleanup()
+    renderWithNotes()
+    expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
+  })
+
+  it('expands the pill from a margin marker and opens the note', async () => {
+    const user = userEvent.setup()
+    renderWithNotes(withBookQuotes)
+    await findWorkspaceRegion('Оригинал')
+    await user.keyboard('n')
+    await user.click(screen.getByRole('button', { name: 'Свернуть заметки' }))
+    // Пилюля считает заметки книги.
+    expect((await screen.findByRole('button', { name: 'Заметки · 1', expanded: false }))).toBeTruthy()
+
+    await user.click(await screen.findByRole('button', { name: 'Метка на полях' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Заметки' })
+    expect(await within(dialog).findByRole('heading', { name: 'Шторм' })).toBeTruthy()
+    expect(pill()).toBeNull()
+  })
+
+  it('opens closed notes from a margin marker', async () => {
+    const user = userEvent.setup()
+    renderWithNotes(withBookQuotes)
+    await findWorkspaceRegion('Оригинал')
+    expect(notesWindow()).toBeNull()
+    await user.click(await screen.findByRole('button', { name: 'Метка на полях' }))
+    expect(await within(await screen.findByRole('dialog', { name: 'Заметки' })).findByRole('heading', { name: 'Шторм' })).toBeTruthy()
+  })
+
+  it('moves and resizes the window from the keyboard inside the workspace', async () => {
+    // jsdom не считает раскладку: рабочая область 1000×700 без верхней и нижней панелей.
+    const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000)
+    const height = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(700)
+    try {
+      const user = userEvent.setup()
+      renderWithNotes()
+      await findWorkspaceRegion('Оригинал')
+      await user.keyboard('n')
+      const dialog = await screen.findByRole('dialog', { name: 'Заметки' })
+      // По умолчанию — правый верхний угол: 12px от краёв.
+      expect(dialog.style).toMatchObject({ left: '688px', top: '12px', width: '300px', height: '520px' })
+
+      const handle = within(dialog).getByRole('button', { name: 'Переместить окно заметок' })
+      handle.focus()
+      await user.keyboard('{ArrowLeft}{ArrowDown}')
+      expect(dialog.style).toMatchObject({ left: '672px', top: '28px' })
+      // Вправо дальше края не уйти.
+      await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}')
+      expect(dialog.style.left).toBe('688px')
+      await user.keyboard('{Shift>}{ArrowLeft}{ArrowDown}{/Shift}')
+      expect(dialog.style).toMatchObject({ width: '284px', height: '536px', left: '688px' })
+      // Вниз окно растёт только до нижнего края области.
+      await user.keyboard('{Shift>}' + '{ArrowDown}'.repeat(20) + '{/Shift}')
+      expect(dialog.style.height).toBe(`${700 - 12 - 28}px`)
+
+      cleanup()
+      renderWithNotes()
+      expect((await screen.findByRole('dialog', { name: 'Заметки' })).style).toMatchObject({ left: '688px', top: '28px', width: '284px' })
+    } finally {
+      width.mockRestore()
+      height.mockRestore()
+    }
+  })
+
+  it('keeps the window in fullscreen and returns to the book with Esc', async () => {
+    const user = userEvent.setup()
+    renderWithNotes()
+    await findWorkspaceRegion('Оригинал')
+    await user.keyboard('n')
+    expect(notesWindow()).toBeTruthy()
+
+    await user.keyboard('g')
+    expect(screen.queryByText('Мои книги')).toBeNull()
+    // «Читаю только перевод и заметки»: окно остаётся поверх книги.
+    expect(notesWindow()).toBeTruthy()
+    // N в полноэкранном режиме прячет и возвращает окно.
+    await user.keyboard('n')
+    expect(notesWindow()).toBeNull()
+    await user.keyboard('n')
+    expect(notesWindow()).toBeTruthy()
+
+    // Esc в окне возвращает фокус в книгу, не закрывая окно и не выходя из режима.
+    within(notesWindow()!).getByRole('button', { name: 'Переместить окно заметок' }).focus()
+    await user.keyboard('{Escape}')
+    expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Прокрутка панели «Перевод»' }))
+    expect(notesWindow()).toBeTruthy()
+    expect(screen.queryByText('Мои книги')).toBeNull()
+    // Esc в книге, как и раньше, выходит из полноэкранного режима.
+    await user.keyboard('{Escape}')
+    expect(screen.getByText('Мои книги')).toBeTruthy()
+    expect(notesWindow()).toBeTruthy()
+  })
+
+  it('hides the column in fullscreen and brings it back afterwards', async () => {
+    const user = userEvent.setup()
+    renderWithNotes()
+    await findWorkspaceRegion('Оригинал')
+    await user.click(notesButton())
+    await user.click(await screen.findByRole('button', { name: 'Закрепить колонкой' }))
+    expect(notesColumn()).toBeTruthy()
+
+    await user.keyboard('f')
+    expect(notesColumn()).toBeNull()
+    // Колонка — часть раскладки: в полноэкранном режиме N её не возвращает.
+    await user.keyboard('n')
+    expect(notesColumn()).toBeNull()
+    expect(notesWindow()).toBeNull()
+
+    await user.keyboard('{Escape}')
+    expect(notesColumn()).toBeTruthy()
+  })
+
+  it('moves the column to the other edge and keeps its width', async () => {
+    const user = userEvent.setup()
+    renderWithNotes()
+    await findWorkspaceRegion('Оригинал')
+    await user.click(notesButton())
+    await user.click(await screen.findByRole('button', { name: 'Закрепить колонкой' }))
+    await user.click(await screen.findByRole('button', { name: 'Перенести панель заметок влево' }))
+
+    // У левого края «к книге» — стрелка вправо: колонка становится шире.
+    const handle = screen.getByRole('separator', { name: 'Изменить ширину панели заметок' })
+    expect(handle.getAttribute('aria-valuenow')).toBe('360')
+    handle.focus()
+    await user.keyboard('{ArrowRight}{ArrowRight}')
+    expect(handle.getAttribute('aria-valuenow')).toBe('392')
+
+    cleanup()
+    renderWithNotes()
+    expect(await screen.findByRole('button', { name: 'Перенести панель заметок вправо' })).toBeTruthy()
+    expect(screen.getByRole('separator', { name: 'Изменить ширину панели заметок' }).getAttribute('aria-valuenow')).toBe('392')
   })
 })
 
@@ -1348,25 +1799,52 @@ describe('document actions', () => {
     expect(JSON.parse(String(init?.body))).toEqual({ target_lang: 'deu_Latn', use_glossary: true })
     expect(new Headers(init?.headers).get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/)
     expect(screen.queryByRole('dialog')).toBeNull()
-    await waitFor(() => expect(screen.getByText(/Языки перевода/).parentElement?.textContent).toMatch(/Английский.*Немецкий/))
-    expect(within(sidebarList()).getAllByRole('button', { name: /^english_course_book\.pdf/ })).toHaveLength(2)
+    expect(await screen.findByRole('radio', { name: 'Перевод DE' })).toBeTruthy()
+    expect(within(sidebarList()).getAllByRole('button', { name: /^English course book/ })).toHaveLength(2)
   })
 
-  it('shows the document menu with icons and opens the language list from the language pair', async () => {
+  it('filters the shelf by search and clears the search with Escape', async () => {
+    const user = userEvent.setup()
+    renderDocumentRoute(`/documents/${firstJob}`)
+    await within(sidebarList()).findAllByRole('button', { name: /^English course book/ })
+    const search = screen.getByRole('searchbox', { name: 'Найти книгу' })
+
+    await user.type(search, 'REPORT')
+    expect(within(sidebarList()).getByRole('button', { name: /^Project report/ })).toBeTruthy()
+    expect(within(sidebarList()).queryByRole('button', { name: /^English course book/ })).toBeNull()
+
+    await user.clear(search)
+    await user.type(search, 'нет такой книги')
+    expect(screen.getByText('Ничего не найдено')).toBeTruthy()
+
+    await user.keyboard('{Escape}')
+    expect((search as HTMLInputElement).value).toBe('')
+    expect(within(sidebarList()).getAllByRole('button', { name: /^English course book/ }).length).toBeGreaterThan(0)
+  })
+
+  it('shows how much of a book is read and marks it as read or unread from the menu', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('parallel.reading-progress.v1.reader@example.com',
+      JSON.stringify({ [firstJob]: { position: 0.3, furthest: 0.384, markedRead: false, openedAt: 1 } }))
+    renderDocumentRoute(`/documents/${firstJob}`)
+
+    const book = await within(sidebarList()).findByRole('button', { name: /^English course book/, pressed: true })
+    expect(book.textContent).toContain('Прочитано 38%')
+    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Отметить прочитанной' }))
+    expect(book.textContent).toContain('Прочитана')
+    // Снятая отметка сбрасывает подсчёт: книга снова «не начата».
+    await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Отметить непрочитанной' }))
+    expect(book.textContent).toContain('Не начата')
+  })
+
+  it('shows the document menu with icons', async () => {
     const user = userEvent.setup()
     renderDocumentRoute(`/documents/${firstJob}`)
 
     const menu = await openActions(user)
     expect(within(menu).getAllByRole('menuitem').map((item) => item.textContent))
-      .toEqual(['Закрепить', 'Оценить перевод', 'На другой язык', 'Удалить'])
+      .toEqual(['Скачать перевод', 'Закрепить', 'Отметить прочитанной', 'Оценить перевод', 'На другой язык', 'Удалить'])
     expect(within(menu).getAllByRole('menuitem').every((item) => item.querySelector('svg'))).toBe(true)
-    await user.keyboard('{Escape}')
-
-    await user.click(screen.getByRole('button', { name: /Языки перевода/ }))
-    const dialog = screen.getByRole('dialog', { name: 'Перевести на другой язык' })
-    // Список языков раскрыт сразу, фокус — в поиске.
-    expect(within(dialog).getByRole('listbox', { name: 'Язык перевода' })).toBeTruthy()
-    expect(document.activeElement).toBe(within(dialog).getByRole('combobox', { name: 'Найти язык' }))
   })
 
   it('explains that the original has expired on the server', async () => {
@@ -1399,7 +1877,7 @@ describe('document actions', () => {
     const dialog = screen.getByRole('alertdialog', { name: 'Удалить «english_course_book.pdf»?' })
     await user.click(within(dialog).getByRole('button', { name: 'Удалить' }))
 
-    await waitFor(() => expect(screen.queryByRole('button', { name: /^english_course_book\.pdf/ })).toBeNull())
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^English course book/ })).toBeNull())
     expect(callsTo(fetchMock, `/api/documents/${firstJob}`, 'DELETE')).toHaveLength(1)
     expect(router.state.location.pathname).toBe('/documents/00000000-0000-0000-0000-000000000102')
   })
@@ -1417,7 +1895,7 @@ describe('document actions', () => {
 
     expect((await within(screen.getByRole('alertdialog')).findByRole('alert')).textContent)
       .toBe('Документ ещё переводится — удалить его можно после завершения или отмены перевода.')
-    expect(screen.getAllByRole('button', { name: /^english_course_book\.pdf/ }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /^English course book/ }).length).toBeGreaterThan(0)
   })
 
   it('retries a failed translation from the server copy of the original', async () => {
@@ -1480,8 +1958,8 @@ describe('document actions', () => {
     await user.click(within(await openActions(user)).getByRole('menuitem', { name: 'Закрепить' }))
 
     const pinned = screen.getByRole('navigation', { name: 'Закреплённые' })
-    expect(within(pinned).getByRole('button', { name: /^english_course_book\.pdf/ })).toBeTruthy()
-    expect(within(sidebarList()).queryByRole('button', { name: /^english_course_book\.pdf/ })).toBeNull()
+    expect(within(pinned).getByRole('button', { name: /^English course book/ })).toBeTruthy()
+    expect(within(sidebarList()).queryByRole('button', { name: /^English course book/ })).toBeNull()
     expect(screen.getByRole('img', { name: 'Закреплён' })).toBeTruthy()
     expect(JSON.parse(localStorage.getItem('parallel.pinned-documents.v1.reader@example.com') ?? '[]'))
       .toEqual([firstJob])
@@ -1489,7 +1967,7 @@ describe('document actions', () => {
     await user.click(within(await openBookActions(user, 'english_course_book.pdf'))
       .getByRole('menuitem', { name: 'Открепить' }))
     expect(screen.queryByRole('navigation', { name: 'Закреплённые' })).toBeNull()
-    expect(within(sidebarList()).getByRole('button', { name: /^english_course_book\.pdf/ })).toBeTruthy()
+    expect(within(sidebarList()).getByRole('button', { name: /^English course book/ })).toBeTruthy()
   })
 
   it('disables deleting a document that is being translated', async () => {
@@ -1525,7 +2003,7 @@ describe('cost, glossary and rating', () => {
         remaining_units: 12, enough_quota: false,
       }),
     })
-    await screen.findAllByText('english_course_book.pdf')
+    await screen.findAllByText('English course book')
     await uploadDraft(user, document.body)
 
     expect(await screen.findByText(/≈ 31 стр\. к списанию/)).toBeTruthy()
@@ -1544,7 +2022,7 @@ describe('cost, glossary and rating', () => {
         file_name: 'Договор.pdf', glossary_term_count: 4,
       }),
     })
-    await screen.findAllByText('english_course_book.pdf')
+    await screen.findAllByText('English course book')
     await uploadDraft(user, document.body)
 
     const glossary = within(await openTools(user))
@@ -1694,8 +2172,10 @@ describe('document status events', () => {
 
     server = ['DONE', 100]
     await stream.send('job', { job_id: job, status: 'DONE', progress: 100 })
-    expect(await within(sidebarList()).findByText(/Готов · 100%/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Скачать' })).toBeTruthy()
+    expect(await within(sidebarList()).findByText(/Не начата · /)).toBeTruthy()
+    // Готовый результат можно скачать из меню документа.
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Действия с документом' }))
+    expect(screen.getByRole('menuitem', { name: 'Скачать перевод' })).toBeTruthy()
   })
 
   it('falls back to polling when the server has no event stream', async () => {
@@ -1705,7 +2185,7 @@ describe('document status events', () => {
       [`/api/documents/${job}/status`]: statusResponse('DONE', 100),
     })
 
-    expect(await screen.findByText(/Готов · 100%/)).toBeTruthy()
+    expect(await screen.findByText(/Не начата · /)).toBeTruthy()
     expect(callsTo(fetchMock, '/api/documents/events', 'GET')).toHaveLength(1)
   })
 
@@ -1724,7 +2204,12 @@ describe('document status events', () => {
       page: 0, size: 100, total_elements: 1, total_pages: 1, first: true, last: true,
     })
     const noEvents = () => jsonResponse(apiErrorBody(404, 'Not found'), 404)
-    const notice = (text: string) => screen.findByText(text, { selector: '[role="status"]' })
+    // Сообщение — живая область `status`; текст в ней лежит рядом со значком, поэтому ищем область по содержимому.
+    const notice = (text: string) => waitFor(() => {
+      const region = screen.getAllByRole('status').find((element) => element.textContent?.trim() === text)
+      if (!region) throw new Error(`Нет сообщения «${text}»`)
+      return region
+    })
 
     it('cancels a running translation after warning that its pages stay spent', async () => {
       const user = userEvent.setup()
@@ -1770,7 +2255,7 @@ describe('document status events', () => {
           return status()
         },
       })
-      await screen.findAllByText('english_course_book.pdf')
+      await screen.findAllByText('English course book')
       const input = document.body.querySelector<HTMLInputElement>('input[type="file"]')
       await user.upload(input as HTMLInputElement, new File(['%PDF'], 'Договор.pdf', { type: 'application/pdf' }))
       await user.click(await screen.findByRole('button', { name: 'Перевести' }))
@@ -1845,7 +2330,7 @@ describe('document status events', () => {
 
       expect((await within(screen.getByRole('alertdialog')).findByRole('alert')).textContent)
         .toBe('Перевод уже завершён — отменить его нельзя.')
-      expect(await within(sidebarList()).findByText(/Готов · 100%/)).toBeTruthy()
+      expect(await within(sidebarList()).findByText(/Не начата · /)).toBeTruthy()
     })
   })
 })
@@ -1871,7 +2356,7 @@ describe('home screen', () => {
     await user.upload(fileInput(), pdf())
 
     await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/drafts\/local-/))
-    expect(await screen.findByRole('button', { name: 'Язык перевода: Немецкий' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Язык перевода: Немецкий (DE)' })).toBeTruthy()
     expect(JSON.parse(localStorage.getItem('parallel.home-languages.v1') ?? '{}'))
       .toEqual({ source: 'eng_Latn', target: 'deu_Latn' })
   })
@@ -1886,7 +2371,7 @@ describe('home screen', () => {
     fireEvent.drop(heading, { dataTransfer })
 
     await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/drafts\//))
-    expect(within(sidebarList()).getByRole('button', { name: /^Перетащенный\.pdf/ })).toBeTruthy()
+    expect(within(sidebarList()).getByRole('button', { name: /^Перетащенный/ })).toBeTruthy()
   })
 
   it('explains an unsupported file and stays home', async () => {
@@ -1905,7 +2390,7 @@ describe('home screen', () => {
   it('offers upload and recent documents in the "+" menu', async () => {
     const user = userEvent.setup()
     const { router } = renderDocumentRoute('/')
-    await within(await screen.findByRole('navigation', { name: 'Мои книги' })).findByRole('button', { name: /^english_course_book\.pdf/ })
+    await within(await screen.findByRole('navigation', { name: 'Мои книги' })).findByRole('button', { name: /^English course book/ })
     const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {})
 
     await user.click(screen.getByRole('button', { name: 'Добавить документ' }))

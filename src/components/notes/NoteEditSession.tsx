@@ -7,6 +7,7 @@ import { saveNoteChecked } from '../../notes/saveNote.ts'
 import { useNotes } from '../../notes/useNotes.ts'
 import { NoteEditor } from './NoteEditor.tsx'
 import styles from './NotesPage.module.css'
+import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 
 interface NoteEditSessionProps {
   note: NoteResponse
@@ -59,7 +60,7 @@ export function NoteEditSession({ note, knownLinks, compact = false, onSaved, on
 
   const notice = conflict ? (
     <div className={`${styles.notice} ${styles.noticeWarning}`} role="alert">
-      <span><strong>{t('notes.conflictTitle')}</strong> {t('notes.conflictDescription')}</span>
+      <span><GlyphIcon name="warning" /> <strong>{t('notes.conflictTitle')}</strong> {t('notes.conflictDescription')}</span>
       <span className={styles.noticeActions}>
         <button type="button" onClick={() => {
           onLatest(conflict)

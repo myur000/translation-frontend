@@ -11,13 +11,13 @@
 .card input { width: 100%; min-width: 0; padding: 10px 12px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); }
 .card input[readonly] { color: var(--color-text-muted); background: var(--color-surface-subtle); }
 .card input[aria-invalid='true'] { border-color: var(--color-danger-text); }
-.card input:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.card input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .card input:disabled { opacity: .65; }
 .card small, .note { color: var(--color-text-muted); font-size: 11px; overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
 .primary, .secondary { padding: 9px 16px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); }
-.primary { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); font-weight: 600; }
-.primary:hover:not(:disabled) { background: var(--color-primary-hover); }
+.primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); font-weight: 600; }
+.primary:hover:not(:disabled) { background: var(--color-accent-hover); }
 .secondary:hover:not(:disabled) { border-color: var(--color-primary); }
 .primary:disabled, .secondary:disabled { opacity: .55; cursor: default; }
 .fieldError, .error { color: var(--color-danger-text); font-size: 12px; margin: 0; overflow-wrap: anywhere; }
@@ -40,6 +40,6 @@
 .logoutButton svg { width: 20px; height: 20px; flex: 0 0 auto; }
 .logoutButton:hover:not(:disabled), .textDanger:hover:not(:disabled) { text-decoration: underline; }
 .textDanger:disabled, .inlineButton:disabled, .logoutButton:disabled { opacity: .55; cursor: default; }
-.textDanger:focus-visible, .inlineButton:focus-visible, .logoutButton:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: var(--radius-sm); }
+.textDanger:focus-visible, .inlineButton:focus-visible, .logoutButton:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; border-radius: var(--radius-sm); }
 .avatarSection > .avatarHint { margin-top: 12px; }
 @media (max-width: 620px) { .avatarSection { padding: 18px; } .avatarRow { align-items: flex-start; gap: 14px; } }

@@ -12,4 +12,4 @@
 .actions .confirm { color: var(--color-danger-text); border-color: var(--color-danger-border); background: var(--color-danger-surface); }
 .actions button:disabled { opacity: .55; cursor: default; }
 .dialog .error { color: var(--color-danger-text); }
-.actions button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.actions button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }

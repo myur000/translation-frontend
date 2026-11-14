@@ -1,11 +1,9 @@
+import type { ReactNode } from 'react'
 import { useTranslation } from '../../i18n/useTranslation.ts'
-import { useLanguageCatalog } from '../../languages/useLanguageCatalog.ts'
 import { endedWithoutResult } from '../../documents/translationStatus.ts'
 import type { DocumentItem, LanguageCode } from '../../types/document.ts'
 import { LanguagePicker } from '../languages/LanguagePicker.tsx'
 import { DocumentActionsMenu, type DocumentAction } from './DocumentActionsMenu.tsx'
-import { ScrollSyncButton } from './ScrollSyncButton.tsx'
-import { WorkspaceViewButton } from './WorkspaceViewButton.tsx'
 import styles from './WorkspaceDock.module.css'
 
 interface WorkspaceDockProps {
@@ -15,33 +13,29 @@ interface WorkspaceDockProps {
   onSourceLanguageChange: (language: LanguageCode) => void
   onTargetLanguageChange: (language: LanguageCode) => void
   onSwapLanguages: () => void
-  /** Нажатие на пару языков отправленного документа: перевод на другой язык. */
-  onChooseLanguage: () => void
   /** Пункты меню «+»: глоссарий, другой язык и всё, что появится позже. */
   tools: DocumentAction[]
   currentPage: number
   pageCount: number | null
   onPreviousPage: () => void
   onNextPage: () => void
-  isScrollSyncEnabled: boolean
-  onToggleScrollSync: () => void
-  isDualPanelFullscreen: boolean
-  onToggleDualPanelFullscreen: () => void
   isTranslating: boolean
   canTranslate: boolean
   onTranslate: () => void
   /** Отмена идущего перевода; без него кнопка не показывается. */
   onCancelTranslation?: () => void
-  isDownloading: boolean
-  canDownload: boolean
-  onDownload: () => void
+  /** Управление видом (раскладка, прокрутка, полный экран) — средняя часть панели. */
+  view: ReactNode
 }
 
 /**
  * Что предлагает панель, зависит от состояния документа:
  * - `edit` — черновик, неудачная или отменённая задача: выбор языков и перевод;
  * - `progress` — задача выполняется: языки зафиксированы, показан прогресс и отмена;
- * - `done` — результат готов: главное действие — скачать.
+ * - `done` — результат готов: только инструменты, страницы и вид; скачивание — в меню «⋯» документа.
+ *
+ * У отправленного документа пары языков в панели нет: коды языков уже написаны на
+ * страницах переключателя вида, а перевод на другой язык — в меню «+» и «⋯».
  */
 type DockMode = 'edit' | 'progress' | 'done'
 
@@ -51,12 +45,13 @@ function dockMode(document: DocumentItem): DockMode {
 }
 
 /**
- * Плавающая панель под документами, как поле ввода в чате: инструменты слева,
- * главное действие справа. Новые возможности добавляются в меню «+», а не в ряд кнопок.
+ * Плавающая панель под документами, как поле ввода в чате: инструменты слева, вид
+ * посередине, главное действие справа. Одна панель, а не две карточки рядом: при
+ * смене раскладки или состояния меняется только её содержимое. Новые возможности
+ * добавляются в меню «+», а не в ряд кнопок.
  */
 export function WorkspaceDock(props: WorkspaceDockProps) {
   const { t } = useTranslation()
-  const { getLabel } = useLanguageCatalog()
   const { document, currentPage, pageCount } = props
   const mode = dockMode(document)
 
@@ -76,96 +71,70 @@ export function WorkspaceDock(props: WorkspaceDockProps) {
 
       {mode === 'edit' ? (
         <div className={styles.languages}>
-          <LanguagePicker value={props.sourceLanguage} label={t('toolbar.sourceLanguage')} prefix={t('toolbar.from')} placement="top" onChange={props.onSourceLanguageChange} />
+          <LanguagePicker value={props.sourceLanguage} label={t('toolbar.sourceLanguage')} prefix={t('toolbar.from')} placement="top" compact onChange={props.onSourceLanguageChange} />
           <button type="button" className={styles.iconButton} aria-label={t('toolbar.swapLanguages')} title={t('toolbar.swapLanguages')} onClick={props.onSwapLanguages}>
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 5.5h9.5m0 0L10 3m2.5 2.5L10 8M13 10.5H3.5m0 0L6 8m-2.5 2.5L6 13" /></svg>
           </button>
-          <LanguagePicker value={props.targetLanguage} label={t('toolbar.targetLanguage')} prefix={t('toolbar.to')} placement="top" onChange={props.onTargetLanguageChange} />
+          <LanguagePicker value={props.targetLanguage} label={t('toolbar.targetLanguage')} prefix={t('toolbar.to')} placement="top" compact onChange={props.onTargetLanguageChange} />
         </div>
-      ) : (
-        // У отправленного документа язык оригинала уже закреплён за файлом на сервере,
-        // поэтому плашка открывает перевод того же текста на другой язык.
-        <button
-          type="button"
-          className={styles.languagePair}
-          aria-haspopup="dialog"
-          disabled={mode === 'progress'}
-          title={mode === 'progress' ? t('documentActions.processing') : t('retranslate.title')}
-          onClick={props.onChooseLanguage}
-        >
-          <span className={styles.visuallyHidden}>{t('toolbar.languagePair')}: </span>
-          {getLabel(document.sourceLanguage)}
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9.5m0 0L9.5 5m3 3-3 3" /></svg>
-          <span className={styles.visuallyHidden}> → </span>
-          {getLabel(document.targetLanguage)}
-          <svg className={styles.chevron} viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
-        </button>
-      )}
+      ) : null}
 
-      <span className={styles.separator} aria-hidden="true" />
+      {/* Номера страниц есть только у PDF; у DOCX и текста стрелкам нечего листать. */}
+      {pageCount !== null ? (
+        <>
+          <span className={styles.separator} aria-hidden="true" />
 
-      <div className={styles.pages}>
-        <button type="button" className={styles.iconButton} aria-label={t('toolbar.previousPage')} title={t('toolbar.previousPage')} onClick={props.onPreviousPage} disabled={pageCount === null || currentPage === 1}>
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 3.5-4.5 4.5 4.5 4.5" /></svg>
-        </button>
-        <span aria-live="polite">
-          {pageCount === null ? '—' : t('reader.page', { page: currentPage, total: pageCount })}
-        </span>
-        <button type="button" className={styles.iconButton} aria-label={t('toolbar.nextPage')} title={t('toolbar.nextPage')} onClick={props.onNextPage} disabled={pageCount === null || currentPage >= pageCount}>
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3.5 4.5 4.5L6 12.5" /></svg>
-        </button>
-      </div>
-
-      <span className={styles.separator} aria-hidden="true" />
-
-      <div className={styles.view}>
-        <ScrollSyncButton isEnabled={props.isScrollSyncEnabled} onToggle={props.onToggleScrollSync} />
-        <WorkspaceViewButton isEnabled={props.isDualPanelFullscreen} onToggle={props.onToggleDualPanelFullscreen} />
-      </div>
-
-      <div className={styles.primary}>
-        {mode === 'edit' ? (
-          <button type="button" className={styles.primaryButton} disabled={props.isTranslating || !props.canTranslate} aria-busy={props.isTranslating} onClick={props.onTranslate}>
-            {t(props.isTranslating
-              ? 'toolbar.translating'
-              : endedWithoutResult(document) ? 'toolbar.retryTranslation' : 'toolbar.translate')}
-          </button>
-        ) : null}
-        {mode === 'progress' ? (
-          document.waitingIssue ? (
-            <button type="button" className={styles.secondaryButton} onClick={props.onTranslate}>
-              {t('toolbar.checkStatus')}
+          <div className={styles.pages}>
+            <button type="button" className={styles.iconButton} aria-label={t('toolbar.previousPage')} title={t('toolbar.previousPage')} onClick={props.onPreviousPage} disabled={currentPage === 1}>
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 3.5-4.5 4.5 4.5 4.5" /></svg>
             </button>
-          ) : (
-            <ProgressPill document={document} />
-          )
-        ) : null}
-        {mode === 'progress' && props.onCancelTranslation ? (
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            aria-haspopup="dialog"
-            aria-label={t('documentActions.cancelTranslation')}
-            title={t('documentActions.cancelTranslation')}
-            onClick={props.onCancelTranslation}
-          >
-            {t('toolbar.cancelTranslation')}
-          </button>
-        ) : null}
-        {mode === 'done' ? (
-          <button
-            type="button"
-            className={styles.primaryButton}
-            disabled={props.isDownloading || !props.canDownload}
-            aria-busy={props.isDownloading}
-            title={props.canDownload ? t('toolbar.downloadResult') : undefined}
-            onClick={props.onDownload}
-          >
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8m0 0 3-3m-3 3-3-3M3 12.5h10" /></svg>
-            {t(props.isDownloading ? 'toolbar.downloading' : 'toolbar.download')}
-          </button>
-        ) : null}
-      </div>
+            <span aria-live="polite">
+              {t('reader.page', { page: currentPage, total: pageCount })}
+            </span>
+            <button type="button" className={styles.iconButton} aria-label={t('toolbar.nextPage')} title={t('toolbar.nextPage')} onClick={props.onNextPage} disabled={currentPage >= pageCount}>
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3.5 4.5 4.5L6 12.5" /></svg>
+            </button>
+          </div>
+        </>
+      ) : null}
+
+      {props.tools.length || mode === 'edit' || pageCount !== null ? (
+        <span className={styles.separator} aria-hidden="true" />
+      ) : null}
+      {props.view}
+
+      {mode !== 'done' ? (
+        <div className={styles.primary}>
+          {mode === 'edit' ? (
+            <button type="button" className={styles.primaryButton} disabled={props.isTranslating || !props.canTranslate} aria-busy={props.isTranslating} onClick={props.onTranslate}>
+              {t(props.isTranslating
+                ? 'toolbar.translating'
+                : endedWithoutResult(document) ? 'toolbar.retryTranslation' : 'toolbar.translate')}
+            </button>
+          ) : null}
+          {mode === 'progress' ? (
+            document.waitingIssue ? (
+              <button type="button" className={styles.secondaryButton} onClick={props.onTranslate}>
+                {t('toolbar.checkStatus')}
+              </button>
+            ) : (
+              <ProgressPill document={document} />
+            )
+          ) : null}
+          {mode === 'progress' && props.onCancelTranslation ? (
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              aria-haspopup="dialog"
+              aria-label={t('documentActions.cancelTranslation')}
+              title={t('documentActions.cancelTranslation')}
+              onClick={props.onCancelTranslation}
+            >
+              {t('toolbar.cancelTranslation')}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

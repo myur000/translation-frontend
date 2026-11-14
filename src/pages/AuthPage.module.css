@@ -85,15 +85,15 @@
 .submitButton {
   height: 42px;
   margin-top: 2px;
-  color: var(--color-on-primary);
-  background: var(--color-primary);
-  border: 1px solid var(--color-primary);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
   border-radius: var(--radius-sm);
   font-weight: 650;
 }
 
 .submitButton:hover:not(:disabled) {
-  background: var(--color-primary-hover);
+  background: var(--color-accent-hover);
 }
 
 .submitButton:disabled {

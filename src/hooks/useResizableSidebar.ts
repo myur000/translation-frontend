@@ -4,10 +4,10 @@ import {
   type PointerEvent,
 } from 'react'
 
-export const SIDEBAR_MIN_WIDTH = 200
-export const SIDEBAR_MAX_WIDTH = 380
-export const SIDEBAR_DEFAULT_WIDTH = 244
-export const SIDEBAR_COLLAPSED_WIDTH = 72
+export const SIDEBAR_MIN_WIDTH = 256
+export const SIDEBAR_MAX_WIDTH = 440
+export const SIDEBAR_DEFAULT_WIDTH = 304
+export const SIDEBAR_COLLAPSED_WIDTH = 56
 
 const KEYBOARD_RESIZE_STEP = 16
 

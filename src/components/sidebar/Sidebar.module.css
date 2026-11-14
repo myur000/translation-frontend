@@ -2,73 +2,183 @@
   /* Тёмная в обеих темах. Переопределение общих токенов заставляет вложенные
      компоненты (меню пользователя, бейджи, ссылки) следовать без своих правил. */
   --color-bg: var(--sidebar-hover);
-  --color-surface: #12233a;
+  --color-surface: var(--sidebar-surface);
   --color-surface-subtle: var(--sidebar-hover);
   --color-text: var(--sidebar-text);
   --color-text-muted: var(--sidebar-muted);
   --color-text-soft: var(--sidebar-soft);
   --color-border: var(--sidebar-border);
-  --color-border-strong: rgb(143 177 201 / 26%);
+  --color-border-strong: var(--sidebar-border-strong);
   --color-primary: var(--palette-mist);
-  --color-primary-hover: #a9c4d7;
+  --color-primary-hover: var(--sidebar-primary-hover);
   --color-primary-soft: var(--sidebar-active);
-  --color-primary-border: rgb(143 177 201 / 30%);
+  --color-primary-border: var(--sidebar-primary-border);
   --color-on-primary: var(--palette-ink);
-  --color-focus-ring: rgb(143 177 201 / 30%);
-  /* Единый размер плитки в свёрнутой панели: логотип, «+», документы, история и аватар
-     занимают одинаковый квадрат, поэтому колонка читается ровным рядом. */
-  --rail-tile: 44px;
+  /* Акцент и фокус на тёмной панели — светлые в обеих темах. */
+  --color-accent: var(--sidebar-accent);
+  --color-on-accent: var(--palette-ink);
+  --color-focus: var(--sidebar-accent);
+  --color-focus-ring: var(--sidebar-accent-focus-ring);
+  /* Тона обложек: приглушённые, белая буква на каждом — не ниже 6:1. */
+  --cover-0: #2f5d73;
+  --cover-1: #5b4a6e;
+  --cover-2: #7a5a2e;
+  --cover-3: #4a6b4f;
+  --cover-4: #7a3f3f;
+  --cover-5: #3d4f7a;
+  /* Ширина рельса — она же ширина свёрнутой панели (SIDEBAR_COLLAPSED_WIDTH). */
+  --rail-width: 56px;
+  /* Размер плиток рельса; его же берёт кнопка меню пользователя (UserMenu.module.css). */
+  --rail-tile: 40px;
 
   position: relative;
   height: 100vh;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
   overflow: hidden;
   color: var(--sidebar-text);
   background: var(--sidebar-bg);
   border-right: 1px solid var(--sidebar-border);
 }
 
-.brand {
+/* Рельс разделов. */
+.rail {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0;
+  border-right: 1px solid var(--sidebar-border);
+}
+
+.railBrand {
+  display: grid;
+  place-items: center;
+  margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+}
+
+.brandMark {
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--sidebar-ring);
+}
+
+.railItem {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  font-size: 19px;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.railItem:hover {
+  color: var(--color-text);
+  background: var(--sidebar-hover);
+}
+
+/* Открытая панель раздела: светлая иконка на тёмно-синем. */
+.railItemOpen {
+  color: var(--color-text);
+  background: var(--sidebar-active);
+}
+
+/* Текущая страница (заметки, история): полоса-акцент у края рельса, как у выбранной книги. */
+.railItemActive {
+  color: var(--color-text);
+  background: var(--sidebar-hover);
+}
+
+.railItemActive::before {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: -8px;
+  width: 3px;
+  background: var(--color-accent);
+  border-radius: 0 3px 3px 0;
+  content: '';
+}
+
+.railFooter {
+  margin-top: auto;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Панель раздела. */
+.panel {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.collapsed {
+  grid-template-columns: var(--rail-width);
+}
+
+.collapsed .panel {
+  display: none;
+}
+
+.panelHeader {
   height: var(--toolbar-height);
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 14px 0 16px;
-  font-size: 17px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  gap: 4px;
+  padding: 0 10px 0 16px;
 }
 
-.brandLink {
+.panelTitle {
   min-width: 0;
   flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.panelTitleLink {
   color: inherit;
-  border-radius: var(--radius-sm);
   text-decoration: none;
 }
 
-.brandName {
-  min-width: 0;
+.panelTitleLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Содержимое раздела панели: книги или заметки. */
+.sectionBody {
+  min-height: 0;
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
 }
 
-.brandMark {
-  flex: 0 0 auto;
-  border-radius: 8px;
-  box-shadow: 0 0 0 1px rgb(143 177 201 / 18%);
+.sectionBody[hidden] {
+  display: none;
 }
 
-.collapseButton {
-  width: 32px;
-  height: 32px;
+.iconButton {
+  width: 30px;
+  height: 30px;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
@@ -77,26 +187,35 @@
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease, opacity 120ms ease;
+  font-size: 16px;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
 }
 
-.collapseButton svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: 1.6;
-}
-
-.collapseButton:hover {
+.iconButton:hover {
   color: var(--color-text);
   background: var(--color-bg);
   border-color: var(--color-border);
 }
 
-.primaryAction {
-  padding: 8px 14px 12px;
+/* «Добавить книгу» — главное действие панели: светлая плитка, как была кнопка. */
+.addButton {
+  color: var(--sidebar-action-text);
+  background: var(--sidebar-action);
+}
+
+.addButton:hover {
+  color: var(--sidebar-action-text);
+  background: var(--sidebar-action-hover);
+  border-color: transparent;
+}
+
+.collapseButton svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.6;
 }
 
 .fileInput {
@@ -109,32 +228,57 @@
   white-space: nowrap;
 }
 
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 12px 0;
+  padding: 0 10px;
+  color: var(--color-text-soft);
+  background: var(--sidebar-hover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+
+.search:focus-within {
+  border-color: var(--color-primary-border);
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.search input {
+  min-width: 0;
+  flex: 1;
+  height: 32px;
+  padding: 0;
+  color: var(--color-text);
+  background: transparent;
+  border: 0;
+  outline: none;
+  font-size: 13px;
+}
+
+.search input::placeholder {
+  color: var(--color-text-soft);
+}
+
 .uploadStatus {
-  min-height: 16px;
-  margin: 6px 2px 0;
+  min-height: 0;
+  margin: 4px 16px 0;
   color: var(--color-text-muted);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.35;
 }
 
-.uploadButton {
-  width: 100%;
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 9px 12px;
-  color: var(--sidebar-action-text);
-  background: var(--sidebar-action);
-  border: 1px solid var(--sidebar-action);
-  border-radius: var(--radius-md);
-  font-weight: 600;
-  transition: background-color 120ms ease;
+.uploadStatus:empty {
+  display: none;
 }
 
-.uploadButton:hover {
-  background: var(--sidebar-action-hover);
+.noMatches {
+  margin: 4px 10px;
+  color: var(--color-text-soft);
+  font-size: 12px;
 }
 
 .sectionHeader {
@@ -224,36 +368,39 @@
   background: var(--sidebar-active);
 }
 
-/* Полоса-акцент у активного документа, чтобы выбор читался не только цветом. */
+/* Полоса-акцент у активного пункта, чтобы выбор читался не только цветом. Фон
+   панели остаётся тёмно-синим; оранжевая только полоса. */
 .active::before {
   position: absolute;
   top: 10px;
   bottom: 10px;
   left: 0;
   width: 3px;
-  background: var(--palette-mist);
+  background: var(--color-accent);
   border-radius: 0 3px 3px 0;
   content: '';
 }
 
-.fileIcon {
-  width: 32px;
-  height: 38px;
+.cover {
+  width: 26px;
+  height: 36px;
   flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  color: var(--palette-ice);
-  background: rgb(143 177 201 / 10%);
-  border: 1px solid rgb(143 177 201 / 22%);
-  border-radius: 5px;
-  font-size: 8.5px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 4px;
+  color: #ffffff;
+  /* Корешок: тень у левого края и чуть скруглённый обрез справа. */
+  border-radius: 2px 4px 4px 2px;
+  box-shadow: inset 3px 0 0 rgb(0 0 0 / 24%);
+  font-family: var(--font-serif);
+  font-size: 13px;
+  line-height: 1;
 }
 
-.active .fileIcon {
-  background: rgb(202 220 234 / 14%);
-  border-color: rgb(202 220 234 / 32%);
+/* Перевод ещё идёт или книга не отправлена: обложка бледнее, статус — в подписи. */
+.coverPending {
+  opacity: 0.5;
 }
 
 .documentInfo {
@@ -280,26 +427,21 @@
   font-size: 11px;
 }
 
-.footer {
-  flex: 0 0 auto;
-  padding: 10px;
-  border-top: 1px solid var(--color-border);
+/* Сколько прочитано: тонкая полоска под подписью, число — в самой подписи. */
+.readingBar {
+  display: block;
+  height: 2px;
+  margin-top: 5px;
+  overflow: hidden;
+  background: var(--color-border-strong);
+  border-radius: 2px;
 }
 
-.footerLink {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 10px;
-  color: var(--color-text-muted);
-  border-radius: var(--radius-sm);
-  font-weight: 550;
-}
-
-.footerLink:hover,
-.footerLinkActive {
-  color: var(--color-text);
-  background: var(--color-bg);
+.readingBar span {
+  display: block;
+  height: 100%;
+  background: var(--sidebar-muted);
+  border-radius: inherit;
 }
 
 .resizeHandle {
@@ -330,134 +472,57 @@
 }
 
 .resizeHandle:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--color-focus);
   outline-offset: -2px;
 }
 
-.collapsed {
-  overflow: visible;
-}
-
-.collapsed .brand {
-  position: relative;
-  justify-content: center;
-  padding: 0;
-}
-
-.collapsed .brandLink {
-  flex: none;
-  transition: opacity 120ms ease;
-}
-
-.collapsed .brandMark {
-  width: var(--rail-tile);
-  height: var(--rail-tile);
-}
-
-/* Кнопка лежит поверх логотипа и проявляется при наведении на шапку (или фокусе
-   с клавиатуры): логотип остаётся главным знаком колонки, а разворот всегда под рукой. */
-.collapsed .collapseButton {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: var(--rail-tile);
-  height: var(--rail-tile);
-  opacity: 0;
-  background: var(--color-bg);
-  border-color: var(--color-border);
-  border-radius: var(--radius-md);
-  transform: translate(-50%, -50%);
-}
-
-.collapsed .collapseButton svg {
-  width: 22px;
-  height: 22px;
-}
-
-.collapsed .brand:hover .collapseButton,
-.collapsed .collapseButton:focus-visible {
-  color: var(--color-text);
-  opacity: 1;
-}
-
-.collapsed .brand:hover .brandLink,
-.collapsed .brand:has(.collapseButton:focus-visible) .brandLink {
-  opacity: 0;
-}
-
-.collapsed .brandName,
-.collapsed .uploadLabel,
-.collapsed .sectionHeader,
-.collapsed .documentInfo,
-.collapsed .footerLabel,
-.collapsed .uploadStatus {
-  display: none;
-}
-
-.collapsed .primaryAction {
-  padding: 8px 0 14px;
-}
-
-.collapsed .uploadButton {
-  width: var(--rail-tile);
-  min-height: var(--rail-tile);
-  margin: 0 auto;
-  padding: 0;
-  font-size: 18px;
-}
-
-.collapsed .documentGroup {
-  align-items: center;
-  gap: 6px;
-}
-
-.collapsed .documentItem {
-  width: var(--rail-tile);
-  height: var(--rail-tile);
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-  padding: 0;
-}
-
-/* Полоса уходит к краю панели: внутри узкой плитки она теснила бы значок файла. */
-.collapsed .active::before {
-  top: 12px;
-  bottom: 12px;
-  left: calc((var(--rail-tile) - var(--sidebar-current-width, 72px)) / 2);
-}
-
-.collapsed .fileIcon {
-  width: 28px;
-  height: 32px;
-  font-size: 7px;
-}
-
-.collapsed .footer {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-}
-
-.collapsed .footerLink {
-  width: var(--rail-tile);
-  height: var(--rail-tile);
-  justify-content: center;
-  padding: 0;
-  font-size: 18px;
-}
-
+/* Узкий экран: рельс — строка разделов сверху, книги — горизонтальной лентой под ним.
+   Сворачивания нет: панель видна всегда. */
 @media (max-width: 840px) {
-  .sidebar {
+  .sidebar,
+  .collapsed {
+    /* Лента книг прокручивается внутри и не раздвигает страницу шире экрана. */
+    min-width: 0;
     height: auto;
-    max-height: none;
+    display: flex;
+    flex-direction: column;
     overflow: visible;
     border-right: 0;
     border-bottom: 1px solid var(--sidebar-border);
   }
 
+  .rail {
+    flex-direction: row;
+    padding: 8px 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--sidebar-border);
+  }
+
+  .railBrand {
+    margin: 0 8px 0 0;
+  }
+
+  .railItemActive::before {
+    top: auto;
+    right: 10px;
+    bottom: -8px;
+    left: 10px;
+    width: auto;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+  }
+
+  .railFooter {
+    margin: 0 0 0 auto;
+  }
+
+  .collapsed .panel {
+    display: flex;
+  }
+
   .collapseButton,
-  .resizeHandle {
+  .resizeHandle,
+  .rail > button.railItem {
     display: none;
   }
 
@@ -479,88 +544,5 @@
 
   .documentItem {
     min-width: 210px;
-  }
-
-  .footer {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: center;
-    gap: 4px;
-    padding: 8px 14px;
-  }
-
-  .collapsed .brand {
-    justify-content: flex-start;
-    gap: 10px;
-    padding: 0 18px;
-  }
-
-  .collapsed .brandName,
-  .collapsed .uploadLabel,
-  .collapsed .footerLabel {
-    display: inline;
-  }
-
-  .collapsed .brandLink {
-    flex: 1;
-  }
-
-  .collapsed .sectionHeader,
-  .collapsed .documentInfo {
-    display: flex;
-  }
-
-  .collapsed .uploadStatus {
-    display: block;
-  }
-
-  .collapsed .primaryAction {
-    padding: 16px 14px 12px;
-  }
-
-  .collapsed .uploadButton {
-    width: 100%;
-    margin: 0;
-    padding: 9px 12px;
-  }
-
-  .collapsed .documentItem {
-    justify-content: flex-start;
-    padding: 10px;
-  }
-
-  .collapsed .footerLink {
-    width: auto;
-    height: auto;
-    justify-content: flex-start;
-    padding: 9px 10px;
-    font-size: inherit;
-  }
-
-  .collapsed .brandMark {
-    width: 28px;
-    height: 28px;
-  }
-
-  .collapsed .uploadButton {
-    min-height: 40px;
-    font-size: inherit;
-  }
-
-  .collapsed .documentItem {
-    width: 100%;
-    height: auto;
-    align-items: stretch;
-  }
-
-  .collapsed .fileIcon {
-    width: 32px;
-    height: 38px;
-    font-size: 8.5px;
-  }
-
-  .collapsed .footer {
-    justify-items: stretch;
-    gap: 4px;
   }
 }

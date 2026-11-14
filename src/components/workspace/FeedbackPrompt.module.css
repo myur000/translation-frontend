@@ -87,7 +87,7 @@
 }
 
 .star.filled {
-  color: var(--color-warning);
+  color: var(--color-rating);
 }
 
 .star:hover:not(:disabled) svg {
@@ -137,7 +137,7 @@
 }
 
 .commentForm textarea:focus {
-  border-color: var(--color-primary);
+  border-color: var(--color-focus);
   outline: 3px solid var(--color-focus-ring);
 }
 
@@ -159,9 +159,9 @@
 }
 
 .actions .primary {
-  color: var(--color-on-primary);
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .thanks {

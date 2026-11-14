@@ -39,9 +39,162 @@
   text-decoration: none;
 }
 
+/* Книга и панель заметок рядом: панель у края сдвигает книгу, а не перекрывает её.
+   Шапка и нижняя панель остаются над книгой, поэтому центрируются по ней. */
+.shell {
+  /* Сколько ширины книга оставляет себе: две колонки сравнения или одна. */
+  --book-min-width: 420px;
+  position: relative;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.shell.notesOnLeft {
+  flex-direction: row-reverse;
+}
+
+.shell.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.shell.compareLayout {
+  --book-min-width: 640px;
+}
+
+.notesDock {
+  position: relative;
+  /* Выбранная ширина, но книге остаётся минимум; уже 280px панель не становится. */
+  width: clamp(
+    280px,
+    calc(100vw - var(--sidebar-current-width, 0px) - var(--book-min-width)),
+    var(--notes-width)
+  );
+  flex: none;
+  min-height: 0;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border-strong);
+}
+
+.notesOnLeft .notesDock {
+  border-right: 1px solid var(--color-border-strong);
+  border-left: 0;
+}
+
+.notesDock[hidden] {
+  display: none;
+}
+
+/* Окно заметок: лежит над книгой в пределах рабочей области. Место и размер
+   задаёт сама область (inline-стиль); здесь — место по умолчанию на первый кадр,
+   пока область ещё не измерена. Книга вокруг окна остаётся доступной. */
+.notesDock.notesWindow {
+  position: absolute;
+  z-index: 20;
+  top: 72px;
+  right: 12px;
+  width: 300px;
+  height: min(520px, calc(100% - 160px));
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+}
+
+.notesWindow:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Угол ресайза: две диагональные риски в правом нижнем углу. */
+.notesGrip {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(
+    135deg,
+    transparent 0 52%,
+    var(--color-border-strong) 52% 58%,
+    transparent 58% 70%,
+    var(--color-border-strong) 70% 76%,
+    transparent 76%
+  );
+}
+
+.notesGrip:hover {
+  background: linear-gradient(
+    135deg,
+    transparent 0 52%,
+    var(--color-primary) 52% 58%,
+    transparent 58% 70%,
+    var(--color-primary) 70% 76%,
+    transparent 76%
+  );
+}
+
+/* Свёрнутое окно — пилюля справа над нижней панелью и кнопками масштаба (отступ задаёт inline-стиль). */
+.notesPill {
+  position: absolute;
+  z-index: 20;
+  right: 16px;
+}
+
+/* Ручка ширины на шве с книгой: узкая полоса, которая подсвечивается при наведении. */
+.notesResizeHandle {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.notesOnLeft .notesResizeHandle {
+  right: -4px;
+  left: auto;
+}
+
+.notesResizeHandle::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  content: '';
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+
+.notesResizeHandle:hover::after,
+.notesResizeHandle:focus-visible::after,
+.resizing .notesResizeHandle::after {
+  background: var(--color-primary);
+}
+
+.notesResizeHandle:focus-visible {
+  outline: none;
+}
+
+.notesLoading {
+  margin: 0;
+  padding: 18px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
 .workspace {
   position: relative;
   height: 100%;
+  flex: 1;
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -75,14 +228,12 @@
   }
 }
 
-/* Снизу — прозрачный слой с панелью по центру. Сам слой клики не перехватывает,
-   чтобы страницы по бокам оставались доступны; панель включает их обратно. */
+/* Снизу — прозрачный слой с одной панелью по центру. Сам слой клики не
+   перехватывает, чтобы страницы по бокам оставались доступны; панель включает их обратно. */
 .bottomChrome {
   bottom: 0;
   display: flex;
-  align-items: flex-end;
   justify-content: center;
-  gap: 10px;
   padding: 0 16px 16px;
   pointer-events: none;
 }
@@ -100,7 +251,14 @@
   font-size: 12px;
 }
 
+.noticeText {
+  flex: 1;
+  min-width: 0;
+}
+
 .noticeWarning {
+  justify-content: flex-start;
+  gap: 8px;
   color: var(--color-warning-text);
   background: color-mix(in srgb, var(--color-warning-surface) 90%, transparent);
   border-top-color: var(--color-warning-border);
@@ -197,6 +355,31 @@
 .workArea.immersiveWorkArea > * { min-height: 0; }
 
 @media (max-width: 680px) {
+  .shell {
+    height: auto;
+    display: block;
+  }
+
+  /* На телефоне заметки — шторка снизу поверх книги: рядом места нет. */
+  .notesDock {
+    position: fixed;
+    z-index: 30;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    height: min(72vh, 640px);
+    overflow: hidden;
+    border: 1px solid var(--color-border-strong);
+    border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+    box-shadow: var(--shadow-sheet);
+  }
+
+  .notesResizeHandle {
+    display: none;
+  }
+
   /* Колонки друг под другом растут по содержимому, поэтому панели возвращаются в поток. */
   .workspace {
     --chrome-top: 0px !important;
@@ -221,5 +404,11 @@
 
   .workArea > * {
     min-height: 680px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notesResizeHandle::after {
+    transition: none;
   }
 }

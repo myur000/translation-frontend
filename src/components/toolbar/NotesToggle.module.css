@@ -1,0 +1,49 @@
+/* Тихая иконка в группе вида; открытые заметки отмечены той же оранжевой полоской, что выбранная раскладка. */
+.button {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+}
+
+.button:hover {
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button[aria-pressed='true'] {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.button[aria-pressed='true']::after {
+  position: absolute;
+  right: 30%;
+  bottom: 3px;
+  left: 30%;
+  height: 3px;
+  content: '';
+  background: var(--color-accent);
+  border-radius: 999px;
+}
+
+.button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}

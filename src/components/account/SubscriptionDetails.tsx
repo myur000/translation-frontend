@@ -1,6 +1,7 @@
 import { useAccount } from '../../account/useAccount.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import styles from '../../pages/PlansPage.module.css'
+import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 
 export function SubscriptionDetails() {
   const { usage, subscription } = useAccount()
@@ -27,8 +28,8 @@ export function SubscriptionDetails() {
           {data.current_period_start ? <div><dt>{t('plans.periodStart')}</dt><dd>{date(data.current_period_start)}</dd></div> : null}
           {data.current_period_end ? <div><dt>{t('plans.periodEnd')}</dt><dd>{date(data.current_period_end)}</dd></div> : null}
         </dl>
-        {data.cancel_at_period_end ? <p className={styles.warning}>{t('plans.cancelScheduled')}</p> : null}
-        {data.status === 'PAST_DUE' ? <p className={styles.warning}>{t('plans.pastDue')}</p> : null}
+        {data.cancel_at_period_end ? <p className={styles.warning}><GlyphIcon name="warning" /><span>{t('plans.cancelScheduled')}</span></p> : null}
+        {data.status === 'PAST_DUE' ? <p className={styles.warning}><GlyphIcon name="warning" /><span>{t('plans.pastDue')}</span></p> : null}
       </> : null}
     </section>
   )

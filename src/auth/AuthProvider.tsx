@@ -7,6 +7,7 @@ import { AuthContext, type AuthContextValue } from './AuthContext.ts'
 import { clearAuthSession, readAuthSession } from './authStorage.ts'
 import { SessionController } from './sessionController.ts'
 import styles from './AuthProvider.module.css'
+import { GlyphIcon } from '../components/ui/GlyphIcon.tsx'
 
 interface AuthProviderProps { children: ReactNode }
 
@@ -70,7 +71,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       {children}
       {notice ? (
         <div className={styles.notice} role="alert">
-          <span>{notice}</span>
+          <GlyphIcon name="warning" />
+          <span className={styles.noticeText}>{notice}</span>
           {accessNotice ? (
             <button type="button" aria-label={t('auth.closeAccessNotice')} onClick={dismissNotice}>×</button>
           ) : null}

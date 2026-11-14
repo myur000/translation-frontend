@@ -5,7 +5,13 @@
  *   Steel #4A6F8C — второстепенный текст и иконки
  *   Mist  #8FB1C9 — рамки, акценты на тёмном
  *   Ice   #CADCEA — мягкие заливки, выделение
- * Текстовые пары соответствуют WCAG AA (4.5:1) на своих поверхностях.
+ * Акцент — оранжевая шкала Ember. Структура интерфейса остаётся тёмно-синей,
+ * акцентом помечено только то, куда смотреть и что нажать: главная кнопка
+ * экрана, выбранный режим, активный пункт, метки и подсветка цитат,
+ * [[ссылки]] и кольца фокуса. Откат — вернуть семантические токены акцента
+ * и фокуса на primary, компоненты при этом не меняются.
+ * Текстовые пары соответствуют WCAG AA (4.5:1) на своих поверхностях,
+ * кольца фокуса, метки и иконки — 3:1 (расчёт — docs/accent-color.md).
  */
 :root {
   color-scheme: light;
@@ -14,6 +20,14 @@
   --palette-steel: #4a6f8c;
   --palette-mist: #8fb1c9;
   --palette-ice: #cadcea;
+  --palette-ember-50: #fdebdd;
+  --palette-ember-100: #fce3cf;
+  --palette-ember-200: #ffb37a;
+  --palette-ember-300: #f59e57;
+  --palette-ember-400: #f28c3a;
+  --palette-ember-600: #ad4f0e;
+  --palette-ember-700: #9a3f0b;
+  --palette-ember-900: #4a2614;
 
   --color-bg: #eef3f7;
   --color-surface: #ffffff;
@@ -30,21 +44,64 @@
   --color-primary-soft: #e4edf4;
   --color-primary-border: var(--palette-ice);
   --color-on-primary: #ffffff;
-  --color-focus-ring: rgb(74 111 140 / 28%);
   --color-selection: rgb(74 111 140 / 22%);
   --color-backdrop: rgb(9 20 35 / 45%);
+
+  /* Акцент. #AD4F0E чуть темнее исходного #B4530F: тот давал 4.49:1 на фоне
+     страницы (#EEF3F7), и [[ссылка]] в заметке не дотягивала до 4.5:1. */
+  --color-accent: var(--palette-ember-600);
+  --color-accent-hover: var(--palette-ember-700);
+  --color-on-accent: #ffffff;
+  /* Метки и бейджи: мягкий фон и тёмно-оранжевый текст на нём. */
+  --color-accent-soft: var(--palette-ember-50);
+  --color-accent-soft-text: var(--palette-ember-700);
+  --color-accent-focus-ring: rgb(173 79 14 / 26%);
+  /* Подсветка цитаты в тексте книги. Страница книги белая в обеих темах,
+     поэтому в тёмной теме эти токены не переопределяются. */
+  --color-accent-highlight: var(--palette-ember-100);
+  --color-accent-highlight-line: var(--palette-ember-400);
+
+  /* Фокус с клавиатуры: сплошное кольцо (outline) и мягкое у полей ввода. */
+  --color-focus: var(--color-accent);
+  --color-focus-ring: var(--color-accent-focus-ring);
+
+  /* Бумага книги: белая в обеих темах, как настоящая страница. */
+  --paper-bg: #ffffff;
+  --paper-text: #1f2937;
+  --paper-heading: #111827;
+  --paper-muted: #667085;
+  --paper-soft: #98a2b3;
+  --paper-rule: #e4e7ec;
+  --paper-border: #d0d5dd;
+  --paper-error: #b42318;
+  /* Фокус на бумаге: тёмный акцент, светлый #F28C3A на белом даёт лишь 2.45:1. */
+  --paper-focus: var(--palette-ember-600);
+
+  --paper-body: #344054;
+  --paper-hover: #f2f6f9;
+
+  --shadow-raised: 0 1px 2px rgb(9 20 35 / 10%);
+  --shadow-control: 0 4px 14px rgb(9 20 35 / 8%);
+  --shadow-dock: 0 6px 24px rgb(9 20 35 / 10%), 0 1px 3px rgb(9 20 35 / 6%);
+  --shadow-card: 0 1px 2px rgb(9 20 35 / 4%), 0 8px 28px rgb(9 20 35 / 6%);
+  --shadow-card-hover: 0 6px 18px rgb(14 27 43 / 8%);
+  --shadow-sheet: 0 -12px 40px rgb(9 20 35 / 18%);
 
   --color-success: #2f7d5b;
   --color-success-text: #1f5c42;
   --color-success-surface: #edf7f2;
   --color-success-border: #bfe3d1;
   --color-success-icon: #d6efe2;
-  --color-warning: #b07219;
-  --color-warning-text: #7a4e0f;
-  --color-warning-muted: #946016;
-  --color-warning-surface: #fcf6ea;
-  --color-warning-border: #ecd5a6;
-  --color-warning-icon: #f6e7c6;
+  /* Предупреждение — жёлто-янтарное, чтобы не читаться как оранжевый акцент.
+     Текст темнее значка: #A16207 на #FEF3C7 даёт 4.42:1, для текста мало. */
+  --color-warning: #a16207;
+  --color-warning-text: #713f12;
+  --color-warning-muted: #854d0e;
+  --color-warning-surface: #fef3c7;
+  --color-warning-border: #f5d565;
+  --color-warning-icon: #fde68a;
+  /* Звёзды оценки — не предупреждение, но того же золотого тона. */
+  --color-rating: var(--color-warning);
   --color-danger: #c03b3b;
   --color-danger-text: #a12f2f;
   --color-danger-surface: #fcf1f1;
@@ -61,6 +118,18 @@
   --sidebar-action: var(--palette-ice);
   --sidebar-action-hover: #dce8f1;
   --sidebar-action-text: var(--palette-ink);
+  --sidebar-surface: #12233a;
+  --sidebar-border-strong: rgb(143 177 201 / 26%);
+  --sidebar-primary-hover: #a9c4d7;
+  --sidebar-primary-border: rgb(143 177 201 / 30%);
+  --sidebar-ring: rgb(143 177 201 / 18%);
+  --sidebar-tile: rgb(143 177 201 / 10%);
+  --sidebar-tile-border: rgb(143 177 201 / 22%);
+  --sidebar-tile-active: rgb(202 220 234 / 14%);
+  --sidebar-tile-active-border: rgb(202 220 234 / 32%);
+  /* Боковая панель тёмная в обеих темах: акцент на ней всегда светлый. */
+  --sidebar-accent: var(--palette-ember-400);
+  --sidebar-accent-focus-ring: rgb(242 140 58 / 32%);
 
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -70,8 +139,14 @@
   --sidebar-width: 244px;
   --notes-width: 280px;
   --toolbar-height: 56px;
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system,
+  /* Интерфейс — Golos Text: гротеск с родной, а не дорисованной кириллицей. */
+  --font-sans: 'Golos Text Variable', ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Текст книги, заметок и цитат — Literata, шрифт для чтения с экрана. Оптический
+     размер подстраивает рисунок под кегль. Алфавитов, которых в Literata нет
+     (армянский, грузинский…), браузер возьмёт из Noto Serif или системного шрифта. */
+  --font-serif: 'Literata Variable', 'Noto Serif', Georgia, 'Times New Roman', serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 :root[data-theme='dark'] {
@@ -90,8 +165,14 @@
   --color-primary-soft: #1a3048;
   --color-primary-border: #34506b;
   --color-on-primary: var(--palette-ink);
-  --color-focus-ring: rgb(143 177 201 / 30%);
   --color-selection: rgb(143 177 201 / 28%);
+
+  --color-accent: var(--palette-ember-400);
+  --color-accent-hover: var(--palette-ember-300);
+  --color-on-accent: var(--palette-ink);
+  --color-accent-soft: var(--palette-ember-900);
+  --color-accent-soft-text: var(--palette-ember-200);
+  --color-accent-focus-ring: rgb(242 140 58 / 32%);
   --color-backdrop: rgb(3 8 15 / 65%);
 
   --color-success: #6fcf9f;
@@ -99,12 +180,12 @@
   --color-success-surface: #11291f;
   --color-success-border: #24573f;
   --color-success-icon: #1b4532;
-  --color-warning: #e6b45e;
-  --color-warning-text: #f1d39c;
-  --color-warning-muted: #e6b45e;
-  --color-warning-surface: #2a2214;
-  --color-warning-border: #6a5222;
-  --color-warning-icon: #44361a;
+  --color-warning: #facc15;
+  --color-warning-text: #fde68a;
+  --color-warning-muted: #facc15;
+  --color-warning-surface: #2e2408;
+  --color-warning-border: #6b5414;
+  --color-warning-icon: #4a3b0c;
   --color-danger: #ef8b8b;
   --color-danger-text: #f4a9a9;
   --color-danger-surface: #341b20;

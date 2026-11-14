@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -145,6 +145,23 @@ describe('download filenames and Blob lifecycle', () => {
   })
 })
 
+/** Скачивание — первый пункт меню «⋯» в шапке документа. */
+async function openDocumentMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'Действия с документом' }))
+  return within(screen.getByRole('menu'))
+}
+
+async function clickDownload(user = userEvent.setup()) {
+  await user.click((await openDocumentMenu(user)).getByRole('menuitem', { name: 'Скачать перевод' }))
+}
+
+/** Пункт снова доступен: следующее скачивание можно начать. */
+async function expectDownloadAvailable(user: ReturnType<typeof userEvent.setup>) {
+  const item = (await openDocumentMenu(user)).getByRole('menuitem', { name: 'Скачать перевод' })
+  expect(item.getAttribute('aria-disabled')).toBe('false')
+  await user.keyboard('{Escape}')
+}
+
 describe('translation download UI', () => {
   it('downloads the DONE result with Bearer authentication and the server filename', async () => {
     const files = installFileSavingMock()
@@ -154,8 +171,7 @@ describe('translation download UI', () => {
         'Content-Disposition': "attachment; filename*=UTF-8''%D0%BA%D0%BD%D0%B8%D0%B3%D0%B0.pdf",
       },
     }))
-    const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: 'Скачать' }))
+    await clickDownload()
     expect(await screen.findByText('Скачивание книга.pdf началось.')).toBeTruthy()
     expect(files.saved[0].name).toBe('книга.pdf')
     const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/download'))
@@ -168,36 +184,36 @@ describe('translation download UI', () => {
   it('uses a fallback name when backend omits Content-Disposition', async () => {
     const files = installFileSavingMock()
     renderWorkspace(async () => fileResponse(null))
-    await userEvent.setup().click(await screen.findByRole('button', { name: 'Скачать' }))
+    await clickDownload()
     await screen.findByText('Скачивание book_ru.pdf началось.')
     expect(files.saved[0].name).toBe('book_ru.pdf')
   })
 
-  it('blocks double clicks while a download is pending', async () => {
+  it('blocks a second download while one is pending', async () => {
     let resolve!: (value: Response) => void
     const files = installFileSavingMock()
     const pending = vi.fn(() => new Promise<Response>((finish) => { resolve = finish }))
     renderWorkspace(pending)
-    const button = await screen.findByRole('button', { name: 'Скачать' })
-    fireEvent.click(button)
-    fireEvent.click(button)
-    const busy = screen.getByRole('button', { name: 'Скачиваем…' }) as HTMLButtonElement
-    expect(busy.disabled).toBe(true)
-    expect(busy.getAttribute('aria-busy')).toBe('true')
+    const user = userEvent.setup()
+    await clickDownload(user)
+    // Пока файл скачивается, пункт меню недоступен и говорит об этом.
+    const busy = (await openDocumentMenu(user)).getByRole('menuitem', { name: 'Скачиваем…' })
+    expect(busy.getAttribute('aria-disabled')).toBe('true')
+    await user.click(busy)
     await waitFor(() => expect(pending).toHaveBeenCalledTimes(1))
+    await user.keyboard('{Escape}')
     await act(async () => resolve(fileResponse()))
     await screen.findByText('Скачивание translation.pdf началось.')
-    expect((screen.getByRole('button', { name: 'Скачать' }) as HTMLButtonElement).disabled).toBe(false)
+    await expectDownloadAvailable(user)
     expect(files.createUrl).toHaveBeenCalledTimes(1)
   })
 
-  // Скачивание становится главным действием только когда результат есть; до этого
-  // панель предлагает перевод или показывает прогресс.
+  // Скачать можно только готовый результат; до этого в меню такого пункта нет.
   it.each(['PENDING', 'PROCESSING', 'FAILED'])('offers no download for %s jobs', async (status) => {
     const handler = vi.fn(async () => fileResponse())
     renderWorkspace(handler, [historyItem(jobId, status)])
-    await screen.findByRole('button', { name: 'Действия с документом' })
-    expect(screen.queryByRole('button', { name: 'Скачать' })).toBeNull()
+    const menu = await openDocumentMenu(userEvent.setup())
+    expect(menu.queryByRole('menuitem', { name: 'Скачать перевод' })).toBeNull()
     expect(handler).not.toHaveBeenCalled()
   })
 
@@ -207,7 +223,7 @@ describe('translation download UI', () => {
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
     await userEvent.setup().upload(input, new File(['document'], 'draft.pdf', { type: 'application/pdf' }))
     expect(await screen.findByRole('button', { name: 'Перевести' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Скачать' })).toBeNull()
+    expect((await openDocumentMenu(userEvent.setup())).queryByRole('menuitem', { name: 'Скачать перевод' })).toBeNull()
     expect(handler).not.toHaveBeenCalled()
   })
 
@@ -223,12 +239,12 @@ describe('translation download UI', () => {
     renderWorkspace(async () => new Response(JSON.stringify({ message: 'Backend error' }), {
       status, headers: { 'Content-Type': 'application/json', 'Retry-After': '12' },
     }))
-    await userEvent.setup().click(await screen.findByRole('button', { name: 'Скачать' }))
+    await clickDownload()
     await waitFor(() => {
       expect(screen.getAllByRole('alert').some((alert) => alert.textContent?.includes(message))).toBe(true)
     })
     expect(files.createUrl).not.toHaveBeenCalled()
-    expect((screen.getByRole('button', { name: 'Скачать' }) as HTMLButtonElement).disabled).toBe(false)
+    await expectDownloadAvailable(userEvent.setup())
   })
 
   it('allows retry after a network error', async () => {
@@ -238,9 +254,9 @@ describe('translation download UI', () => {
       .mockImplementationOnce(async () => fileResponse())
     renderWorkspace(handler)
     const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: 'Скачать' }))
+    await clickDownload(user)
     expect(await screen.findByText(/Не удалось скачать перевод/)).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'Скачать' }))
+    await clickDownload(user)
     await screen.findByText('Скачивание translation.pdf началось.')
     expect(files.createUrl).toHaveBeenCalledTimes(1)
   })
@@ -252,7 +268,7 @@ describe('translation download UI', () => {
   ])('rejects empty or invalid successful responses', async (body, contentType, message) => {
     const files = installFileSavingMock()
     renderWorkspace(async () => new Response(body, { headers: { 'Content-Type': contentType } }))
-    await userEvent.setup().click(await screen.findByRole('button', { name: 'Скачать' }))
+    await clickDownload()
     expect(await screen.findByText(new RegExp(message.replace('.', '\\.')))).toBeTruthy()
     expect(files.createUrl).not.toHaveBeenCalled()
   })
@@ -266,14 +282,14 @@ describe('translation download UI', () => {
       return new Promise((finish) => { resolve = finish })
     }, [historyItem(), historyItem(secondJobId, 'DONE', 'docx')])
     const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: 'Скачать' }))
+    await clickDownload(user)
     await waitFor(() => expect(signal).toBeDefined())
     await user.click(screen.getByTitle('second.docx'))
     expect(signal?.aborted).toBe(true)
     await act(async () => resolve(fileResponse()))
     expect(files.createUrl).not.toHaveBeenCalled()
     expect(screen.queryByText('Скачивание translation.pdf началось.')).toBeNull()
-    expect((screen.getByRole('button', { name: 'Скачать' }) as HTMLButtonElement).disabled).toBe(false)
+    await expectDownloadAvailable(user)
   })
 
   it('cancels a pending download when signing out', async () => {
@@ -281,7 +297,7 @@ describe('translation download UI', () => {
     const files = installFileSavingMock()
     renderWorkspace(() => new Promise((finish) => { resolve = finish }))
     const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: 'Скачать' }))
+    await clickDownload(user)
     await waitFor(() => expect(resolve).toBeTypeOf('function'))
     await user.click(screen.getByRole('button', { name: 'Открыть меню пользователя' }))
     await user.click(screen.getByRole('menuitem', { name: 'Выйти' }))
@@ -296,7 +312,7 @@ describe('translation download UI', () => {
       const authorization = (init.headers as Headers).get('Authorization')
       return authorization === 'Bearer ' + accessToken ? new Response(null, { status: 401 }) : fileResponse()
     })
-    await userEvent.setup().click(await screen.findByRole('button', { name: 'Скачать' }))
+    await clickDownload()
     await screen.findByText('Скачивание translation.pdf началось.')
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/download'))).toHaveLength(2)
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/auth/refresh')).toHaveLength(1)

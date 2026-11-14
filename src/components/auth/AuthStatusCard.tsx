@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import styles from './AuthStatusCard.module.css'
+import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 
 interface AuthStatusCardProps {
   tone: 'loading' | 'success' | 'error'
@@ -14,7 +15,7 @@ export function AuthStatusCard({
   description,
   children,
 }: AuthStatusCardProps) {
-  const icon = tone === 'success' ? '✓' : tone === 'error' ? '!' : '…'
+  const icon = tone === 'success' ? <GlyphIcon name="check" /> : tone === 'error' ? '!' : '…'
 
   return (
     <section
