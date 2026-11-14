@@ -169,6 +169,65 @@
   text-decoration: none;
 }
 
+/* Строка заметки: справа — корзина, видна при наведении или фокусе с клавиатуры. */
+.noteRow {
+  position: relative;
+}
+
+.noteRow .note {
+  padding-right: 30px;
+}
+
+.deleteButton {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--color-text-soft);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 120ms ease;
+}
+
+.noteRow:hover .deleteButton,
+.deleteButton:focus-visible {
+  opacity: 1;
+}
+
+.deleteButton:hover {
+  color: var(--color-danger);
+  background: var(--sidebar-hover);
+}
+
+.deleteButton:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.deleteButton svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+/* На сенсорных экранах наведения нет: корзина видна всегда. */
+@media (hover: none) {
+  .deleteButton {
+    opacity: 1;
+  }
+}
+
 .nested .note {
   padding-left: 32px;
 }
@@ -199,6 +258,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.summaryIcon {
+  width: 13px;
+  height: 13px;
+  margin-right: 5px;
+  vertical-align: -2px;
+  fill: none;
+  stroke: var(--color-text-muted);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
 }
 
 .noteTitle {

@@ -1,10 +1,14 @@
 import { useState } from 'react'
-import { Link, NavLink, useMatch } from 'react-router'
+import { Link, NavLink, useMatch, useNavigate } from 'react-router'
 import type { NoteSummary } from '../../api/contracts/notes.ts'
 import { coverTone } from '../../documents/bookTitle.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import type { NotesTree, NotesTreeBook } from '../../notes/notesTree.ts'
 import { useNotes } from '../../notes/useNotes.ts'
+import { deleteNote } from '../../api/notes.ts'
+import { useAuth } from '../../auth/useAuth.ts'
+import { noteErrorMessage } from '../../notes/noteErrors.ts'
+import { ConfirmDialog } from '../ui/ConfirmDialog.tsx'
 import { useNotesSidebar } from '../../notes/useNotesSidebar.ts'
 import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 import styles from './NotesSidebarPanel.module.css'
@@ -24,7 +28,11 @@ interface NotesSidebarPanelProps {
  */
 export function NotesSidebarPanel({ isActive }: NotesSidebarPanelProps) {
   const { t } = useTranslation()
-  const { revision } = useNotes()
+  const { revision, drafts, notesChanged } = useNotes()
+  const { session } = useAuth()
+  const navigate = useNavigate()
+  // Удаление прямо из панели: та же проверка, что на странице заметки.
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string; busy: boolean; error: string | null } | null>(null)
   // Граф не грузим, пока панель ни разу не открыли.
   const [wasShown, setWasShown] = useState(isActive)
   if (isActive && !wasShown) setWasShown(true)
@@ -39,12 +47,47 @@ export function NotesSidebarPanel({ isActive }: NotesSidebarPanelProps) {
 
   const excerpts = new Map(data.status === 'ready' ? data.recent.map((note) => [note.id, note.excerpt]) : [])
 
-  const renderNote = (id: string, title: string, excerpt?: string) => (
-    <li key={id}>
+  const removeNote = async () => {
+    const token = session?.accessToken
+    if (!token || !pendingDelete) return
+    const { id } = pendingDelete
+    setPendingDelete({ ...pendingDelete, busy: true, error: null })
+    try {
+      await deleteNote(id, { accessToken: token })
+      drafts.clear(id)
+      setPendingDelete(null)
+      notesChanged()
+      // Удалена открытая заметка — её страницы больше нет, возвращаемся к списку.
+      if (activeNoteId === id) void navigate('/notes', { replace: true })
+    } catch (caught) {
+      const message = noteErrorMessage(caught)
+      setPendingDelete((current) => current && { ...current, busy: false, error: message.kind === 'key' ? t(message.key) : message.text })
+    }
+  }
+
+  const renderNote = (id: string, title: string, excerpt?: string, isSummary = false) => (
+    <li key={id} className={styles.noteRow}>
       <NavLink to={`/notes/${id}`} className={({ isActive: isCurrent }) => `${styles.note} ${isCurrent ? styles.noteActive : ''}`}>
-        <span className={styles.noteTitle}>{title}</span>
+        <span className={styles.noteTitle}>
+          {isSummary ? (
+            // Тетрадь — конспект книги: заметка о ней целиком, а не об абзаце.
+            <svg className={styles.summaryIcon} viewBox="0 0 16 16" role="img" aria-label={t('notesPanel.summary')}>
+              <path d="M4 2.5h8.5v11H4zM4 2.5v11M2.5 5h3M2.5 8h3M2.5 11h3M7 6h3.5" />
+            </svg>
+          ) : null}
+          {title}
+        </span>
         {excerpt ? <span className={styles.excerpt}>{excerpt}</span> : null}
       </NavLink>
+      <button
+        type="button"
+        className={styles.deleteButton}
+        aria-label={t('notesPanel.deleteNote', { title })}
+        title={t('notesPanel.deleteNote', { title })}
+        onClick={() => setPendingDelete({ id, title, busy: false, error: null })}
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.8 4.5h10.4M6.3 4.5V2.8h3.4v1.7M4.3 4.5l.7 8.7h6l.7-8.7M6.7 7v3.8M9.3 7v3.8" /></svg>
+      </button>
     </li>
   )
   const renderSummaries = (items: NoteSummary[]) => (
@@ -74,7 +117,7 @@ export function NotesSidebarPanel({ isActive }: NotesSidebarPanelProps) {
         </button>
         {isOpen ? (
           <ul id={listId} className={`${styles.notes} ${styles.nested}`}>
-            {noteIds.map((id) => renderNote(id, tree.titles.get(id) ?? '', excerpts.get(id)))}
+            {noteIds.map((id) => renderNote(id, tree.titles.get(id) ?? '', excerpts.get(id), book?.summaryIds.includes(id)))}
           </ul>
         ) : null}
       </li>
@@ -172,6 +215,17 @@ export function NotesSidebarPanel({ isActive }: NotesSidebarPanelProps) {
           : data.status === 'error' ? <ErrorState onRetry={retry} />
             : <p className={styles.empty} role="status">{t('notes.loading')}</p>}
       </div>
+      {pendingDelete ? (
+        <ConfirmDialog
+          title={t('notes.deleteTitle')}
+          description={t('notes.deleteDescription', { title: pendingDelete.title })}
+          confirmLabel={t('notes.delete')}
+          busy={pendingDelete.busy}
+          error={pendingDelete.error}
+          onConfirm={() => void removeNote()}
+          onClose={() => setPendingDelete(null)}
+        />
+      ) : null}
     </>
   )
 }

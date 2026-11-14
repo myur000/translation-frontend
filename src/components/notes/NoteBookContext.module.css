@@ -1,14 +1,4 @@
-/* Корешки книг — тех же тонов, что обложки на полке (Sidebar.module.css). */
-.bar,
-.quotes {
-  --cover-0: #2f5d73;
-  --cover-1: #5b4a6e;
-  --cover-2: #7a5a2e;
-  --cover-3: #4a6b4f;
-  --cover-4: #7a3f3f;
-  --cover-5: #3d4f7a;
-}
-
+/* Корешки книг — тона обложек из tokens.css (`--cover-N`), как на полке. */
 .spine {
   width: 12px;
   height: 17px;

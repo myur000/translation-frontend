@@ -304,13 +304,11 @@ const ru = {
   'notes.linkBookSubmit': 'Привязать',
   'notesPanel.summary': 'Конспект книги',
   'notesPanel.newSummary': 'Начать конспект книги',
+  'notesPanel.deleteNote': 'Удалить заметку «{title}»',
   'marginNotes.appendPlaceholder': 'Дописать…',
   'marginNotes.quoteDraft': 'Цитата в заметку',
   'notesPanel.paragraphLabel': 'Абзац {number}',
   'notesPanel.showAllBookNotes': 'Все заметки книги',
-  'notes.search': 'Поиск по заметкам',
-  'notes.clearSearch': 'Очистить поиск',
-  'notes.listHeader': 'Мои заметки',
   'notes.loading': 'Загружаем заметки…',
   'notes.loadError': 'Не удалось загрузить заметки.',
   'notes.retry': 'Повторить',
@@ -318,12 +316,29 @@ const ru = {
   'notes.emptySearch': 'Ничего не найдено',
   'notes.loadMore': 'Показать ещё',
   'notes.tags': 'Теги',
-  'notes.tagFilterActive': 'Фильтр: #{tag}. Нажмите, чтобы снять',
   'notes.homeTitle': 'Заметки',
   'notes.homeDescription': 'Записывайте мысли о книгах, связывайте заметки ссылками [[Название]] и отмечайте темы тегами #тег.',
   'notes.homeSearch': 'Поиск: «{query}»',
   'notes.homeTag': 'Тег #{tag}',
   'notes.homeAll': 'Все заметки',
+  'notes.home.new': 'Новая заметка',
+  'notes.home.recent': 'Продолжить',
+  'notes.home.showAll': 'Все заметки · {count}',
+  'notes.home.showLess': 'Только последние',
+  'notes.home.books': 'Книги с заметками',
+  'notes.home.noteCount.one': '{count} заметка',
+  'notes.home.noteCount.few': '{count} заметки',
+  'notes.home.noteCount.many': '{count} заметок',
+  'notes.home.hasSummary': 'конспект',
+  'notes.home.openBook': 'Открыть книгу →',
+  'notes.home.openBookNamed': 'Открыть книгу «{title}»',
+  'notes.home.openSummaryNamed': 'Конспект книги «{title}»',
+  'notes.home.bookDeleted': 'Книга удалена',
+  'notes.home.booksError': 'Не удалось загрузить книги с заметками.',
+  'notes.home.today': 'сегодня',
+  'notes.home.yesterday': 'вчера',
+  'notes.home.resetFilter': 'Сбросить фильтр',
+  'notes.home.emptyHint': 'Откройте книгу, выделите фрагмент и нажмите «В заметку» — цитата сохранится вместе с вашей мыслью. Или начните с чистого листа: «Новая заметка».',
   'notes.storage': 'Заметки хранятся, пока существует аккаунт. Книги удаляются по сроку хранения, а цитаты из них остаются в заметках.',
   'notes.quoteCount': 'Цитат: {count}',
   'notes.updatedAt': 'Изменена {date}',
@@ -883,13 +898,11 @@ const en: Record<TranslationKey, string> = {
   'notes.linkBookSubmit': 'Link',
   'notesPanel.summary': 'Book summary',
   'notesPanel.newSummary': 'Start a book summary',
+  'notesPanel.deleteNote': 'Delete the note “{title}”',
   'marginNotes.appendPlaceholder': 'Add to the note…',
   'marginNotes.quoteDraft': 'Quote into a note',
   'notesPanel.paragraphLabel': 'Paragraph {number}',
   'notesPanel.showAllBookNotes': 'All notes for this book',
-  'notes.search': 'Search notes',
-  'notes.clearSearch': 'Clear search',
-  'notes.listHeader': 'My notes',
   'notes.loading': 'Loading notes…',
   'notes.loadError': 'Could not load notes.',
   'notes.retry': 'Retry',
@@ -897,12 +910,29 @@ const en: Record<TranslationKey, string> = {
   'notes.emptySearch': 'Nothing found',
   'notes.loadMore': 'Show more',
   'notes.tags': 'Tags',
-  'notes.tagFilterActive': 'Filter: #{tag}. Click to clear',
   'notes.homeTitle': 'Notes',
   'notes.homeDescription': 'Write down thoughts about books, connect notes with [[Title]] links and mark topics with #tags.',
   'notes.homeSearch': 'Search: “{query}”',
   'notes.homeTag': 'Tag #{tag}',
   'notes.homeAll': 'All notes',
+  'notes.home.new': 'New note',
+  'notes.home.recent': 'Continue',
+  'notes.home.showAll': 'All notes · {count}',
+  'notes.home.showLess': 'Recent only',
+  'notes.home.books': 'Books with notes',
+  'notes.home.noteCount.one': '{count} note',
+  'notes.home.noteCount.few': '{count} notes',
+  'notes.home.noteCount.many': '{count} notes',
+  'notes.home.hasSummary': 'summary',
+  'notes.home.openBook': 'Open book →',
+  'notes.home.openBookNamed': 'Open the book “{title}”',
+  'notes.home.openSummaryNamed': 'Summary of “{title}”',
+  'notes.home.bookDeleted': 'Book deleted',
+  'notes.home.booksError': 'Could not load books with notes.',
+  'notes.home.today': 'today',
+  'notes.home.yesterday': 'yesterday',
+  'notes.home.resetFilter': 'Clear filter',
+  'notes.home.emptyHint': 'Open a book, select a passage and press “To note” — the quote is saved together with your thought. Or start from a blank page with “New note”.',
   'notes.storage': 'Notes are kept for as long as the account exists. Books are removed after the retention period, but quotes from them stay in your notes.',
   'notes.quoteCount': 'Quotes: {count}',
   'notes.updatedAt': 'Edited {date}',
@@ -1166,4 +1196,34 @@ export function translate(
     (message, [name, value]) => message.replaceAll(`{${name}}`, String(value)),
     template,
   )
+}
+
+/**
+ * Формы слова при числе: `one` — 1, 21, 101; `few` — 2–4, 22–24; `many` — 0,
+ * 5–20, 25–30. В английском `few` не бывает: обе формы, кроме `one`, — `many`.
+ */
+export type CountForm = 'one' | 'few' | 'many'
+
+type CountBase<Key> = Key extends `${infer Base}.one`
+  ? `${Base}.few` extends TranslationKey
+    ? `${Base}.many` extends TranslationKey ? Base : never
+    : never
+  : never
+
+/** Ключ с тремя формами: `<ключ>.one`, `<ключ>.few`, `<ключ>.many`. */
+export type CountKey = CountBase<TranslationKey>
+
+export function countForm(language: InterfaceLanguage, count: number): CountForm {
+  const rule = new Intl.PluralRules(language === 'en' ? 'en' : 'ru').select(count)
+  return rule === 'one' || rule === 'few' ? rule : 'many'
+}
+
+/** Текст с числом в нужной форме: «1 заметка», «3 заметки», «5 заметок». Число — в `{count}`. */
+export function translateCount(
+  language: InterfaceLanguage,
+  key: CountKey,
+  count: number,
+  variables: Record<string, string | number> = {},
+) {
+  return translate(language, `${key}.${countForm(language, count)}`, { ...variables, count })
 }

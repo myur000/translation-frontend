@@ -16,3 +16,5 @@ export function tagCounts(graph: NoteGraphResponse): NoteTagCount[] {
     .sort((left, right) => right.count - left.count || left.tag.localeCompare(right.tag, 'ru'))
 }
 
+/** Всё, что нужно от графа заметок: книги (дерево, обзор), теги, несозданные заметки. */
+export const NOTES_GRAPH_TYPES = ['document', 'tag', 'missing'] as const

@@ -1327,6 +1327,9 @@ describe('document route', () => {
     const panel = within(panelElement)
     const book = await panel.findByRole('button', { name: /Lighthouse keepers ledger/, expanded: false })
     expect(book.textContent).toContain('2')
+    // Панель, главная раздела и теги делят один граф: запрос один.
+    expect(callsTo(fetchMock, '/api/notes/graph?types=document%2Ctag%2Cmissing', 'GET')).toHaveLength(1)
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/notes/graph'))).toHaveLength(1)
     await user.click(book)
     expect(panel.getByRole('link', { name: /^Маяк/ }).getAttribute('href')).toBe('/notes/n-2')
     expect(panel.getByRole('link', { name: /^Шторм/ }).getAttribute('href')).toBe('/notes/n-1')

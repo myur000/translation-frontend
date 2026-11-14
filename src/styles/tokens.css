@@ -131,6 +131,16 @@
   --sidebar-accent: var(--palette-ember-400);
   --sidebar-accent-focus-ring: rgb(242 140 58 / 32%);
 
+  /* Тона обложек книг (`coverTone` в documents/bookTitle.ts): полка, корешки у
+     заметок, карточки книг. Одни в обеих темах — приглушённые, белая буква на
+     каждом не ниже 6:1. */
+  --cover-0: #2f5d73;
+  --cover-1: #5b4a6e;
+  --cover-2: #7a5a2e;
+  --cover-3: #4a6b4f;
+  --cover-4: #7a3f3f;
+  --cover-5: #3d4f7a;
+
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;

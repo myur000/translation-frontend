@@ -1,123 +1,233 @@
-import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router'
+import { useId, useMemo, useState } from 'react'
+import { Link } from 'react-router'
+import type { NoteSummary } from '../../api/contracts/notes.ts'
+import { coverInitial, coverTone } from '../../documents/bookTitle.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
-import { NOTES_SEARCH_DELAY_MS, notesSearch } from '../../notes/notesQuery.ts'
-import { useNoteDateFormat } from '../../notes/useNoteDateFormat.ts'
+import { notesSearch } from '../../notes/notesQuery.ts'
+import { bookOfNote, noteDay, RECENT_NOTES_LIMIT } from '../../notes/notesOverview.ts'
+import type { NotesTreeBook } from '../../notes/notesTree.ts'
 import { plainExcerpt } from '../../notes/noteSyntax.ts'
+import { useNoteDateFormat } from '../../notes/useNoteDateFormat.ts'
 import { useNotes } from '../../notes/useNotes.ts'
-import styles from './NotesPage.module.css'
+import { useNotesGraph } from '../../notes/useNotesGraph.ts'
+import styles from './NotesHome.module.css'
 import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 
+const NO_BOOKS: ReadonlyMap<string, NotesTreeBook> = new Map()
+
 /**
- * `/notes`: центр раздела — поиск, теги и карточки заметок. Фильтры живут в адресе,
- * поэтому «Назад» и ссылка на тег из заметки возвращают тот же список.
+ * `/notes`: обзор раздела. «Продолжить» — последние заметки, «Книги с
+ * заметками» — к чему они относятся и как попасть в книгу, «Теги» — темы.
+ * Поиск живёт в боковой панели; фильтр из адреса (`?tag=`, `?q=` — ссылки
+ * на тег из заметок) показывает найденные заметки списком со сбросом.
  */
 export function NotesHome() {
   const { t } = useTranslation()
-  const formatDate = useNoteDateFormat()
-  const location = useLocation()
-  const navigate = useNavigate()
   const { query, items, total, status, hasMore, isLoadingMore, loadMore, retry, tags } = useNotes()
-  const [searchText, setSearchText] = useState(query.q)
-  const [syncedQuery, setSyncedQuery] = useState(query.q)
-  // Адрес изменился извне (ссылка на тег, «Назад») — поле поиска следует за ним.
-  if (syncedQuery !== query.q) {
-    setSyncedQuery(query.q)
-    setSearchText(query.q)
-  }
-  useEffect(() => {
-    const next = searchText.trim()
-    if (next === query.q) return
-    const timer = window.setTimeout(() => {
-      void navigate({ pathname: location.pathname, search: notesSearch({ q: next, tag: query.tag }) }, { replace: true })
-    }, NOTES_SEARCH_DELAY_MS)
-    return () => window.clearTimeout(timer)
-  }, [location.pathname, navigate, query.q, query.tag, searchText])
+  const { graph, retry: retryBooks } = useNotesGraph()
+  const [showAll, setShowAll] = useState(false)
+  // «Сегодня» и «вчера» считаем от момента открытия страницы.
+  const [now] = useState(() => new Date())
+  const filtersHeadingId = useId()
+  const recentHeadingId = useId()
+  const booksHeadingId = useId()
+  const tagsHeadingId = useId()
+  const isFiltered = Boolean(query.q || query.tag)
   const search = notesSearch(query)
-  // Фильтры сочетаются, поэтому заголовок называет каждый активный.
-  const filters = [
-    query.q ? t('notes.homeSearch', { query: query.q }) : '',
-    query.tag ? t('notes.homeTag', { tag: query.tag }) : '',
-  ].filter(Boolean)
-  const heading = filters.length ? filters.join(' · ') : t('notes.homeAll')
+  const tree = graph.status === 'ready' ? graph.tree : null
+  const bookIndex = useMemo(() => (tree ? bookOfNote(tree) : NO_BOOKS), [tree])
+
+  const listState = status === 'loading' ? (
+    <p className={styles.state} role="status">{t('notes.loading')}</p>
+  ) : status === 'error' ? (
+    <div className={styles.state} role="alert">
+      <span>{t('notes.loadError')}</span>
+      <button type="button" onClick={retry}>{t('notes.retry')}</button>
+    </div>
+  ) : null
+
+  const rows = (notes: readonly NoteSummary[], labelledBy: string) => (
+    <ul className={styles.rows} aria-labelledby={labelledBy}>
+      {notes.map((note) => (
+        <li key={note.id}>
+          <NoteRow note={note} book={bookIndex.get(note.id)} search={search} now={now} />
+        </li>
+      ))}
+    </ul>
+  )
+  const more = hasMore ? (
+    <button type="button" className={styles.quietButton} onClick={loadMore} disabled={isLoadingMore}>
+      {t('notes.loadMore')}
+    </button>
+  ) : null
+
+  const header = (
+    <header className={styles.header}>
+      <div>
+        <h1>{t('notes.homeTitle')}</h1>
+        <p>{t('notes.homeDescription')}</p>
+      </div>
+      <Link className={styles.newNote} to={`/notes/new${search}`}><GlyphIcon name="plus" /> {t('notes.home.new')}</Link>
+    </header>
+  )
+
+  if (isFiltered) {
+    // Фильтры сочетаются, поэтому заголовок называет каждый активный.
+    const heading = [
+      query.q ? t('notes.homeSearch', { query: query.q }) : '',
+      query.tag ? t('notes.homeTag', { tag: query.tag }) : '',
+    ].filter(Boolean).join(' · ')
+    return (
+      <section className={styles.page}>
+        {header}
+        <section className={styles.section} aria-labelledby={filtersHeadingId}>
+          <div className={styles.sectionHead}>
+            <h2 id={filtersHeadingId} className={styles.filterHeading}>
+              {heading}{status === 'ready' ? <span className={styles.count}>{total}</span> : null}
+            </h2>
+            <Link className={styles.quietLink} to="/notes">{t('notes.home.resetFilter')}</Link>
+          </div>
+          {listState}
+          {status === 'ready' && !items.length ? <p className={styles.state}>{t('notes.emptySearch')}</p> : null}
+          {items.length ? rows(items, filtersHeadingId) : null}
+          {more}
+        </section>
+      </section>
+    )
+  }
+
+  if (status === 'ready' && !items.length) {
+    return (
+      <section className={styles.page}>
+        {header}
+        <div className={styles.invite}>
+          <h2>{t('notes.empty')}</h2>
+          <p>{t('notes.home.emptyHint')}</p>
+        </div>
+      </section>
+    )
+  }
+
+  const recent = showAll ? items : items.slice(0, RECENT_NOTES_LIMIT)
+  // Книги без заметок в графе не появляются; удалённые — в конце (так строит дерево).
+  const books = tree?.books ?? []
 
   return (
     <section className={styles.page}>
-      <header className={styles.intro}>
-        <h1>{t('notes.homeTitle')}</h1>
-        <p>{t('notes.homeDescription')}</p>
-        <Link className={styles.primaryLink} to={`/notes/new${search}`}><GlyphIcon name="plus" /> {t('notes.create')}</Link>
-      </header>
+      {header}
+      {listState}
 
-      <div className={styles.filters}>
-        <input
-          type="search"
-          className={styles.search}
-          value={searchText}
-          onChange={(event) => setSearchText(event.currentTarget.value)}
-          placeholder={t('notes.search')}
-          aria-label={t('notes.search')}
-          maxLength={200}
-        />
-        {tags.length ? (
-          <nav className={styles.tagList} aria-label={t('notes.tags')}>
-            {tags.map(({ tag, count }) => {
-              const isActive = tag === query.tag
-              return (
-                <Link
-                  key={tag}
-                  className={`${styles.tag} ${isActive ? styles.tagActive : ''}`}
-                  to={{ pathname: '/notes', search: notesSearch({ q: query.q, tag: isActive ? '' : tag }) }}
-                  replace
-                  aria-current={isActive ? 'true' : undefined}
-                  title={isActive ? t('notes.tagFilterActive', { tag }) : undefined}
-                >
-                  #{tag}<span className={styles.tagCount}>{count}</span>
-                </Link>
-              )
-            })}
-          </nav>
-        ) : null}
-      </div>
+      {/* Бэкенд отдаёт список без поиска по `updated_at DESC` — первые и есть последние правки. */}
+      {items.length ? (
+        <section className={styles.section} aria-labelledby={recentHeadingId}>
+          <div className={styles.sectionHead}>
+            <h2 id={recentHeadingId} className={styles.eyebrow}>{t(showAll ? 'notes.homeAll' : 'notes.home.recent')}</h2>
+            {total > RECENT_NOTES_LIMIT ? (
+              <button type="button" className={styles.quietButton} aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>
+                {showAll ? t('notes.home.showLess') : t('notes.home.showAll', { count: total })}
+              </button>
+            ) : null}
+          </div>
+          {rows(recent, recentHeadingId)}
+          {showAll ? more : null}
+        </section>
+      ) : null}
 
-      <h2 className={styles.listHeading}>
-        {heading}{status === 'ready' ? <span className={styles.count}>{total}</span> : null}
-      </h2>
-      {status === 'loading' ? <p className={styles.state} role="status">{t('notes.loading')}</p> : null}
-      {status === 'error' ? (
+      {graph.status === 'error' ? (
         <div className={styles.state} role="alert">
-          <span>{t('notes.loadError')}</span>
-          <button type="button" onClick={retry}>{t('notes.retry')}</button>
+          <span>{t('notes.home.booksError')}</span>
+          <button type="button" onClick={retryBooks}>{t('notes.retry')}</button>
         </div>
       ) : null}
-      {status === 'ready' && !items.length ? (
-        <p className={styles.state}>{t(query.q || query.tag ? 'notes.emptySearch' : 'notes.empty')}</p>
+      {books.length ? (
+        <section className={styles.section} aria-labelledby={booksHeadingId}>
+          <h2 id={booksHeadingId} className={styles.eyebrow}>{t('notes.home.books')}</h2>
+          <ul className={styles.books}>
+            {books.map((book) => <li key={book.key}><BookCard book={book} /></li>)}
+          </ul>
+        </section>
       ) : null}
-      {items.length ? (
-        <ul className={styles.cards} aria-label={t('notes.listHeader')}>
-          {items.map((note) => (
-            <li key={note.id}>
-              <Link className={styles.card} to={`/notes/${encodeURIComponent(note.id)}${search}`}>
-                <strong>{note.title}</strong>
-                {note.excerpt ? <span className={styles.excerpt}>{plainExcerpt(note.excerpt)}</span> : null}
-                {note.tags.length ? (
-                  <span className={styles.cardTags}>{note.tags.map((tag) => <span key={tag}>#{tag}</span>)}</span>
-                ) : null}
-                <span className={styles.cardMeta}>
-                  {t('notes.updatedAt', { date: formatDate(note.updated_at) })}
-                  {note.quote_count ? ` · ${t('notes.quoteCount', { count: note.quote_count })}` : ''}
-                </span>
+
+      {tags.length ? (
+        <section className={styles.section} aria-labelledby={tagsHeadingId}>
+          <h2 id={tagsHeadingId} className={styles.eyebrow}>{t('notes.tags')}</h2>
+          <nav className={styles.tags} aria-labelledby={tagsHeadingId}>
+            {tags.map(({ tag, count }) => (
+              <Link key={tag} className={styles.tag} to={{ pathname: '/notes', search: notesSearch({ q: '', tag }) }}>
+                #{tag}<span className={styles.tagCount}>{count}</span>
               </Link>
-            </li>
-          ))}
-        </ul>
+            ))}
+          </nav>
+        </section>
       ) : null}
-      {hasMore ? (
-        <button type="button" className={styles.loadMore} onClick={loadMore} disabled={isLoadingMore}>
-          {t('notes.loadMore')}
-        </button>
-      ) : null}
+
       <p className={styles.storage}>{t('notes.storage')}</p>
     </section>
+  )
+}
+
+/** Строка заметки: корешок книги, название, откуда она и когда её меняли. */
+function NoteRow({ note, book, search, now }: { note: NoteSummary; book: NotesTreeBook | undefined; search: string; now: Date }) {
+  const { t, language } = useTranslation()
+  const formatDate = useNoteDateFormat()
+  const day = noteDay(note.updated_at, now, language === 'ru' ? 'ru-RU' : 'en-US')
+  const dayText = day.kind === 'date' ? day.text : t(day.kind === 'today' ? 'notes.home.today' : 'notes.home.yesterday')
+  const excerpt = note.excerpt ? plainExcerpt(note.excerpt) : ''
+  return (
+    <Link className={styles.row} to={`/notes/${encodeURIComponent(note.id)}${search}`}>
+      <span
+        className={`${styles.spine} ${book ? '' : styles.spineNone}`}
+        style={book ? { background: `var(--cover-${coverTone(book.fileName)})` } : undefined}
+        aria-hidden="true"
+      />
+      <span className={styles.rowText}>
+        <span className={styles.rowTitle}>{note.title}</span>
+        {book || excerpt ? (
+          <span className={styles.rowMeta}>
+            {book ? <span className={styles.rowBook}>{book.title}</span> : null}
+            {excerpt ? <span className={styles.rowExcerpt}>{excerpt}</span> : null}
+          </span>
+        ) : null}
+      </span>
+      <time className={styles.rowDate} dateTime={note.updated_at} title={t('notes.updatedAt', { date: formatDate(note.updated_at) })}>
+        {dayText}
+      </time>
+    </Link>
+  )
+}
+
+/** Карточка книги: обложка, сколько заметок, есть ли конспект и вход в книгу. */
+function BookCard({ book }: { book: NotesTreeBook }) {
+  const { t, tc } = useTranslation()
+  const countText = tc('notes.home.noteCount', book.noteIds.length)
+  const summaryId = book.summaryIds[0]
+  return (
+    <article className={`${styles.book} ${book.deleted ? styles.bookDeleted : ''}`} aria-label={book.title}>
+      <span className={styles.cover} style={{ background: `var(--cover-${coverTone(book.fileName)})` }} aria-hidden="true">
+        {coverInitial(book.title)}
+      </span>
+      <span className={styles.bookText}>
+        <strong className={styles.bookTitle} title={book.fileName}>{book.title}</strong>
+        <span className={styles.bookMeta}>
+          {countText}{summaryId ? ` · ${t('notes.home.hasSummary')}` : ''}
+        </span>
+        <span className={styles.bookActions}>
+          {summaryId ? (
+            <Link className={styles.quietLink} to={`/notes/${encodeURIComponent(summaryId)}`}
+              aria-label={t('notes.home.openSummaryNamed', { title: book.title })}>
+              {t('notesPanel.summary')}
+            </Link>
+          ) : null}
+          {book.jobId ? (
+            <Link className={styles.openBook} to={`/documents/${encodeURIComponent(book.jobId)}`}
+              aria-label={t('notes.home.openBookNamed', { title: book.title })}>
+              {t('notes.home.openBook')}
+            </Link>
+          ) : (
+            <span className={styles.bookGone}>{t('notes.home.bookDeleted')}</span>
+          )}
+        </span>
+      </span>
+    </article>
   )
 }

@@ -10,7 +10,10 @@ export interface NotesTreeBook {
   fileName: string
   title: string
   deleted: boolean
+  /** Конспекты книги первыми, затем заметки с цитатами — по названию. */
   noteIds: string[]
+  /** Заметки о книге целиком (ребро `about`, T-67). */
+  summaryIds: string[]
 }
 
 export interface NotesTreeCount {
@@ -20,7 +23,7 @@ export interface NotesTreeCount {
 
 export interface NotesTree {
   books: NotesTreeBook[]
-  /** Заметки без цитат: «Без книги». */
+  /** Заметки без цитат и без привязки к книге: «Без книги». */
   looseNoteIds: string[]
   /** Название каждой заметки по id. */
   titles: ReadonlyMap<string, string>
@@ -53,7 +56,7 @@ export function buildNotesTree(graph: NoteGraphResponse): NotesTree {
     const source = nodes.get(edge.source)
     const target = nodes.get(edge.target)
     if (!source?.ref || source.type !== 'note' || !target) continue
-    if (edge.type === 'quotes' && target.type === 'document') {
+    if ((edge.type === 'quotes' || edge.type === 'about') && target.type === 'document') {
       const book = books.get(target.id) ?? {
         jobId: target.deleted ? null : target.ref,
         key: target.id,
@@ -61,8 +64,10 @@ export function buildNotesTree(graph: NoteGraphResponse): NotesTree {
         title: bookTitle(target.label),
         deleted: target.deleted,
         noteIds: [],
+        summaryIds: [],
       }
       if (!book.noteIds.includes(source.ref)) book.noteIds.push(source.ref)
+      if (edge.type === 'about' && !book.summaryIds.includes(source.ref)) book.summaryIds.push(source.ref)
       books.set(target.id, book)
       quoting.add(source.ref)
     } else if (edge.type === 'tagged' && target.type === 'tag') {
@@ -76,7 +81,13 @@ export function buildNotesTree(graph: NoteGraphResponse): NotesTree {
     (titles.get(first) ?? '').localeCompare(titles.get(second) ?? '', undefined, { sensitivity: 'base' })
   return {
     books: [...books.values()]
-      .map((book) => ({ ...book, noteIds: book.noteIds.sort(byTitle) }))
+      .map((book) => ({
+        ...book,
+        // Конспект — главное о книге: он первым в её группе.
+        noteIds: book.noteIds.sort((first, second) =>
+          Number(book.summaryIds.includes(second)) - Number(book.summaryIds.includes(first)) || byTitle(first, second)),
+        summaryIds: book.summaryIds.sort(byTitle),
+      }))
       // Удалённые книги — в конце: их заметки живы, но открыть книгу нельзя.
       .sort((first, second) => Number(first.deleted) - Number(second.deleted) || byLabel({ label: first.title }, { label: second.title })),
     looseNoteIds: [...titles.keys()].filter((id) => !quoting.has(id)).sort(byTitle),

@@ -79,18 +79,28 @@ afterEach(() => {
 })
 
 describe('notes section', () => {
-  it('lists notes with readable excerpts and tag counts, and keeps the search in the address', async () => {
+  it('lists recent notes with readable excerpts and filters by a tag kept in the address', async () => {
     const user = userEvent.setup()
     renderNotes('/notes')
-    const list = await screen.findByRole('list', { name: 'Мои заметки' })
+    const list = await screen.findByRole('list', { name: 'Продолжить' })
     expect(within(list).getByRole('link', { name: /Сроки/ }).textContent).toContain('Срок — десять дней. #договор')
-    expect(screen.getByRole('link', { name: /#договор\s*1/ })).toBeTruthy()
 
-    await user.type(screen.getByRole('searchbox', { name: 'Поиск по заметкам' }), 'срок')
-    await waitFor(() => expect(location()).toBe('/notes?q=%D1%81%D1%80%D0%BE%D0%BA'))
+    await user.click(screen.getByRole('link', { name: /#договор\s*1/ }))
+    expect(location()).toBe(`/notes?tag=${encodeURIComponent('договор')}`)
     await waitFor(() => expect(api.listNotes).toHaveBeenLastCalledWith(
-      expect.objectContaining({ q: 'срок', page: 0 }), expect.objectContaining({ accessToken: 'jwt' })))
-    expect(screen.getByRole('heading', { name: /Поиск: «срок»/ })).toBeTruthy()
+      expect.objectContaining({ tag: 'договор', page: 0 }), expect.objectContaining({ accessToken: 'jwt' })))
+    expect(screen.getByRole('heading', { name: /Тег #договор/ })).toBeTruthy()
+
+    await user.click(screen.getByRole('link', { name: 'Сбросить фильтр' }))
+    expect(location()).toBe('/notes')
+    expect(await screen.findByRole('list', { name: 'Продолжить' })).toBeTruthy()
+  })
+
+  it('shows a search from the address as a filtered list', async () => {
+    renderNotes(`/notes?q=${encodeURIComponent('срок')}`)
+    expect(await screen.findByRole('heading', { name: /Поиск: «срок»/ })).toBeTruthy()
+    expect(api.listNotes).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'срок' }), expect.anything())
+    expect(within(screen.getByRole('list', { name: /Поиск: «срок»/ })).getByRole('link', { name: /Сроки/ })).toBeTruthy()
   })
 
   it('creates a note and opens it', async () => {
@@ -222,10 +232,10 @@ describe('notes section', () => {
 
     // Другая заметка открывается из списка раздела; правка первой не теряется.
     await user.click(screen.getByRole('link', { name: 'К списку заметок' }))
-    await user.click(within(await screen.findByRole('list', { name: 'Мои заметки' })).getByRole('link', { name: /Штрафы/ }))
+    await user.click(within(await screen.findByRole('list', { name: 'Продолжить' })).getByRole('link', { name: /Штрафы/ }))
     expect(await screen.findByRole('heading', { name: 'Штрафы', level: 1 })).toBeTruthy()
     await user.click(screen.getByRole('link', { name: 'К списку заметок' }))
-    await user.click(within(await screen.findByRole('list', { name: 'Мои заметки' })).getByRole('link', { name: /Сроки/ }))
+    await user.click(within(await screen.findByRole('list', { name: 'Продолжить' })).getByRole('link', { name: /Сроки/ }))
 
     expect(await screen.findByText('Восстановлен несохранённый черновик.')).toBeTruthy()
     expect((screen.getByLabelText('Текст заметки') as HTMLTextAreaElement).value).toBe('Срок — **десять дней**. #договор Дополнение')

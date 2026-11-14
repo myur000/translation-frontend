@@ -70,13 +70,13 @@ Frontend обновляет JWT за минуту до истечения и п�
 | GET | `/api/documents/{jobId}/status` | JWT | — | `200 DocumentStatusResponse` |
 | GET | `/api/documents/{jobId}/download` | JWT | — | file stream |
 | GET | `/api/documents/{jobId}/text?page=0&size=500` | JWT | query, `size` до 500 | `200 DocumentTextResponse` |
-| GET | `/api/notes?q=&tag=&prefix=&page=&size=` | JWT | query, `size` до 100 | `200 NotePageResponse` |
+| GET | `/api/notes?q=&tag=&prefix=&page=&size=` | JWT | query, `size` до 100 | `200 NotePageResponse`; порядок — `updated_at DESC, id`, с `q` — сначала по релевантности |
 | POST | `/api/notes` | verified JWT | `NoteCreateRequest` | `201 NoteResponse` |
 | GET / PUT / DELETE | `/api/notes/{id}` | JWT (PUT — verified) | `NoteUpdateRequest` с `version` | `200 NoteResponse` / `204` |
 | GET | `/api/notes/{id}/backlinks` | JWT | — | `200 NoteReference[]` |
 | POST / DELETE | `/api/notes/{id}/quotes[/{quoteId}]` | verified JWT (POST) | `NoteQuoteRequest` | `201 NoteQuoteResponse` / `204` |
-| GET | `/api/notes/graph?types=tag` | JWT | — | `200 NoteGraphResponse` (сейчас — только для списка тегов) |
 | POST / DELETE | `/api/notes/{id}/documents[/{jobId}]` | JWT | `NoteDocumentRequest` `{job_id}` | `200 NoteResponse` / `204`; `404 DOCUMENT_NOT_FOUND`, `400 NOTE_DOCUMENT_LIMIT_REACHED` |
+| GET | `/api/notes/graph?types=document,tag,missing` | JWT | — | `200 NoteGraphResponse`: дерево заметок, теги, несозданные ссылки |
 | GET | `/api/documents/history?page=0&size=20` | JWT | query, `size` 1–100 | `200 DocumentHistoryResponse` |
 | GET | `/api/profile` | JWT | — | `200 ProfileResponse` |
 | PUT | `/api/profile` | JWT | `UpdateProfileRequest` | `200 ProfileResponse` |
@@ -288,8 +288,14 @@ OpenAPI выключен по умолчанию. После запуска с
 
 - **Фильтры в адресе.** `?q=` (поиск) и `?tag=` — единственный источник фильтра
   списка: их понимают ссылки на теги в тексте, «Назад» и боковая панель.
-- **Теги.** Отдельного списка тегов backend не отдаёт; он строится из
-  `GET /api/notes/graph?types=tag` (узлы `tag:…` и рёбра `tagged`).
+- **Теги.** Отдельного списка тегов backend не отдаёт; он строится из графа
+  (узлы `tag:…` и рёбра `tagged`). Граф запрашивается один раз на приложение —
+  `GET /api/notes/graph?types=document,tag,missing` в `NotesProvider`: из него
+  же дерево панели заметок и книги на главной раздела.
+- **Порядок списка.** Без `q` backend сортирует по `updated_at DESC, id`
+  (`NoteIndexStore`), поэтому первые заметки — последние изменённые: на этом
+  стоит «Продолжить» на главной и «Недавние» в панели. С `q` первым идёт
+  `ts_rank`.
 - **Синтаксис** `[[…]]` и `#тег` frontend разбирает по тем же правилам, что
   `NoteMarkup` backend (`src/notes/noteSyntax.ts`): тег не начинается после буквы,
   цифры, `_ # / & [`; из одних цифр — не тег; в коде ссылки и теги не ищутся.
@@ -333,6 +339,10 @@ Backend с 2026-11-14 привязывает заметку к документ�
   «Конспект книги» у верха страницы, над заметками к абзацам; в колонке —
   сверху списка со значком §. Конспекты читаются тем же загрузчиком, что и
   цитаты (`loadBookNotes`): заметки книги с цитатами или привязкой.
+- **В разделе «Заметки».** В дереве по книгам конспект первым в группе своей
+  книги, со значком тетради (раньше такая заметка попала бы в «Без книги»).
+  На странице заметки — раздел «О книгах»: привязанные книги со ссылками и
+  «×» (отвязать), ниже выбор своей книги и «Привязать».
 
 ## Заметки рядом с книгой и цитаты (этап 2)
 

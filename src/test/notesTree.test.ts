@@ -57,4 +57,19 @@ describe('notes tree', () => {
     expect(tree.looseNoteIds).toEqual(['n-1', 'n-2'])
     expect(tree.truncated).toBe(true)
   })
+
+  it('puts the summary of a book first in its group instead of «no book»', () => {
+    const tree = buildNotesTree(graph({
+      nodes: [
+        note('n-1', 'Абзац'), note('n-2', 'Конспект'),
+        { id: 'document:j-1', type: 'document', label: 'ledger.docx', ref: 'j-1', deleted: false },
+      ],
+      edges: [
+        { source: 'note:n-1', target: 'document:j-1', type: 'quotes', weight: 1 },
+        { source: 'note:n-2', target: 'document:j-1', type: 'about', weight: 1 },
+      ],
+    }))
+    expect(tree.books[0]).toMatchObject({ noteIds: ['n-2', 'n-1'], summaryIds: ['n-2'] })
+    expect(tree.looseNoteIds).toEqual([])
+  })
 })

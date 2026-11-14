@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { NoteSummary } from '../api/contracts/notes.ts'
-import { getNoteGraph, listNotes } from '../api/notes.ts'
+import { listNotes } from '../api/notes.ts'
 import { useAuth } from '../auth/useAuth.ts'
-import { buildNotesTree, type NotesTree } from './notesTree.ts'
+import type { NotesTree } from './notesTree.ts'
+import { useNotesGraph } from './useNotesGraph.ts'
 
-/** Сколько заметок читаем ради подписей и «Недавних»; дерево строится по графу целиком. */
+/** Сколько заметок читаем ради отрывков и «Недавних»; дерево строится по графу целиком. */
 export const SIDEBAR_NOTES_LIMIT = 100
 /** Пауза после ввода в поиске, чтобы не слать запрос на каждую букву. */
 export const SIDEBAR_SEARCH_DELAY_MS = 250
@@ -23,8 +24,9 @@ export type NotesSidebarResults =
 interface Loaded<T> { key: string; value: T }
 
 /**
- * Данные панели заметок в боковой панели: дерево из графа и последние заметки
- * (для подписей и вида «Недавние»), а при поиске или выбранном теге — найденные
+ * Данные панели заметок в боковой панели: дерево из общего графа заметок
+ * (`useNotesGraph`) и последние заметки (для отрывков и вида «Недавние»), а при
+ * поиске или выбранном теге — найденные
  * заметки. Ничего не грузится, пока панель ни разу не открыли (`enabled`).
  * Перечитывается после любой правки заметок (`revision`).
  */
@@ -34,7 +36,8 @@ export function useNotesSidebar(enabled: boolean, revision: number, query: strin
   useEffect(() => { tokenRef.current = session?.accessToken }, [session?.accessToken])
   const owner = session?.email ?? ''
   const [attempt, setAttempt] = useState(0)
-  const [data, setData] = useState<Loaded<NotesSidebarData> | null>(null)
+  const { graph, retry: retryGraph } = useNotesGraph(enabled)
+  const [recent, setRecent] = useState<Loaded<NoteSummary[] | null> | null>(null)
   const [results, setResults] = useState<Loaded<NotesSidebarResults> | null>(null)
 
   const dataKey = enabled ? `${owner}\n${revision}\n${attempt}` : null
@@ -42,15 +45,10 @@ export function useNotesSidebar(enabled: boolean, revision: number, query: strin
     const token = tokenRef.current
     if (!dataKey || !token) return
     const controller = new AbortController()
-    const options = { accessToken: token, signal: controller.signal }
-    Promise.all([
-      getNoteGraph(['document', 'tag', 'missing'], options),
-      listNotes({ page: 0, size: SIDEBAR_NOTES_LIMIT }, options),
-    ]).then(
-      ([graph, page]) => {
-        if (!controller.signal.aborted) setData({ key: dataKey, value: { status: 'ready', tree: buildNotesTree(graph), recent: page.items } })
-      },
-      () => { if (!controller.signal.aborted) setData({ key: dataKey, value: { status: 'error' } }) },
+    listNotes({ page: 0, size: SIDEBAR_NOTES_LIMIT }, { accessToken: token, signal: controller.signal }).then(
+      (page) => { if (!controller.signal.aborted) setRecent({ key: dataKey, value: page.items }) },
+      // null — ошибка загрузки.
+      () => { if (!controller.signal.aborted) setRecent({ key: dataKey, value: null }) },
     )
     return () => controller.abort()
   }, [dataKey])
@@ -75,13 +73,21 @@ export function useNotesSidebar(enabled: boolean, revision: number, query: strin
     }
   }, [needle, resultsKey, tag])
 
+  // При перечитывании после правки прежний список остаётся на месте и не мигает.
+  // При повторе после ошибки показываем загрузку, а не прежнюю ошибку.
+  const recentShown = recent && (recent.key === dataKey || recent.value) ? recent.value : undefined
+  const data: NotesSidebarData = graph.status === 'error' || recentShown === null ? { status: 'error' }
+    : graph.status === 'ready' && recentShown ? { status: 'ready', tree: graph.tree, recent: recentShown }
+      : { status: 'loading' }
+
   return {
-    // При перечитывании после правки прежнее дерево остаётся на месте и не мигает.
-    // При повторе после ошибки показываем загрузку, а не прежнюю ошибку.
-    data: data && (data.key === dataKey || data.value.status === 'ready') ? data.value : { status: 'loading' } as NotesSidebarData,
+    data,
     results: !resultsKey
       ? { status: 'idle' } as NotesSidebarResults
       : results?.key === resultsKey ? results.value : { status: 'loading' } as NotesSidebarResults,
-    retry: () => setAttempt((value) => value + 1),
+    retry: () => {
+      setAttempt((value) => value + 1)
+      if (graph.status === 'error') retryGraph()
+    },
   }
 }

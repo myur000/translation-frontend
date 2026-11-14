@@ -3,10 +3,16 @@ import { useLocation } from 'react-router'
 import type { NoteSummary } from '../api/contracts/notes.ts'
 import { getNoteGraph, listNotes } from '../api/notes.ts'
 import { useAuth } from '../auth/useAuth.ts'
-import { NotesContext, type NoteDraft, type NoteDrafts, type NotesContextValue, type NoteTagCount } from './NotesContext.ts'
-import { NOTES_PAGE_SIZE, tagCounts } from './noteTags.ts'
+import { NotesContext, type NoteDraft, type NoteDrafts, type NotesContextValue, type NotesGraphState, type NoteTagCount } from './NotesContext.ts'
+import { NOTES_GRAPH_TYPES, NOTES_PAGE_SIZE, tagCounts } from './noteTags.ts'
 import { isNotesPath, readNotesQuery } from './notesQuery.ts'
+import { buildNotesTree, type NotesTree } from './notesTree.ts'
 
+interface LoadedGraph {
+  key: string
+  owner: string
+  value: { status: 'ready'; tree: NotesTree; tags: NoteTagCount[] } | { status: 'error' }
+}
 
 interface LoadedList {
   key: string
@@ -20,6 +26,9 @@ interface LoadedList {
  * Список заметок для раздела `/notes`. Фильтры берутся из адреса; запросы идут
  * только на маршрутах заметок. При смене фильтра или обновлении прежний список
  * остаётся на экране до ответа — без мигания пустого состояния.
+ *
+ * Здесь же граф заметок (`NOTES_GRAPH_TYPES`) — один запрос на всё приложение:
+ * из него теги раздела, дерево панели заметок и книги на главной.
  */
 export function NotesProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth()
@@ -30,12 +39,16 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const [revision, setRevision] = useState(0)
   const [list, setList] = useState<LoadedList | null>(null)
   const [loadingMoreKey, setLoadingMoreKey] = useState<string | null>(null)
-  const [tags, setTags] = useState<{ key: string; tags: NoteTagCount[] } | null>(null)
+  const [isGraphWanted, setGraphWanted] = useState(false)
+  const [graphAttempt, setGraphAttempt] = useState(0)
+  const [graph, setGraph] = useState<LoadedGraph | null>(null)
   useEffect(() => { tokenRef.current = session?.accessToken }, [session?.accessToken])
 
   const owner = session?.email ?? ''
   const listKey = `${owner}\n${query.q}\n${query.tag}\n${revision}`
-  const tagsKey = `${owner}\n${revision}`
+  // Граф один на всё приложение: раньше его отдельно запрашивали теги раздела,
+  // панель заметок и главная — на странице `/notes` выходило три одинаковых запроса.
+  const graphKey = session && (enabled || isGraphWanted) ? `${owner}\n${revision}\n${graphAttempt}` : null
 
   useEffect(() => {
     const token = tokenRef.current
@@ -56,16 +69,17 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const token = tokenRef.current
-    if (!enabled || !token) return
+    if (!graphKey || !token) return
     const controller = new AbortController()
-    getNoteGraph(['tag'], { accessToken: token, signal: controller.signal }).then((graph) => {
-      if (!controller.signal.aborted) setTags({ key: tagsKey, tags: tagCounts(graph) })
+    getNoteGraph([...NOTES_GRAPH_TYPES], { accessToken: token, signal: controller.signal }).then((response) => {
+      if (!controller.signal.aborted) {
+        setGraph({ key: graphKey, owner, value: { status: 'ready', tree: buildNotesTree(response), tags: tagCounts(response) } })
+      }
     }, () => {
-      // Теги — вспомогательный фильтр: без них список заметок полностью работает.
-      if (!controller.signal.aborted) setTags({ key: tagsKey, tags: [] })
+      if (!controller.signal.aborted) setGraph({ key: graphKey, owner, value: { status: 'error' } })
     })
     return () => controller.abort()
-  }, [enabled, tagsKey])
+  }, [graphKey, owner])
 
   const loadMore = useCallback(() => {
     const token = tokenRef.current
@@ -86,6 +100,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   }, [list, listKey, loadingMoreKey, query.q, query.tag])
 
   const notesChanged = useCallback(() => setRevision((value) => value + 1), [])
+  const requestNotesGraph = useCallback(() => setGraphWanted(true), [])
+  const retryNotesGraph = useCallback(() => setGraphAttempt((value) => value + 1), [])
   // Не в sessionStorage: личные тексты не стоит оставлять в хранилище браузера.
   // Провайдер живёт, пока открыт сеанс, — этого хватает для переходов внутри приложения.
   const draftStore = useRef(new Map<string, NoteDraft>())
@@ -101,6 +117,12 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       : current ? current.status
         : list?.status === 'ready' ? 'ready' : 'loading'
     const shown = current ?? (list?.status === 'ready' ? list : null)
+    // После правки прежний граф того же человека остаётся на экране до ответа — без мигания.
+    // После ошибки повтор показывает загрузку, а не прежнюю ошибку.
+    const graphShown = graph && (graph.key === graphKey || (graph.owner === owner && graph.value.status === 'ready')) ? graph.value : null
+    const notesGraph: NotesGraphState = !graphKey ? { status: 'idle' }
+      : !graphShown ? { status: 'loading' }
+        : graphShown.status === 'ready' ? { status: 'ready', tree: graphShown.tree } : { status: 'error' }
     return {
       query,
       items: shown?.items ?? [],
@@ -110,12 +132,15 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       isLoadingMore: loadingMoreKey === listKey,
       loadMore,
       retry: notesChanged,
-      tags: tags?.tags ?? [],
+      tags: graphShown?.status === 'ready' ? graphShown.tags : [],
       notesChanged,
       revision,
+      notesGraph,
+      requestNotesGraph,
+      retryNotesGraph,
       drafts,
     }
-  }, [drafts, enabled, list, listKey, loadMore, loadingMoreKey, notesChanged, query, revision, tags])
+  }, [drafts, enabled, graph, graphKey, list, listKey, loadMore, loadingMoreKey, notesChanged, owner, query, requestNotesGraph, retryNotesGraph, revision])
 
   return <NotesContext.Provider value={value}>{children}</NotesContext.Provider>
 }

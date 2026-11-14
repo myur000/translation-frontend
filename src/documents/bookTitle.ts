@@ -19,7 +19,7 @@ export function coverInitial(title: string) {
 }
 
 /**
- * Число тонов обложек (`--cover-0` … в Sidebar.module.css). Тон выбирается по
+ * Число тонов обложек (`--cover-0` … в styles/tokens.css). Тон выбирается по
  * имени файла, а не по задаче: перевод той же книги на другой язык — та же обложка.
  */
 export const COVER_TONES = 6
