@@ -76,3 +76,23 @@ export function textClickTarget(noteIds: readonly string[], summaryIds: Readonly
   if (summaries.length) return { kind: 'summary', noteId: summaries[0] }
   return { kind: 'notes', noteIds: notes }
 }
+
+/** «Конспект — Книга» на вкладке — просто «Конспект»: книга и так названа в шапке. */
+function shortLabel(title: string, bookTitle: string) {
+  const suffix = ` — ${bookTitle}`
+  return title.endsWith(suffix) && title.length > suffix.length ? title.slice(0, -suffix.length) : title
+}
+
+/**
+ * Подписи вкладок. Короткая — если она ни с чем не совпадает: у книги могут быть
+ * «Конспект» и «Конспект — Книга», и без названия книги обе стали бы «Конспект».
+ */
+export function summaryLabels(summaries: readonly Pick<NoteResponse, 'id' | 'title'>[], bookTitle: string) {
+  const short = summaries.map((note) => shortLabel(note.title, bookTitle))
+  const count = new Map<string, number>()
+  for (const label of short) count.set(label.toLocaleLowerCase(), (count.get(label.toLocaleLowerCase()) ?? 0) + 1)
+  return new Map(summaries.map((note, index) => [
+    note.id,
+    (count.get(short[index].toLocaleLowerCase()) ?? 0) > 1 ? note.title : short[index],
+  ]))
+}

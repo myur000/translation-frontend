@@ -213,6 +213,10 @@ function DocumentWorkspace({
   const canQuote = Boolean(document.jobId) && document.status === 'ready'
   const quoteSelection = useQuoteSelection(synchronizedScroll.originalRef, synchronizedScroll.translationRef, canQuote)
   const [pendingQuote, setPendingQuote] = useState<QuoteSelection | null>(null)
+  // Куда отправлено выделение в колонку: в заметку или выпиской в конспект.
+  const [pendingQuoteKind, setPendingQuoteKind] = useState<'note' | 'summary'>('note')
+  // «В конспект» на полях: закладка раскрывается с формой выписки.
+  const [summaryQuote, setSummaryQuote] = useState<{ nonce: number; selection: QuoteSelection } | null>(null)
   // Метки на полях: цитаты этой книги, перечитываются после каждой правки заметок.
   const { revision: notesRevision } = useNotes()
   // Конспект можно начать, пока книга переводится: заметки о книге грузятся у любой отправленной.
@@ -239,6 +243,12 @@ function DocumentWorkspace({
   const [quoteChoice, setQuoteChoice] = useState<{ x: number; y: number; choices: QuoteChoice[] } | null>(null)
   // Ссылка постоянная: меню подписывается на клики мимо один раз, а не на каждую перерисовку.
   const closeQuoteChoice = useCallback(() => setQuoteChoice(null), [])
+  // Ссылка постоянная: поля зовут её из эффекта, когда закладку с выпиской закрыли.
+  const clearQuoteSelection = quoteSelection.clear
+  const finishSummaryQuote = useCallback(() => {
+    setSummaryQuote(null)
+    clearQuoteSelection()
+  }, [clearQuoteSelection])
   const openFromText = (noteIds: string[], point: { x: number; y: number }) => {
     const target = textClickTarget(noteIds, summaryIds)
     if (target.kind === 'notes') {
@@ -739,6 +749,9 @@ function DocumentWorkspace({
                 linkedNoteIds={textHoverNoteIds}
                 draft={marginDraft}
                 onDraftDone={() => { setMarginDraft(null); quoteSelection.clear() }}
+                summaryQuotes={summaryQuotes}
+                summaryQuote={summaryQuote}
+                onSummaryQuoteDone={finishSummaryQuote}
                 onNoteSaved={bookNotes.upsertNote}
               />
             </Suspense>
@@ -822,7 +835,7 @@ function DocumentWorkspace({
           />
         ) : null}
         {/* Пока цитата оформляется в панели, кнопка над старым выделением только мешает. */}
-        {quoteSelection.selection && !pendingQuote && !marginDraft ? (
+        {quoteSelection.selection && !pendingQuote && !marginDraft && !summaryQuote ? (
           <QuoteSelectionButton
             selection={quoteSelection.selection}
             onQuote={() => {
@@ -832,10 +845,22 @@ function DocumentWorkspace({
               if (isMarginAvailable && viewport) {
                 setMarginDraft((current) => ({ nonce: nextNonce(current), kind: 'quote', selection, anchor: draftAnchor(viewport, rect.top) }))
               } else {
+                setPendingQuoteKind('note')
                 setPendingQuote(selection)
               }
               revealNotes()
             }}
+            onSummary={document.jobId ? () => {
+              const { rect: _rect, ...selection } = quoteSelection.selection!
+              // На полях выписка пишется в закладке конспекта, в колонке — в ней.
+              if (isMarginAvailable) {
+                setSummaryQuote((current) => ({ nonce: nextNonce(current), selection }))
+              } else {
+                setPendingQuoteKind('summary')
+                setPendingQuote(selection)
+              }
+              revealNotes()
+            } : undefined}
           />
         ) : null}
         {isNotesMounted ? (
@@ -872,6 +897,8 @@ function DocumentWorkspace({
                 document={document}
                 bookQuotes={bookQuotes}
                 pendingQuote={pendingQuote}
+                pendingQuoteKind={pendingQuoteKind}
+                summaries={bookNotes.aboutBook}
                 request={notesRequest}
                 onQuoteFinished={() => { setPendingQuote(null); quoteSelection.clear() }}
                 onShowQuote={showQuote}

@@ -176,6 +176,23 @@ describe('notes next to the book', () => {
     expect(api.updateNote).not.toHaveBeenCalled()
   })
 
+  it('writes an excerpt into the current summary of the book in the column', async () => {
+    const user = userEvent.setup()
+    const summary: NoteResponse = { ...storm, id: 's-1', title: 'Конспект — Ledger', body: '', quotes: [] }
+    api.addNoteQuote.mockResolvedValue(quoteResponse)
+    api.getNote.mockResolvedValue(summary)
+    const stormQuote = { ...bookQuote('n-1', 1), noteTitle: 'Шторм', quote: 'Ветер дул с северо-востока.' }
+    renderPanel({ pendingQuote: selection, pendingQuoteKind: 'summary', summaries: [summary], bookQuotes: [stormQuote] })
+    const composer = await screen.findByRole('group', { name: 'Выписка в конспект' })
+    await within(composer).findByRole('button', { name: 'Показать оригинал' })
+    // Без полей «В конспект» пишется в колонке, в тот же текущий конспект, что у закладки.
+    expect(composer.textContent).toContain('В «Конспект — Ledger»')
+    // Заметка «Шторм» цитирует этот абзац — та же мысль уже записана, подсказка ведёт к ней.
+    expect(within(composer).getByRole('button', { name: 'Уже в заметке «Шторм»' })).toBeTruthy()
+    await user.click(within(composer).getByRole('button', { name: 'В конспект' }))
+    expect(api.addNoteQuote).toHaveBeenCalledWith('s-1', expect.objectContaining({ paragraph_index: 1 }), expect.anything())
+  })
+
   it('explains that a removed original can no longer be quoted', async () => {
     text.loadDocumentText.mockResolvedValue({ ...bookText, sourceAvailable: false })
     renderPanel({ pendingQuote: { ...selection, side: 'SOURCE', text: 'north-east' } })

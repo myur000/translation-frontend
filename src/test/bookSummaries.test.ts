@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { NoteResponse } from '../api/contracts/notes.ts'
-import { nextSummaryTitle, pickCurrentSummary, readCurrentSummary, textClickTarget, writeCurrentSummary } from '../notes/bookSummaries.ts'
+import { nextSummaryTitle, pickCurrentSummary, readCurrentSummary, summaryLabels, textClickTarget, writeCurrentSummary } from '../notes/bookSummaries.ts'
 
 const titles = {
   first: (book: string) => `Конспект — ${book}`,
@@ -43,5 +43,13 @@ describe('summaries of a book', () => {
     expect(textClickTarget(['s-1'], summaries)).toEqual({ kind: 'summary', noteId: 's-1' })
     // Слово и в заметке, и в конспекте — выбирает человек.
     expect(textClickTarget(['n-1', 's-1'], summaries)).toEqual({ kind: 'choice', noteIds: ['n-1'], summaryIds: ['s-1'] })
+  })
+
+  it('shortens tab labels without the book title unless two summaries would look the same', () => {
+    const labels = summaryLabels([
+      summary('a', 'Конспект'), summary('b', 'Конспект — Ledger'), summary('c', 'Персонажи — Ledger'),
+    ], 'Ledger')
+    // «Конспект» и «Конспект — Ledger» без названия книги совпали бы — второй остаётся полным.
+    expect([...labels.values()]).toEqual(['Конспект', 'Конспект — Ledger', 'Персонажи'])
   })
 })

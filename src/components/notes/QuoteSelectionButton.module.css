@@ -1,20 +1,35 @@
-.button {
+/* Пара кнопок над выделением — одна «пилюля», разделённая тонкой чертой. */
+.group {
   position: fixed;
   z-index: 40;
   height: 36px;
+  display: flex;
+  overflow: hidden;
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: 999px;
+  box-shadow: var(--shadow-popover);
+  animation: appear 120ms ease-out;
+}
+
+.button {
+  flex: 1 1 auto;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
   padding: 0 12px;
   color: var(--color-on-primary);
-  background: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  border-radius: 999px;
-  box-shadow: var(--shadow-popover);
+  background: transparent;
+  border: 0;
   font-size: 13px;
   font-weight: 650;
-  animation: appear 120ms ease-out;
+  white-space: nowrap;
+}
+
+.button + .button {
+  border-left: 1px solid color-mix(in srgb, var(--color-on-primary) 25%, transparent);
 }
 
 .button:hover {
@@ -23,7 +38,7 @@
 
 .button:focus-visible {
   outline: 3px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline-offset: -3px;
 }
 
 .button svg {
@@ -41,5 +56,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .button { animation: none; }
+  .group { animation: none; }
 }

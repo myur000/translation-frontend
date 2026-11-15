@@ -7,6 +7,7 @@ import type { NoteResponse } from '../api/contracts/notes.ts'
 import { MarginNotes, type MarginDraft } from '../components/notes/MarginNotes.tsx'
 import type { NotesPanelRequest } from '../components/notes/WorkspaceNotesPanel.tsx'
 import type { BookQuote } from '../notes/bookQuotes.ts'
+import type { QuoteSelection } from '../notes/quoteLocator.ts'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
 import { useNotes } from '../notes/useNotes.ts'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
@@ -35,7 +36,14 @@ function Revision() {
 }
 
 /** Колонка книги в текстовом виде: абзацы с номерами, как у текста с сервера. */
-function Book(props: { quotes: BookQuote[]; aboutBook?: NoteResponse[]; request?: NotesPanelRequest | null; draft?: MarginDraft | null }) {
+function Book(props: {
+  quotes: BookQuote[]
+  aboutBook?: NoteResponse[]
+  request?: NotesPanelRequest | null
+  draft?: MarginDraft | null
+  summaryQuote?: { nonce: number; selection: QuoteSelection } | null
+  onSummaryQuoteDone?: () => void
+}) {
   const ref = useRef<HTMLDivElement>(null)
   return (
     <PreferencesProvider>
@@ -49,7 +57,8 @@ function Book(props: { quotes: BookQuote[]; aboutBook?: NoteResponse[]; request?
             </article>
           </div>
           <MarginNotes viewportRef={ref} column="TRANSLATION" jobId="job-1" bookName="lighthouse-keepers-ledger.docx" quotes={props.quotes} aboutBook={props.aboutBook} layoutKey="translation"
-            request={props.request ?? null} draft={props.draft ?? null} onDraftDone={vi.fn()} />
+            request={props.request ?? null} draft={props.draft ?? null} onDraftDone={vi.fn()}
+            summaryQuote={props.summaryQuote ?? null} onSummaryQuoteDone={props.onSummaryQuoteDone} />
           <Revision />
         </NotesProvider>
       </MemoryRouter>
@@ -299,4 +308,51 @@ describe('margin notes', () => {
     await user.keyboard('{Escape}')
   })
 
+
+  it('adds an excerpt with a thought to the current summary from «To summary»', async () => {
+    mockGeometry(560)
+    const user = userEvent.setup()
+    const summary = note('n-9', 'Конспект — Lighthouse keepers ledger', 'О чём книга.')
+    api.addNoteQuote.mockResolvedValue({})
+    api.getNote.mockResolvedValue(summary)
+    api.updateNote.mockResolvedValue({ ...summary, version: 4 })
+    const onDone = vi.fn()
+    const selection: QuoteSelection = { side: 'TRANSLATION', text: 'северо-востока', blockText: 'Ветер дул с северо-востока.', paragraphIndex: 1 }
+    render(<Book quotes={[]} aboutBook={[summary]} summaryQuote={{ nonce: 1, selection }} onSummaryQuoteDone={onDone} />)
+    await nextFrame()
+
+    const bookmark = await screen.findByRole('region', { name: 'Конспект книги' })
+    const composer = within(bookmark).getByRole('group', { name: 'Выписка в конспект' })
+    // Пишется сразу в текущий конспект — название не спрашивается, видно только куда.
+    expect(composer.textContent).toContain('В «Конспект — Lighthouse keepers ledger»')
+    const thought = within(composer).getByRole('textbox', { name: 'Текст заметки' })
+    expect(document.activeElement).toBe(thought)
+    await within(composer).findByRole('button', { name: 'Показать оригинал' })
+    await user.type(thought, 'Ветер — предвестник')
+    await user.keyboard('{Control>}{Enter}{/Control}')
+
+    expect(api.addNoteQuote).toHaveBeenCalledWith('n-9', expect.objectContaining({ paragraph_index: 1, quote: 'северо-востока' }), expect.anything())
+    expect(api.updateNote).toHaveBeenCalledWith('n-9', { title: summary.title, body: 'О чём книга.\n\nВетер — предвестник', version: 3 }, expect.anything())
+    expect(onDone).toHaveBeenCalled()
+    expect(JSON.parse(localStorage.getItem('parallel.current-summary.v1.reader@example.com')!)).toEqual({ 'job-1': 'n-9' })
+  })
+
+  it('starts a summary with the excerpt when the book has none and hints that the passage is already in a note', async () => {
+    mockGeometry(560)
+    const user = userEvent.setup()
+    api.createNote.mockResolvedValue(note('n-10', 'Конспект — Lighthouse keepers ledger', ''))
+    const selection: QuoteSelection = { side: 'TRANSLATION', text: 'дул', blockText: 'Ветер дул с северо-востока.', paragraphIndex: 1 }
+    render(<Book quotes={[quote(storm, 1)]} summaryQuote={{ nonce: 1, selection }} />)
+    await nextFrame()
+
+    const composer = await screen.findByRole('group', { name: 'Выписка в конспект' })
+    // То же место уже в заметке «Шторм» — подсказка со ссылкой, записать всё равно можно.
+    expect(await within(composer).findByRole('button', { name: 'Уже в заметке «Шторм»' })).toBeTruthy()
+    expect(within(composer).getByText('Название: Конспект — Lighthouse keepers ledger')).toBeTruthy()
+    await user.click(within(composer).getByRole('button', { name: 'Начать конспект' }))
+    expect(api.createNote).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Конспект — Lighthouse keepers ledger', job_ids: ['job-1'], quote: expect.objectContaining({ quote: 'дул' }) }),
+      expect.anything(),
+    )
+  })
 })

@@ -1,7 +1,8 @@
-import { useId, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { useId, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import type { NoteResponse } from '../../api/contracts/notes.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
+import { summaryLabels } from '../../notes/bookSummaries.ts'
 import { plainExcerpt } from '../../notes/noteSyntax.ts'
 import { OpenNote } from './MarginOpenNote.tsx'
 import { PanelNewNote, type NewNoteSummary } from './WorkspaceNotesPanel.tsx'
@@ -26,6 +27,8 @@ interface SummaryBookmarkProps {
   /** Тон обложки книги (`--cover-N`): корешок закладки — цвета своей книги. */
   tone: number
   newSummary: NewNoteSummary
+  /** Выписка из выделения («В конспект»): форма вместо текста конспекта; вкладки выбирают, куда писать. */
+  composer?: ReactNode
   onOpen: () => void
   onClose: () => void
   onSelect: (noteId: string) => void
@@ -34,12 +37,6 @@ interface SummaryBookmarkProps {
   onCancelCreate: () => void
   onNoteSaved?: (note: NoteResponse) => void
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
-}
-
-/** «Конспект — Книга» на вкладке — просто «Конспект»: книга и так названа в шапке. */
-function tabLabel(title: string, bookTitle: string) {
-  const suffix = ` — ${bookTitle}`
-  return title.endsWith(suffix) && title.length > suffix.length ? title.slice(0, -suffix.length) : title
 }
 
 /**
@@ -63,8 +60,9 @@ export function SummaryBookmark(props: SummaryBookmarkProps) {
     props.isPopover && isOpen ? cardStyles.popover : '',
   ].join(' ')
   const style = { ...props.style, '--summary-tone': `var(--cover-${props.tone})` } as CSSProperties
+  const labels = summaryLabels(summaries, props.bookTitle)
   // Под подписью — название текущего; если оно и есть «Конспект», то начало его текста.
-  const currentLabel = current ? tabLabel(current.title, props.bookTitle) : ''
+  const currentLabel = current ? labels.get(current.id) ?? current.title : ''
   const peek = currentLabel.toLocaleLowerCase() === t('summaries.caption').toLocaleLowerCase()
     ? plainExcerpt(current?.body ?? '')
     : currentLabel
@@ -138,24 +136,26 @@ export function SummaryBookmark(props: SummaryBookmarkProps) {
                       type="button"
                       role="tab"
                       className={styles.tab}
-                      aria-selected={isSelected}
+                      aria-selected={props.composer ? note.id === current?.id : isSelected}
                       aria-controls={`${ids}-panel`}
                       tabIndex={isSelected ? 0 : -1}
                       title={note.title}
                       onClick={() => select(note.id)}
                     >
-                      {tabLabel(note.title, props.bookTitle)}
+                      {labels.get(note.id) ?? note.title}
                     </button>
                   )
                 })}
               </div>
             ) : null}
-            <button type="button" className={styles.newTab} aria-pressed={isCreating} onClick={props.onCreate}>
-              {count ? t('summaries.new') : t('summaries.start')}
-            </button>
+            {props.composer ? null : (
+              <button type="button" className={styles.newTab} aria-pressed={isCreating} onClick={props.onCreate}>
+                {count ? t('summaries.new') : t('summaries.start')}
+              </button>
+            )}
           </div>
           <div id={`${ids}-panel`} role={count && !isCreating ? 'tabpanel' : undefined} aria-labelledby={current && !isCreating ? `${ids}-tab-${current.id}` : undefined}>
-            {isCreating || !current ? (
+            {props.composer ? props.composer : isCreating || !current ? (
               <PanelNewNote key="summary" summary={props.newSummary} onCreated={props.onCreated} onCancel={props.onCancelCreate} />
             ) : (
               <OpenNote

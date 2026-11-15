@@ -64,6 +64,14 @@
   color: var(--color-text);
 }
 
+/* «Уже в конспекте …» — тихая подсказка со ссылкой, а не предупреждение. */
+.already {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0;
+}
+
 .form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

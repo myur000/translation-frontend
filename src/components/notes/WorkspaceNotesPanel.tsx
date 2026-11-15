@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import type { NoteQuoteResponse, NoteSummary } from '../../api/contracts/notes.ts'
+import type { NoteQuoteResponse, NoteResponse, NoteSummary } from '../../api/contracts/notes.ts'
 import { createNote } from '../../api/notes.ts'
 import { useAuth } from '../../auth/useAuth.ts'
+import { bookTitle } from '../../documents/bookTitle.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
+import { nextSummaryTitle, pickCurrentSummary, readCurrentSummary, writeCurrentSummary } from '../../notes/bookSummaries.ts'
 import { noteErrorMessage, type NoteErrorMessage } from '../../notes/noteErrors.ts'
 import { plainExcerpt } from '../../notes/noteSyntax.ts'
 import type { QuoteSelection } from '../../notes/quoteLocator.ts'
@@ -15,6 +17,9 @@ import { NoteEditor } from './NoteEditor.tsx'
 import { PanelNoteView, type ShowQuoteResult } from './PanelNoteView.tsx'
 import { QuoteComposer } from './QuoteComposer.tsx'
 import styles from './WorkspaceNotesPanel.module.css'
+
+/** Без конспектов — один и тот же пустой список. */
+const NO_SUMMARIES: readonly NoteResponse[] = []
 
 type PanelView = { kind: 'list' } | { kind: 'note'; id: string } | { kind: 'new'; summary?: NewNoteSummary }
 
@@ -43,8 +48,12 @@ interface WorkspaceNotesPanelProps {
   document: DocumentItem
   /** Цитаты этой книги (те же, что у меток на полях): по ним заметки идут по ходу текста. */
   bookQuotes: BookQuote[]
-  /** Выделение, которое пользователь отправил «В заметку»; `null` — цитата не добавляется. */
+  /** Выделение, которое пользователь отправил «В заметку» или «В конспект»; `null` — цитата не добавляется. */
   pendingQuote: QuoteSelection | null
+  /** Куда отправлено выделение: в заметку (по умолчанию) или выпиской в конспект. */
+  pendingQuoteKind?: 'note' | 'summary'
+  /** Конспекты книги: куда пишется выписка и чьи цитаты — «Уже в конспекте». */
+  summaries?: readonly NoteResponse[]
   /** Нажатие на метку у абзаца. */
   request?: NotesPanelRequest | null
   onQuoteFinished: () => void
@@ -68,9 +77,11 @@ function firstParagraphs(quotes: BookQuote[]) {
  * поиск и теги — в разделе «Заметки» (ссылка в заголовке). Просмотр и правка
  * заметки, добавление цитаты из выделения — без ухода со страницы.
  */
-export function WorkspaceNotesPanel({ document, bookQuotes, pendingQuote, request = null, onQuoteFinished, onShowQuote, onClose }: WorkspaceNotesPanelProps) {
+export function WorkspaceNotesPanel({ document, bookQuotes, pendingQuote, pendingQuoteKind = 'note', summaries = NO_SUMMARIES, request = null, onQuoteFinished, onShowQuote, onClose }: WorkspaceNotesPanelProps) {
   const { t } = useTranslation()
   const { notesChanged } = useNotes()
+  const { session } = useAuth()
+  const owner = session?.email ?? ''
   const jobId = document.jobId ?? null
   const [view, setView] = useState<PanelView>(() => (request ? viewForRequest(request) : { kind: 'list' }))
   // Заметки абзаца, по метке которого открыли панель; `null` — все заметки книги.
@@ -93,16 +104,32 @@ export function WorkspaceNotesPanel({ document, bookQuotes, pendingQuote, reques
 
   let content
   if (pendingQuote && jobId && document.status === 'ready') {
+    // Выписка в конспект — в текущий конспект книги (тот же, что у закладки на полях).
+    const isSummary = pendingQuoteKind === 'summary'
+    const summaryIds = new Set(summaries.map((note) => note.id))
+    const summaryTarget = pickCurrentSummary(summaries, readCurrentSummary(owner, jobId))
+    const newSummaryTitle = nextSummaryTitle({
+      first: (book) => t('notes.summaryTitle', { book }),
+      numbered: (book, number) => t('notes.summaryTitleNumbered', { book, number }),
+    }, bookTitle(document.name), summaries)
     content = (
       <div className={styles.body}>
         <QuoteComposer
           // Новое выделение — новый поиск абзаца и новое предложенное название.
-          key={`${pendingQuote.side}:${pendingQuote.text}`}
+          key={`${pendingQuoteKind}:${pendingQuote.side}:${pendingQuote.text}`}
           jobId={jobId}
           selection={pendingQuote}
-          bookNotes={bookNotes.items}
-          bookQuotes={bookQuotes}
-          onSaved={(id) => { changed(); onQuoteFinished(); openNote(id) }}
+          bookNotes={bookNotes.items.filter((note) => !summaryIds.has(note.id))}
+          bookQuotes={bookQuotes.filter((quote) => !summaryIds.has(quote.noteId))}
+          summary={isSummary ? { target: summaryTarget, newTitle: newSummaryTitle } : undefined}
+          otherQuotes={bookQuotes.filter((quote) => summaryIds.has(quote.noteId) !== isSummary)}
+          onOpenOther={(id) => { onQuoteFinished(); openNote(id) }}
+          onSaved={(id) => {
+            if (isSummary) writeCurrentSummary(owner, jobId, id)
+            changed()
+            onQuoteFinished()
+            openNote(id)
+          }}
           onCancel={onQuoteFinished}
         />
       </div>

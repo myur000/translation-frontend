@@ -56,6 +56,11 @@ interface MarginNotesProps {
   linkedNoteIds?: readonly string[]
   draft: MarginDraft | null
   onDraftDone: () => void
+  /** Выписки в конспекты книги: подсказка «Уже в конспекте» и выбор, куда писать. */
+  summaryQuotes?: BookQuote[]
+  /** «В конспект» над выделением: закладка раскрывается с формой выписки. */
+  summaryQuote?: { nonce: number; selection: QuoteSelection } | null
+  onSummaryQuoteDone?: () => void
   /** Заметка сохранена (правка на полях, новая цитата): показать её сразу, не дожидаясь перечитывания книги. */
   onNoteSaved?: (note: NoteResponse) => void
 }
@@ -92,6 +97,7 @@ const DRAFT_KEY = 'draft'
 const NO_GROUPS: CardGroup[] = []
 const NO_IDS: readonly string[] = []
 const NO_NOTES: readonly NoteResponse[] = []
+const NO_QUOTES: BookQuote[] = []
 /** Закладка конспекта: в начале книги — у верха страницы, дальше держится вверху полей. */
 const ABOUT_KEY = 'about'
 /** Отступ закладки от верха страницы и от шапки при прокрутке. */
@@ -111,7 +117,7 @@ const ANCHOR_OFFSET = 4
  * остаются метки, а карточка всплывает у абзаца поверх края текста.
  * Слой лежит внутри прокручиваемой колонки, поэтому карточки едут вместе с текстом.
  */
-export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, aboutBook = NO_NOTES, layoutKey, request, linkedNoteIds = NO_IDS, draft, onDraftDone, onNoteSaved }: MarginNotesProps) {
+export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, aboutBook = NO_NOTES, layoutKey, request, linkedNoteIds = NO_IDS, draft, onDraftDone, summaryQuotes = NO_QUOTES, summaryQuote = null, onSummaryQuoteDone, onNoteSaved }: MarginNotesProps) {
   const { t } = useTranslation()
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const [measured, setMeasured] = useState<Measured | null>(null)
@@ -244,6 +250,13 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
       if (group) setActive({ key: group.key, noteId: request.noteIds.length === 1 ? request.noteIds[0] : null })
     }
   }
+  // «В конспект»: закладка раскрывается с формой выписки.
+  const [handledSummaryQuote, setHandledSummaryQuote] = useState<number | null>(null)
+  if (summaryQuote && summaryQuote.nonce !== handledSummaryQuote) {
+    setHandledSummaryQuote(summaryQuote.nonce)
+    setCreatingSummary(false)
+    setActive({ key: ABOUT_KEY, noteId: null })
+  }
   // Новый черновик раскрывается сразу.
   if (draft && draft.nonce !== handledDraft) {
     setHandledDraft(draft.nonce)
@@ -261,9 +274,11 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
   }, [active, host, isPopover])
 
   // Клик мимо раскрытой карточки её сворачивает, как в Google Docs (кроме меток: они
-  // откроют свою). Черновик так не закрывается: его закрывают явно.
+  // откроют свою). Черновик и форма выписки в конспект так не закрываются: в них
+  // начатая мысль, их закрывают явно («Отмена», Esc).
+  const isComposingSummary = Boolean(summaryQuote) && summaryQuote?.nonce === handledSummaryQuote
   useEffect(() => {
-    if (!active || active.key === DRAFT_KEY) return
+    if (!active || active.key === DRAFT_KEY || (active.key === ABOUT_KEY && isComposingSummary)) return
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Element | null
       if (target?.closest('[data-margin-card], [data-quote-markers]')) return
@@ -271,10 +286,16 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
     }
     document.addEventListener('pointerdown', handlePointerDown)
     return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [active])
+  }, [active, isComposingSummary])
 
   // Раскрытая карточка получает фокус: клавиатура (Esc, Tab) работает сразу после клика по метке.
   const activeKey = active?.key ?? null
+  // Закладку с формой выписки закрыли (Esc, клик мимо, «Отмена») — выписка отменена,
+  // выделение в книге снимается вместе с ней.
+  const isSummaryQuoteOpen = isComposingSummary && activeKey === ABOUT_KEY
+  useEffect(() => {
+    if (summaryQuote && summaryQuote.nonce === handledSummaryQuote && activeKey !== ABOUT_KEY) onSummaryQuoteDone?.()
+  }, [activeKey, handledSummaryQuote, onSummaryQuoteDone, summaryQuote])
   useEffect(() => {
     if (!activeKey) return
     const element = cardRefs.current.get(activeKey)
@@ -371,7 +392,7 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
       numbered: (book, number) => t('notes.summaryTitleNumbered', { book, number }),
     }, bookTitle, aboutBook),
   }
-  /** Новый конспект создан: он становится текущим и сразу виден в закладке. */
+  /** Новый конспект создан (или в него дописана выписка): он текущий и сразу виден в закладке. */
   const finishSummary = (noteId: string) => {
     chooseSummary(noteId)
     setCreatingSummary(false)
@@ -379,6 +400,34 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
     if (token && onNoteSaved) void getNote(noteId, { accessToken: token }).then(onNoteSaved, () => {})
     notesChanged()
   }
+  /** Открыть заметку абзаца из подсказки «Уже в заметке …». */
+  const openNoteCard = (noteId: string) => {
+    const group = groups.find((item) => item.noteIds.includes(noteId))
+    if (group) setActive({ key: group.key, noteId })
+  }
+  /** Открыть конспект из подсказки «Уже в конспекте …». */
+  const openSummaryCard = (noteId: string) => {
+    chooseSummary(noteId)
+    setCreatingSummary(false)
+    setActive({ key: ABOUT_KEY, noteId: null })
+  }
+  const summaryComposer = isSummaryQuoteOpen && summaryQuote ? (
+    <QuoteComposer
+      key={summaryQuote.nonce}
+      jobId={jobId}
+      selection={summaryQuote.selection}
+      bookNotes={bookNotes}
+      bookQuotes={quotes}
+      summary={{ target: currentSummary, newTitle: newSummary.title }}
+      otherQuotes={quotes}
+      onOpenOther={openNoteCard}
+      onSaved={(noteId) => {
+        finishSummary(noteId)
+        onSummaryQuoteDone?.()
+      }}
+      onCancel={() => setActive(null)}
+    />
+  ) : undefined
 
   const popoverStyle = (anchor: number, key: string): CSSProperties => {
     const height = heights.get(key) ?? 240
@@ -421,6 +470,7 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
             bookTitle={bookTitle}
             tone={coverTone(bookName)}
             newSummary={newSummary}
+            composer={summaryComposer}
             onOpen={() => {
               setCreatingSummary(!currentSummary)
               setActive({ key: ABOUT_KEY, noteId: null })
@@ -485,6 +535,11 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
               selection={draft.selection}
               bookNotes={bookNotes}
               bookQuotes={quotes}
+              otherQuotes={summaryQuotes}
+              onOpenOther={(noteId) => {
+                onDraftDone()
+                openSummaryCard(noteId)
+              }}
               onSaved={finishDraft}
               onCancel={closeDraft}
             />

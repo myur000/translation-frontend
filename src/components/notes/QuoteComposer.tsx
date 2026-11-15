@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
-import type { NoteQuoteRequest, NoteSummary } from '../../api/contracts/notes.ts'
+import type { NoteQuoteRequest, NoteResponse, NoteSummary } from '../../api/contracts/notes.ts'
 import { loadDocumentText } from '../../api/documentText.ts'
 import { addNoteQuote, createNote, getNote, updateNote } from '../../api/notes.ts'
 import { useAuth } from '../../auth/useAuth.ts'
@@ -8,7 +8,7 @@ import type { BookQuote } from '../../notes/bookQuotes.ts'
 import { isNoteConflict, noteErrorMessage, type NoteErrorMessage } from '../../notes/noteErrors.ts'
 import { appendToBody, NOTE_TITLE_MAX_LENGTH, noteTitleProblem, titleFromQuote } from '../../notes/noteSyntax.ts'
 import { NOTES_SEARCH_DELAY_MS } from '../../notes/notesQuery.ts'
-import { locateQuote, type QuoteLocation, type QuoteSelection } from '../../notes/quoteLocator.ts'
+import { locateQuote, normalizeQuoteText, type QuoteLocation, type QuoteSelection } from '../../notes/quoteLocator.ts'
 import { useNotesList } from '../../notes/useNotesList.ts'
 import { NoteErrorText } from './NoteErrorText.tsx'
 import styles from './QuoteComposer.module.css'
@@ -23,8 +23,30 @@ interface QuoteComposerProps {
   bookNotes: NoteSummary[]
   /** Цитаты книги: по ним видно, какие заметки уже есть у этого абзаца. */
   bookQuotes: readonly Pick<BookQuote, 'noteId' | 'paragraphIndex'>[]
+  /**
+   * «В конспект»: выписка дописывается в конспект книги, а не становится отдельной
+   * заметкой. `target` — текущий конспект; `null` — у книги его нет, и создаётся
+   * новый (`newTitle`, привязан к книге) сразу с этой выпиской.
+   */
+  summary?: { target: Pick<NoteResponse, 'id' | 'title'> | null; newTitle: string }
+  /**
+   * Цитаты «с другой стороны» (для заметки — выписки в конспект, для конспекта —
+   * цитаты заметок). Если выделено то же место, это подсказка «Уже в …», а не запрет:
+   * заметка и конспект решают разные задачи.
+   */
+  otherQuotes?: readonly Pick<BookQuote, 'noteId' | 'noteTitle' | 'paragraphIndex' | 'quote'>[]
+  onOpenOther?: (noteId: string) => void
   onSaved: (noteId: string) => void
   onCancel: () => void
+}
+
+const NO_QUOTES: NonNullable<QuoteComposerProps['otherQuotes']> = []
+
+/** Одно и то же место: тот же абзац и одна цитата содержит другую. */
+function sameExcerpt(first: string, second: string) {
+  const a = normalizeQuoteText(first).toLocaleLowerCase()
+  const b = normalizeQuoteText(second).toLocaleLowerCase()
+  return Boolean(a && b) && (a.includes(b) || b.includes(a))
 }
 
 /**
@@ -34,13 +56,13 @@ interface QuoteComposerProps {
  * такое название уже занято. Заметки этого абзаца предложены первыми —
  * цитата и текст добавятся к ним в один клик; остальные — в поиске «ещё…».
  */
-export function QuoteComposer({ jobId, selection, bookNotes, bookQuotes, onSaved, onCancel }: QuoteComposerProps) {
+export function QuoteComposer({ jobId, selection, bookNotes, bookQuotes, summary, otherQuotes = NO_QUOTES, onOpenOther, onSaved, onCancel }: QuoteComposerProps) {
   const { t } = useTranslation()
   const { session } = useAuth()
   const ids = useId()
   const [location, setLocation] = useState<QuoteLocation | { status: 'locating' | 'failed' }>({ status: 'locating' })
   const [text, setText] = useState('')
-  const [title, setTitle] = useState(() => titleFromQuote(selection.text))
+  const [title, setTitle] = useState(() => (summary ? summary.newTitle : titleFromQuote(selection.text)))
   const [isTitleOpen, setTitleOpen] = useState(false)
   const [isPairedShown, setPairedShown] = useState(false)
   const [isPickerOpen, setPickerOpen] = useState(false)
@@ -93,6 +115,12 @@ export function QuoteComposer({ jobId, selection, bookNotes, bookQuotes, onSaved
     : [...bookNotes, ...found.items.filter((item) => !bookNotes.some((known) => known.id === item.id))].slice(0, 8)
   const titleProblem = noteTitleProblem(title)
   const canSave = Boolean(quote) && !isSaving
+  // То же место уже есть «с другой стороны»: показываем, где, — записать всё равно можно.
+  const selectedText = quote?.quote ?? selection.text
+  const alreadyIn = paragraphIndex === null ? [] : [...new Map(otherQuotes
+    .filter((item) => item.paragraphIndex === paragraphIndex && sameExcerpt(item.quote, selectedText))
+    .map((item) => [item.noteId, item])).values()]
+  const summaryTarget = summary?.target ?? null
 
   const run = async (operation: (token: string, payload: NoteQuoteRequest) => Promise<string>) => {
     const token = session?.accessToken
@@ -113,8 +141,13 @@ export function QuoteComposer({ jobId, selection, bookNotes, bookQuotes, onSaved
       setTitleOpen(true)
       return
     }
-    const caught = await run(async (token, payload) =>
-      (await createNote({ title: title.trim(), body: text.trim(), quote: payload }, { accessToken: token })).id)
+    // Новый конспект сразу привязан к книге целиком и несёт первую выписку.
+    const caught = await run(async (token, payload) => (await createNote({
+      title: title.trim(),
+      body: text.trim(),
+      quote: payload,
+      ...(summary ? { job_ids: [jobId] } : {}),
+    }, { accessToken: token })).id)
     // Название занято (у заметок оно уникально) — показываем поле, чтобы поменять.
     if (caught && isNoteConflict(caught)) setTitleOpen(true)
   }
@@ -132,17 +165,20 @@ export function QuoteComposer({ jobId, selection, bookNotes, bookQuotes, onSaved
     return note.id
   })
 
+  // Главное действие: в конспекте — дописать в текущий (или начать новый), иначе — новая заметка.
+  const submit = () => (summaryTarget ? addTo(summaryTarget) : create())
+
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault()
-      if (canSave) void create()
+      if (canSave) void submit()
     }
   }
 
   const pairedLabel = t(selection.side === 'SOURCE' ? 'notes.showTranslation' : 'notes.showOriginal')
 
   return (
-    <div className={styles.composer} aria-label={t('quote.title')} role="group" onKeyDown={handleKeyDown}>
+    <div className={styles.composer} aria-label={t(summary ? 'quote.summaryTitle' : 'quote.title')} role="group" onKeyDown={handleKeyDown}>
       <figure className={styles.quote}>
         <blockquote className={styles.quoteText}>{quote?.quote ?? selection.text.trim()}</blockquote>
         {quote?.paired_text ? (
@@ -168,11 +204,21 @@ export function QuoteComposer({ jobId, selection, bookNotes, bookQuotes, onSaved
         </p>
       ) : null}
 
+      {alreadyIn.length ? (
+        <p className={styles.already}>
+          {alreadyIn.map((item) => (
+            <button key={item.noteId} type="button" className={styles.link} onClick={() => onOpenOther?.(item.noteId)}>
+              {t(summary ? 'quote.alreadyInNote' : 'quote.alreadyInSummary', { title: item.noteTitle })}
+            </button>
+          ))}
+        </p>
+      ) : null}
+
       <form
         className={styles.form}
         onSubmit={(event) => {
           event.preventDefault()
-          void create()
+          void submit()
         }}
       >
         <textarea
@@ -184,7 +230,12 @@ export function QuoteComposer({ jobId, selection, bookNotes, bookQuotes, onSaved
           aria-label={t('notes.bodyLabel')}
           onChange={(event) => setText(event.currentTarget.value)}
         />
-        {isTitleOpen ? (
+        {summaryTarget ? (
+          // Выписка идёт в существующий конспект: название не нужно, видно только куда.
+          <p className={styles.titleLine}>
+            <span className={styles.titleValue}>{t('quote.intoSummary', { title: summaryTarget.title })}</span>
+          </p>
+        ) : isTitleOpen ? (
           <label className={styles.titleField}>
             <span>{t('notes.titleLabel')}</span>
             <input
@@ -208,13 +259,15 @@ export function QuoteComposer({ jobId, selection, bookNotes, bookQuotes, onSaved
         {error ? <p className={styles.problem} role="alert"><NoteErrorText message={error} /></p> : null}
         <div className={styles.actions}>
           <button type="submit" className={styles.save} disabled={!canSave}>
-            {isSaving ? t('quote.saving') : t('quote.save')}
+            {isSaving ? t('quote.saving') : t(summaryTarget ? 'quote.addToSummary' : summary ? 'quote.startSummary' : 'quote.save')}
           </button>
           <kbd className={styles.hint}>{t('quote.saveHint')}</kbd>
           <button type="button" className={styles.cancel} onClick={onCancel} disabled={isSaving}>{t('common.cancel')}</button>
         </div>
       </form>
 
+      {/* Выписка в конспект не ищет другую заметку: для этого есть «В заметку». */}
+      {summary ? null : (
       <div className={styles.existing}>
         {paragraphNotes.map((note) => (
           <button key={note.id} type="button" className={styles.addTo} disabled={!canSave} onClick={() => void addTo(note)}>
@@ -231,7 +284,8 @@ export function QuoteComposer({ jobId, selection, bookNotes, bookQuotes, onSaved
           {paragraphNotes.length ? t('quote.more') : t('quote.otherNote')}
         </button>
       </div>
-      {isPickerOpen ? (
+      )}
+      {isPickerOpen && !summary ? (
         <section id={`${ids}-picker`} className={styles.picker} aria-label={t('quote.otherNote')}>
           <input
             type="search"
