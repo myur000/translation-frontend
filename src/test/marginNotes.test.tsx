@@ -48,7 +48,7 @@ function Book(props: { quotes: BookQuote[]; aboutBook?: NoteResponse[]; request?
               <p data-paragraph-index="2">Незадолго до полуночи он увидел свет.</p>
             </article>
           </div>
-          <MarginNotes viewportRef={ref} column="TRANSLATION" jobId="job-1" quotes={props.quotes} aboutBook={props.aboutBook} layoutKey="translation"
+          <MarginNotes viewportRef={ref} column="TRANSLATION" jobId="job-1" bookName="lighthouse-keepers-ledger.docx" quotes={props.quotes} aboutBook={props.aboutBook} layoutKey="translation"
             request={props.request ?? null} draft={props.draft ?? null} onDraftDone={vi.fn()} />
           <Revision />
         </NotesProvider>
@@ -69,6 +69,8 @@ function mockGeometry(pageWidth: number) {
 const nextFrame = () => act(() => new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve())))
 
 beforeEach(() => {
+  // Текущий конспект книги запоминается в localStorage: тесты не делят его между собой.
+  localStorage.clear()
   for (const mock of Object.values(api)) mock.mockReset()
   api.listNotes.mockResolvedValue({ items: [], page: 0, size: 50, total_elements: 0, total_pages: 0 })
   text.loadDocumentText.mockResolvedValue({ sourceAvailable: true, aligned: true, truncated: false, paragraphs: [
@@ -213,41 +215,85 @@ describe('margin notes', () => {
     expect((await screen.findByRole('region', { name: 'Новая заметка' })).style.top).toBe('1125px')
   })
 
-  it('pins the book summary at the top of the margin and opens it from the «+» menu', async () => {
+  it('keeps the summary at hand: a bookmark at the top of the margin that stays while reading', async () => {
     mockGeometry(560)
-    const user = userEvent.setup()
-    const summary = note('n-9', 'Конспект — Ledger', 'О чём книга.')
-    const { rerender } = render(<Book quotes={[quote(storm, 1)]} aboutBook={[summary]} />)
+    const summaries = [note('n-9', 'Конспект — Lighthouse keepers ledger', 'О чём книга.'), note('n-8', 'Персонажи', 'Элиас.')]
+    render(<Book quotes={[quote(storm, 1)]} aboutBook={summaries} />)
     await nextFrame()
 
-    const card = await screen.findByRole('region', { name: 'Конспект книги' })
-    expect(card.textContent).toContain('Конспект книги')
-    expect(card.textContent).toContain('Конспект — Ledger')
-    // Карточка конспекта — у верха страницы (jsdom не считает высот абзацев, порядок проверяется вживую).
-    expect(card.style.top).toBeTruthy()
+    const bookmark = await screen.findByRole('region', { name: 'Конспект книги' })
+    expect(bookmark.textContent).toContain('Конспекты · 2')
+    expect(bookmark.textContent).toContain('Конспект')
+    // В начале книги — у верха страницы, дальше держится под шапкой: книга едет, закладка нет.
+    expect(bookmark.style.top).toBe('12px')
+    const column = screen.getByRole('region', { name: 'Колонка' })
+    column.scrollTop = 900
+    column.dispatchEvent(new Event('scroll'))
+    expect(bookmark.style.top).toBe('912px')
+  })
 
-    rerender(<Book quotes={[quote(storm, 1)]} aboutBook={[summary]} request={{ nonce: 5, noteIds: ['n-9'], about: true }} />)
-    expect(await screen.findByRole('heading', { name: 'Конспект — Ledger' })).toBeTruthy()
+  it('opens the current summary, switches between summaries and remembers the choice', async () => {
+    mockGeometry(560)
+    const user = userEvent.setup()
+    const summaries = [note('n-9', 'Конспект — Lighthouse keepers ledger', 'О чём книга.'), note('n-8', 'Персонажи', 'Элиас.')]
+    const { unmount } = render(<Book quotes={[]} aboutBook={summaries} />)
+    await nextFrame()
+
+    const bookmark = await screen.findByRole('region', { name: 'Конспект книги' })
+    await user.click(within(bookmark).getByRole('button', { expanded: false }))
+    // На вкладке книга не повторяется: «Конспект — Lighthouse keepers ledger» → «Конспект».
+    expect(within(bookmark).getByRole('tab', { name: 'Конспект' }).getAttribute('aria-selected')).toBe('true')
+    expect(within(bookmark).getByRole('heading', { name: 'Конспект — Lighthouse keepers ledger' })).toBeTruthy()
+
+    await user.click(within(bookmark).getByRole('tab', { name: 'Персонажи' }))
+    expect(within(bookmark).getByRole('heading', { name: 'Персонажи' })).toBeTruthy()
+    expect(JSON.parse(localStorage.getItem('parallel.current-summary.v1.reader@example.com')!)).toEqual({ 'job-1': 'n-8' })
+    await user.click(within(bookmark).getByRole('button', { name: 'Свернуть конспект' }))
+    unmount()
+
+    // Текущий конспект запомнился для книги: свёрнутая закладка показывает его.
+    render(<Book quotes={[]} aboutBook={summaries} />)
+    await nextFrame()
+    expect((await screen.findByRole('region', { name: 'Конспект книги' })).textContent).toContain('Персонажи')
+  })
+
+  it('starts a new summary with a free title, links it to the book and makes it current', async () => {
+    mockGeometry(560)
+    const user = userEvent.setup()
+    api.createNote.mockResolvedValue(note('n-10', 'Конспект 2 — Lighthouse keepers ledger', ''))
+    const summaries = [note('n-9', 'Конспект — Lighthouse keepers ledger', 'О чём книга.')]
+    render(<Book quotes={[]} aboutBook={summaries} request={{ nonce: 7, noteIds: [], about: true, aboutAction: 'new' }} />)
+    await nextFrame()
+
+    const bookmark = await screen.findByRole('region', { name: 'Конспект книги' })
+    expect(within(bookmark).getByRole('button', { name: '+ Новый' }).getAttribute('aria-pressed')).toBe('true')
+    // «Конспект — …» уже занят: у названий заметок уникальность.
+    expect((within(bookmark).getByRole('textbox', { name: 'Название' }) as HTMLInputElement).value).toBe('Конспект 2 — Lighthouse keepers ledger')
+    await user.type(within(bookmark).getByRole('textbox', { name: 'Текст заметки' }), 'Вторая мысль о книге.')
+    await user.click(within(bookmark).getByRole('button', { name: 'Создать заметку' }))
+    expect(api.createNote).toHaveBeenCalledWith(
+      { title: 'Конспект 2 — Lighthouse keepers ledger', body: 'Вторая мысль о книге.', job_ids: ['job-1'] },
+      expect.objectContaining({ accessToken: 'jwt' }),
+    )
+    // Заметки перечитываются, новый конспект — текущий.
+    expect(screen.getByRole('status', { name: 'Ревизия заметок' }).textContent).toBe('1')
+    expect(JSON.parse(localStorage.getItem('parallel.current-summary.v1.reader@example.com')!)).toEqual({ 'job-1': 'n-10' })
+  })
+
+  it('invites to start a summary when the book has none and toggles from the K key request', async () => {
+    mockGeometry(560)
+    const user = userEvent.setup()
+    const { rerender } = render(<Book quotes={[]} />)
+    await nextFrame()
+
+    const bookmark = await screen.findByRole('region', { name: 'Конспект книги' })
+    expect(bookmark.textContent).toContain('+ Начать конспект')
+    rerender(<Book quotes={[]} request={{ nonce: 1, noteIds: [], about: true, aboutAction: 'toggle' }} />)
+    expect((await within(bookmark).findByRole('textbox', { name: 'Название' }) as HTMLInputElement).value).toBe('Конспект — Lighthouse keepers ledger')
+    // Тот же K ещё раз сворачивает закладку.
+    rerender(<Book quotes={[]} request={{ nonce: 2, noteIds: [], about: true, aboutAction: 'toggle' }} />)
+    expect(within(bookmark).queryByRole('textbox', { name: 'Название' })).toBeNull()
     await user.keyboard('{Escape}')
   })
 
-  it('creates a book summary linked to the book from a draft', async () => {
-    mockGeometry(560)
-    const user = userEvent.setup()
-    api.createNote.mockResolvedValue(note('n-10', 'Конспект — Ledger', ''))
-    render(<Book quotes={[]} draft={{ nonce: 3, kind: 'new', anchor: 200, summary: { jobId: 'job-1', title: 'Конспект — Ledger' } }} />)
-    await nextFrame()
-
-    expect(screen.getByRole('status', { name: 'Ревизия заметок' }).textContent).toBe('0')
-    const draft = await screen.findByRole('region', { name: 'Новый конспект книги' })
-    expect((within(draft).getByRole('textbox', { name: 'Название' }) as HTMLInputElement).value).toBe('Конспект — Ledger')
-    await user.type(within(draft).getByRole('textbox', { name: 'Текст заметки' }), 'Главное о книге.')
-    await user.click(within(draft).getByRole('button', { name: 'Создать заметку' }))
-    expect(api.createNote).toHaveBeenCalledWith(
-      { title: 'Конспект — Ledger', body: 'Главное о книге.', job_ids: ['job-1'] },
-      expect.objectContaining({ accessToken: 'jwt' }),
-    )
-    // Заметки перечитываются: карточка конспекта появится без перезагрузки страницы.
-    expect(screen.getByRole('status', { name: 'Ревизия заметок' }).textContent).toBe('1')
-  })
 })

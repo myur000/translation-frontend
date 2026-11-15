@@ -2,6 +2,7 @@ import { useTranslation } from '../../i18n/useTranslation.ts'
 import type { LayoutPreset } from '../../workspace/workspaceLayout.ts'
 import { LayoutSwitcher, type PaneLanguage } from './LayoutSwitcher.tsx'
 import { NotesToggle } from './NotesToggle.tsx'
+import { SummaryToggle } from './SummaryToggle.tsx'
 import { WorkspaceViewButton } from './WorkspaceViewButton.tsx'
 import styles from './WorkspaceViewBar.module.css'
 
@@ -13,12 +14,14 @@ interface WorkspaceViewBarProps {
   isScrollSyncEnabled: boolean
   onToggleScrollSync: () => void
   notes: { isOpen: boolean; panelId: string; onToggle: () => void }
+  /** Конспект книги; без него (документ ещё не отправлен) кнопки нет. */
+  summary?: { onToggle: () => void }
   onOpenFullscreen: () => void
 }
 
 /**
  * Группа «вид документа» внутри нижней панели: что видно на экране и что рядом с
- * книгой (заметки; позже граф). Состав кнопок от раскладки не зависит — иначе панель,
+ * книгой (заметки и конспект; позже граф). Состав кнопок от раскладки не зависит — иначе панель,
  * выровненная по центру, сдвигалась бы при каждом переключении.
  */
 export function WorkspaceViewBar(props: WorkspaceViewBarProps) {
@@ -34,6 +37,7 @@ export function WorkspaceViewBar(props: WorkspaceViewBarProps) {
       />
       {/* Заметки — тоже «что рядом с книгой», поэтому сразу за раскладкой. */}
       <NotesToggle isOpen={props.notes.isOpen} panelId={props.notes.panelId} onToggle={props.notes.onToggle} />
+      {props.summary ? <SummaryToggle onToggle={props.summary.onToggle} /> : null}
       <span className={styles.separator} aria-hidden="true" />
       <WorkspaceViewButton layout={props.layout} onOpen={props.onOpenFullscreen} />
     </div>

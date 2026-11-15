@@ -4,7 +4,9 @@ import { Link } from 'react-router'
 import type { NoteQuoteSide, NoteResponse, NoteSummary } from '../../api/contracts/notes.ts'
 import { getNote } from '../../api/notes.ts'
 import { useAuth } from '../../auth/useAuth.ts'
+import { bookTitle as titleOfBook, coverTone } from '../../documents/bookTitle.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
+import { nextSummaryTitle, pickCurrentSummary, readCurrentSummary, writeCurrentSummary } from '../../notes/bookSummaries.ts'
 import type { BookQuote } from '../../notes/bookQuotes.ts'
 import {
   CARD_EDGE_GAP,
@@ -19,10 +21,10 @@ import { placeMarkers, quoteRanges } from '../../notes/quoteMarkerLayout.ts'
 import { setActiveQuoteHighlight } from '../../notes/quoteRanges.ts'
 import { useLayoutSettling } from '../../hooks/useLayoutSettling.ts'
 import { useNotes } from '../../notes/useNotes.ts'
-import { NoteContent } from './NoteContent.tsx'
-import { NoteEditSession } from './NoteEditSession.tsx'
+import { OpenNote } from './MarginOpenNote.tsx'
+import { SummaryBookmark } from './SummaryBookmark.tsx'
 import { QuoteComposer } from './QuoteComposer.tsx'
-import { PanelNewNote, type NewNoteSummary, type NotesPanelRequest } from './WorkspaceNotesPanel.tsx'
+import { PanelNewNote, type NotesPanelRequest } from './WorkspaceNotesPanel.tsx'
 import styles from './MarginNotes.module.css'
 
 /**
@@ -33,7 +35,7 @@ import styles from './MarginNotes.module.css'
  */
 export type MarginDraft =
   | { nonce: number; kind: 'quote'; selection: QuoteSelection; anchor: number }
-  | { nonce: number; kind: 'new'; anchor: number; summary?: NewNoteSummary }
+  | { nonce: number; kind: 'new'; anchor: number }
 
 
 interface MarginNotesProps {
@@ -41,8 +43,10 @@ interface MarginNotesProps {
   viewportRef: RefObject<HTMLDivElement | null>
   column: NoteQuoteSide
   jobId: string
+  /** Имя файла книги: название в шапке конспекта и цвет его корешка (тон обложки). */
+  bookName: string
   quotes: BookQuote[]
-  /** Конспекты книги — заметки о ней целиком: карточка «Конспект книги» вверху полей. */
+  /** Конспекты книги — заметки о ней целиком: закладка «Конспект» вверху полей. */
   aboutBook?: readonly NoteResponse[]
   /** Меняется, когда колонка могла смонтироваться заново (раскладка, полный экран). */
   layoutKey: string
@@ -71,7 +75,7 @@ interface Measured {
   groups: CardGroup[]
   /** Правый край страницы в координатах содержимого колонки: карточки встают сразу за ним. */
   pageRight: number
-  /** Верх страницы в тех же координатах: там стоит карточка конспекта. */
+  /** Верх страницы в тех же координатах: там закладка конспекта в начале книги. */
   pageTop: number
 }
 
@@ -80,10 +84,12 @@ const DRAFT_KEY = 'draft'
 const NO_GROUPS: CardGroup[] = []
 const NO_IDS: readonly string[] = []
 const NO_NOTES: readonly NoteResponse[] = []
-/** Карточка конспекта — у начала страницы, над заметками к абзацам. */
+/** Закладка конспекта: в начале книги — у верха страницы, дальше держится вверху полей. */
 const ABOUT_KEY = 'about'
-/** Отступ карточки конспекта от верха страницы. */
+/** Отступ закладки от верха страницы и от шапки при прокрутке. */
 const ABOUT_OFFSET = 12
+/** Высота свёрнутой закладки, пока она не измерена: место под неё у начала книги. */
+const BOOKMARK_HEIGHT = 56
 /** Ширина всплывающей карточки, когда на полях места нет. */
 const POPOVER_MAX_WIDTH = 360
 /** Метка по центру первой строки: карточка встаёт чуть выше, вровень со строкой. */
@@ -97,7 +103,7 @@ const ANCHOR_OFFSET = 4
  * остаются метки, а карточка всплывает у абзаца поверх края текста.
  * Слой лежит внутри прокручиваемой колонки, поэтому карточки едут вместе с текстом.
  */
-export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO_NOTES, layoutKey, request, linkedNoteIds = NO_IDS, draft, onDraftDone, onNoteSaved }: MarginNotesProps) {
+export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, aboutBook = NO_NOTES, layoutKey, request, linkedNoteIds = NO_IDS, draft, onDraftDone, onNoteSaved }: MarginNotesProps) {
   const { t } = useTranslation()
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const [measured, setMeasured] = useState<Measured | null>(null)
@@ -116,6 +122,15 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
   const isSettling = useLayoutSettling(host)
   const { notesChanged } = useNotes()
   const { session } = useAuth()
+  const owner = session?.email ?? ''
+  // Текущий конспект книги — с него раскрывается закладка; запоминается для книги.
+  const [rememberedSummaryId, setRememberedSummaryId] = useState(() => readCurrentSummary(owner, jobId))
+  const [isCreatingSummary, setCreatingSummary] = useState(false)
+  const currentSummary = pickCurrentSummary(aboutBook, rememberedSummaryId)
+  const chooseSummary = (noteId: string) => {
+    setRememberedSummaryId(noteId)
+    writeCurrentSummary(owner, jobId, noteId)
+  }
 
   // Свободное место справа от страницы, отступ под карточки и места абзацев.
   useEffect(() => {
@@ -194,10 +209,18 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
   const pageRight = measured?.host === host ? measured.pageRight : 0
   const aboutAnchor = (measured?.host === host ? measured.pageTop : 0) + ABOUT_OFFSET
 
-  // «Конспект книги» из меню «+»: раскрыть карточку конспекта.
+  // Конспект из меню «+», кнопки «Конспект» или клавиши K: раскрыть закладку (или свернуть).
   if (request?.about && request.nonce !== handledRequest) {
     setHandledRequest(request.nonce)
-    setActive({ key: ABOUT_KEY, noteId: null })
+    if (request.aboutAction === 'toggle' && active?.key === ABOUT_KEY) {
+      setActive(null)
+    } else {
+      // Ссылка на конкретный конспект делает его текущим.
+      const requested = request.noteIds.length === 1 ? aboutBook.find((note) => note.id === request.noteIds[0]) : undefined
+      if (requested) chooseSummary(requested.id)
+      setCreatingSummary(request.aboutAction === 'new' || (!aboutBook.length && !requested))
+      setActive({ key: ABOUT_KEY, noteId: null })
+    }
   }
   // Метка на полях: раскрыть заметки её абзаца.
   if (request && !request.about && request.nonce !== handledRequest) {
@@ -243,6 +266,23 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
     const element = cardRefs.current.get(activeKey)
     if (element && !element.contains(document.activeElement)) element.focus({ preventScroll: true })
   }, [activeKey, isPopover])
+
+  // Закладка конспекта не уезжает с текстом: в начале книги она у верха страницы, дальше
+  // держится под шапкой. Верх ставится прямо в обработчике прокрутки, без перерисовки
+  // React, — иначе закладка отставала бы от текста на кадр и дрожала.
+  useLayoutEffect(() => {
+    if (!host || !fit) return
+    const chromeTop = parseFloat(getComputedStyle(host).getPropertyValue('--chrome-top')) || 0
+    const place = () => {
+      const element = cardRefs.current.get(ABOUT_KEY)
+      if (!element) return
+      const pinned = host.scrollTop + chromeTop + ABOUT_OFFSET
+      element.style.top = `${isPopover ? pinned : Math.max(aboutAnchor, pinned)}px`
+    }
+    place()
+    host.addEventListener('scroll', place, { passive: true })
+    return () => host.removeEventListener('scroll', place)
+  }, [aboutAnchor, activeKey, fit, host, isPopover, isCreatingSummary, aboutBook.length])
 
   // Esc, нажатый вне карточек (фокус ушёл на страницу), тоже закрывает открытую карточку —
   // раньше обработчика полноэкранного режима, чтобы тот же Esc не выводил из него.
@@ -294,8 +334,7 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
   const finishDraft = (noteId: string) => {
     const token = session?.accessToken
     if (token && onNoteSaved) void getNote(noteId, { accessToken: token }).then(onNoteSaved, () => {})
-    // Созданный конспект сразу виден раскрытым: карточка появится, когда заметки перечитаются.
-    setActive(draft?.kind === 'new' && draft.summary ? { key: ABOUT_KEY, noteId: null } : null)
+    setActive(null)
     notesChanged()
     onDraftDone()
   }
@@ -320,10 +359,29 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
   const marginLeft = pageRight + CARD_EDGE_GAP
   const slots = [
     ...groups.map((group) => ({ key: group.key, anchor: group.anchor, height: heights.get(group.key) ?? 64 })),
-    ...(aboutBook.length ? [{ key: ABOUT_KEY, anchor: aboutAnchor, height: heights.get(ABOUT_KEY) ?? 64 }] : []),
+    // Место под свёрнутую закладку в начале книги: первые карточки встают под ней. Раскрытая
+    // закладка ложится поверх карточек и их не двигает — иначе они прыгали бы при каждом клике.
+    { key: ABOUT_KEY, anchor: aboutAnchor, height: BOOKMARK_HEIGHT },
     ...(draft ? [{ key: DRAFT_KEY, anchor: draft.anchor, height: heights.get(DRAFT_KEY) ?? 240 }] : []),
   ]
-  const tops = placeCards(slots, active?.key ?? null)
+  const tops = placeCards(slots, active && active.key !== ABOUT_KEY ? active.key : null)
+  const isBookmarkOpen = active?.key === ABOUT_KEY
+  const bookTitle = titleOfBook(bookName)
+  const newSummary = {
+    jobId,
+    title: nextSummaryTitle({
+      first: (book) => t('notes.summaryTitle', { book }),
+      numbered: (book, number) => t('notes.summaryTitleNumbered', { book, number }),
+    }, bookTitle, aboutBook),
+  }
+  /** Новый конспект создан: он становится текущим и сразу виден в закладке. */
+  const finishSummary = (noteId: string) => {
+    chooseSummary(noteId)
+    setCreatingSummary(false)
+    const token = session?.accessToken
+    if (token && onNoteSaved) void getNote(noteId, { accessToken: token }).then(onNoteSaved, () => {})
+    notesChanged()
+  }
 
   const popoverStyle = (anchor: number, key: string): CSSProperties => {
     const height = heights.get(key) ?? 240
@@ -338,22 +396,40 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
 
   return createPortal(
     <div className={`${styles.layer} ${isPopover ? styles.popoverLayer : ''} ${isSettling ? styles.settling : ''}`} data-margin-notes="" data-quote-ignore="">
-      {aboutBook.length && (!isPopover || active?.key === ABOUT_KEY) ? (
-        <MarginCard
+      {/* Без места на полях свёрнутая закладка не закрывает текст: конспект — по кнопке и K. */}
+      {!isPopover || isBookmarkOpen ? (
+        <SummaryBookmark
           cardRef={cardRef(ABOUT_KEY)}
           cardKey={ABOUT_KEY}
-          style={cardStyle(ABOUT_KEY, aboutAnchor)}
+          style={isPopover ? { left: host.scrollLeft + VIEWPORT_SIDE_PADDING, width: cardWidth } : { left: marginLeft, width: cardWidth }}
           isPopover={isPopover}
-          isAbout
-          notes={[...aboutBook]}
-          paragraph={null}
-          isActive={active?.key === ABOUT_KEY}
-          isLinked={false}
-          activeNoteId={active?.key === ABOUT_KEY ? active.noteId : null}
-          onActivate={(noteId) => setActive({ key: ABOUT_KEY, noteId })}
-          onHover={(isHovered) => setHoveredKey((current) => (isHovered ? ABOUT_KEY : current === ABOUT_KEY ? null : current))}
-          onKeyDown={handleKeyDown}
+          isOpen={isBookmarkOpen}
+          summaries={aboutBook}
+          current={currentSummary}
+          isCreating={isCreatingSummary || !currentSummary}
+          bookTitle={bookTitle}
+          tone={coverTone(bookName)}
+          newSummary={newSummary}
+          onOpen={() => {
+            setCreatingSummary(!currentSummary)
+            setActive({ key: ABOUT_KEY, noteId: null })
+          }}
+          onClose={() => {
+            setCreatingSummary(false)
+            setActive(null)
+          }}
+          onSelect={(noteId) => {
+            setCreatingSummary(false)
+            chooseSummary(noteId)
+          }}
+          onCreate={() => setCreatingSummary(true)}
+          onCreated={finishSummary}
+          onCancelCreate={() => {
+            setCreatingSummary(false)
+            if (!currentSummary) setActive(null)
+          }}
           onNoteSaved={onNoteSaved}
+          onKeyDown={handleKeyDown}
         />
       ) : null}
       {groups.map((group) => {
@@ -386,7 +462,7 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
           data-margin-card=""
           className={`${styles.card} ${styles.activeCard} ${isPopover ? styles.popover : ''}`}
           style={cardStyle(DRAFT_KEY, draft.anchor)}
-          aria-label={t(draft.kind === 'quote' ? 'marginNotes.quoteDraft' : draft.summary ? 'marginNotes.summaryDraft' : 'notesPanel.newNote')}
+          aria-label={t(draft.kind === 'quote' ? 'marginNotes.quoteDraft' : 'notesPanel.newNote')}
           tabIndex={-1}
           onKeyDown={handleKeyDown}
         >
@@ -401,7 +477,7 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
               onCancel={closeDraft}
             />
           ) : (
-            <PanelNewNote key={draft.nonce} summary={draft.summary} onCreated={finishDraft} onCancel={closeDraft} />
+            <PanelNewNote key={draft.nonce} onCreated={finishDraft} onCancel={closeDraft} />
           )}
         </section>
       ) : null}
@@ -418,8 +494,6 @@ interface MarginCardProps {
   notes: NoteResponse[]
   paragraph: number | null
   isActive: boolean
-  /** Карточка конспекта: заметки о книге целиком, без абзаца. */
-  isAbout?: boolean
   /** Курсор над цитатой этой карточки в тексте. */
   isLinked: boolean
   /** Какая заметка абзаца раскрыта; `null` — первая. */
@@ -437,7 +511,7 @@ interface MarginCardProps {
  * заметка целиком, остальные строками; клик по строке раскрывает её.
  * Сворачивается кликом мимо или Esc.
  */
-function MarginCard({ cardRef, cardKey, style, isPopover, notes, paragraph, isActive, isAbout = false, isLinked, activeNoteId, onActivate, onHover, onKeyDown, onNoteSaved }: MarginCardProps) {
+function MarginCard({ cardRef, cardKey, style, isPopover, notes, paragraph, isActive, isLinked, activeNoteId, onActivate, onHover, onKeyDown, onNoteSaved }: MarginCardProps) {
   const { t } = useTranslation()
   const { drafts } = useNotes()
   const open = notes.find((note) => note.id === activeNoteId) ?? notes[0] ?? null
@@ -445,11 +519,9 @@ function MarginCard({ cardRef, cardKey, style, isPopover, notes, paragraph, isAc
   const [editingId, setEditingId] = useState<string | null>(() => (open && drafts.get(open.id) ? open.id : null))
   if (!notes.length || !open) return null
   const isGroup = notes.length > 1
-  const label = isAbout ? t('marginNotes.aboutBook') : isGroup ? t('marginNotes.groupLabel', { count: notes.length }) : open.title
+  const label = isGroup ? t('marginNotes.groupLabel', { count: notes.length }) : open.title
   const where = paragraph === null ? null : `¶${paragraph + 1}`
-  const meta = isAbout
-    ? (isGroup ? `${t('marginNotes.aboutBook')} · ${notes.length}` : t('marginNotes.aboutBook'))
-    : isGroup ? [t('marginNotes.groupCount', { count: notes.length }), where].filter(Boolean).join(' · ') : where
+  const meta = isGroup ? [t('marginNotes.groupCount', { count: notes.length }), where].filter(Boolean).join(' · ') : where
   const className = `${styles.card} ${isActive ? styles.activeCard : ''} ${isLinked && !isActive ? styles.linkedCard : ''} ${isPopover ? styles.popover : ''}`
 
   return (
@@ -468,13 +540,7 @@ function MarginCard({ cardRef, cardKey, style, isPopover, notes, paragraph, isAc
       {!isActive ? (
         // Свёрнутая карточка целиком — кнопка: клик раскрывает.
         <button type="button" className={styles.summary} onClick={() => onActivate(null)}>
-          {isGroup || isAbout ? (
-            <span className={styles.meta}>
-              {/* Тетрадь — значок конспекта: заметка о книге целиком, а не об абзаце. */}
-              {isAbout ? <svg className={styles.metaIcon} viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h8.5v11H4zM4 2.5v11M2.5 5h3M2.5 8h3M2.5 11h3M7 6h3.5" /></svg> : null}
-              {meta}
-            </span>
-          ) : null}
+          {isGroup ? <span className={styles.meta}>{meta}</span> : null}
           <strong className={styles.cardTitle}>{isGroup ? notes.map((note) => note.title).join(' · ') : open.title}</strong>
           {!isGroup && open.body.trim() ? <span className={styles.excerpt}>{plainExcerpt(open.body)}</span> : null}
         </button>
@@ -524,67 +590,5 @@ function MarginCard({ cardRef, cardKey, style, isPopover, notes, paragraph, isAc
         </>
       )}
     </section>
-  )
-}
-
-interface OpenNoteProps {
-  note: NoteResponse
-  isEditing: boolean
-  onEdit: () => void
-  onDone: () => void
-  /** Каждое автосохранение: карточка и метки сразу показывают новую версию. */
-  onSaved?: (note: NoteResponse) => void
-}
-
-/**
- * Раскрытая заметка: текст целиком (до половины экрана) и правка на месте. Клик по
- * тексту, «Дописать…» или карандаш открывают редактор с курсором в конце; черновик
- * и конфликт версий — те же, что на странице заметки (`NoteEditSession`).
- */
-function OpenNote({ note, isEditing, onEdit, onDone, onSaved }: OpenNoteProps) {
-  const { t } = useTranslation()
-  // После конфликта пользователь может взять актуальную версию — до перечитывания цитат она здесь.
-  const [latest, setLatest] = useState<NoteResponse | null>(null)
-  const current = latest && latest.version > note.version ? latest : note
-
-  if (isEditing) {
-    return (
-      <div className={styles.open}>
-        <NoteEditSession
-          note={current}
-          knownLinks={current.links}
-          compact
-          onSaved={(saved) => {
-            setLatest(saved)
-            onSaved?.(saved)
-          }}
-          onLatest={(latestNote) => {
-            setLatest(latestNote)
-            onSaved?.(latestNote)
-          }}
-          onClose={onDone}
-        />
-      </div>
-    )
-  }
-
-  return (
-    <div className={styles.open}>
-      <h3 className={styles.title}>{current.title}</h3>
-      {current.body.trim() ? (
-        <div
-          className={`${styles.body} ${styles.editable}`}
-          title={t('marginNotes.editHint')}
-          onClick={(event) => {
-            // Ссылки в тексте ведут по ссылке, а не в правку.
-            if ((event.target as Element).closest('a')) return
-            onEdit()
-          }}
-        >
-          <NoteContent body={current.body} links={current.links} />
-        </div>
-      ) : null}
-      <button type="button" className={styles.appendField} onClick={onEdit}>{t('marginNotes.appendPlaceholder')}</button>
-    </div>
   )
 }

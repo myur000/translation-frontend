@@ -118,17 +118,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.metaIcon {
-  width: 13px;
-  height: 13px;
-  flex: none;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.4;
-}
-
 /* Шапка раскрытой карточки: где заметка и две иконки — правка и раздел заметок. */
 .cardHeader {
   min-height: 24px;

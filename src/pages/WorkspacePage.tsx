@@ -8,6 +8,7 @@ import type { MarginDraft } from '../components/notes/MarginNotes.tsx'
 import { draftAnchor } from '../notes/marginNotesLayout.ts'
 import { NOTE_PARAM, QUOTE_PARAM } from '../notes/noteBooks.ts'
 import { bookTitle } from '../documents/bookTitle.ts'
+import { nextSummaryTitle } from '../notes/bookSummaries.ts'
 import { QuoteMarkers } from '../components/workspace/QuoteMarkers.tsx'
 import { useBookNotes } from '../notes/useBookQuotes.ts'
 import type { BookQuote } from '../notes/bookQuotes.ts'
@@ -85,6 +86,9 @@ const fullscreenNumberShortcuts: Partial<Record<string, LayoutPreset>> = {
 // N (и «т» в русской раскладке) открывает и прячет заметки.
 const NOTES_SHORTCUT_CODE = 'KeyN'
 const NOTES_SHORTCUT_KEYS = new Set(['n', 'т'])
+// K (и «л» в русской раскладке) раскрывает и сворачивает конспект книги.
+const SUMMARY_SHORTCUT_CODE = 'KeyK'
+const SUMMARY_SHORTCUT_KEYS = new Set(['k', 'л'])
 // Ширина, с которой рабочая область перестраивается под телефон (см. WorkspacePage.module.css).
 const NARROW_SCREEN = '(max-width: 680px)'
 
@@ -241,20 +245,28 @@ function DocumentWorkspace({
     onOpen: openNotesFromMarker, onHover: setTextHoverNoteIds,
   })
   /**
-   * «Конспект книги»: заметка о книге целиком (T-67). Есть — открыть её (на полях —
-   * карточку вверху), нет — черновик с названием «Конспект — …», привязанный к книге.
+   * Конспект книги — заметка о ней целиком (T-67); их может быть несколько. На полях
+   * он в закладке вверху: `open` раскрывает текущий (или форму, если конспектов нет),
+   * `new` — форму нового, `toggle` — то же, что `open`, но раскрытую закладку сворачивает.
+   * Без полей (сравнение, узкий экран) конспекты открываются в колонке заметок.
    */
-  const openSummary = () => {
+  const openSummary = (action: 'open' | 'new' | 'toggle' = 'open') => {
     const jobId = document.jobId
     if (!jobId) return
     const about = bookNotes.aboutBook
-    const viewport = marginViewportRef.current
-    if (about.length) {
+    if (isMarginAvailable) {
+      setNotesRequest((current) => ({
+        nonce: nextNonce(current), noteIds: [], about: true,
+        aboutAction: action === 'open' ? undefined : action,
+      }))
+    } else if (about.length && action !== 'new') {
       setNotesRequest((current) => ({ nonce: nextNonce(current), noteIds: about.map((note) => note.id), about: true }))
     } else {
-      const summary = { jobId, title: t('notes.summaryTitle', { book: bookTitle(document.name) }) }
-      if (isMarginAvailable && viewport) setMarginDraft((current) => ({ nonce: nextNonce(current), kind: 'new', anchor: draftAnchor(viewport), summary }))
-      else setNotesRequest((current) => ({ nonce: nextNonce(current), noteIds: [], summary }))
+      const title = nextSummaryTitle({
+        first: (book) => t('notes.summaryTitle', { book }),
+        numbered: (book, number) => t('notes.summaryTitleNumbered', { book, number }),
+      }, bookTitle(document.name), about)
+      setNotesRequest((current) => ({ nonce: nextNonce(current), noteIds: [], summary: { jobId, title } }))
     }
     revealNotes()
   }
@@ -345,6 +357,11 @@ function DocumentWorkspace({
     event.preventDefault()
     toggleNotes()
   })
+  const handleSummaryShortcut = useEffectEvent((event: KeyboardEvent) => {
+    if (!document.jobId) return
+    event.preventDefault()
+    openSummary('toggle')
+  })
 
   useEffect(() => {
     const handleViewKey = (event: KeyboardEvent) => {
@@ -353,6 +370,10 @@ function DocumentWorkspace({
 
       if (event.code === NOTES_SHORTCUT_CODE || NOTES_SHORTCUT_KEYS.has(event.key.toLowerCase())) {
         handleNotesShortcut(event)
+        return
+      }
+      if (event.code === SUMMARY_SHORTCUT_CODE || SUMMARY_SHORTCUT_KEYS.has(event.key.toLowerCase())) {
+        handleSummaryShortcut(event)
         return
       }
 
@@ -524,7 +545,11 @@ function DocumentWorkspace({
   const tools: DocumentAction[] = document.jobId
     ? [
         { id: 'new-note', label: t('notesPanel.newNote'), icon: 'note', onSelect: startNewNote },
-        { id: 'summary', label: t(bookNotes.aboutBook.length ? 'notesPanel.summary' : 'notesPanel.newSummary'), icon: 'summary', onSelect: openSummary },
+        { id: 'summary', label: t(bookNotes.aboutBook.length ? 'notesPanel.summary' : 'notesPanel.newSummary'), icon: 'summary', onSelect: () => openSummary() },
+        // Конспектов может быть несколько: новый можно начать, даже когда один уже есть.
+        ...(bookNotes.aboutBook.length
+          ? [{ id: 'summary-new', label: t('summaries.newMenu'), icon: 'summary' as const, onSelect: () => openSummary('new') }]
+          : []),
       ]
     : []
   if (canUploadFile && canTranslate && glossaryTermCount) {
@@ -671,6 +696,7 @@ function DocumentWorkspace({
                 viewportRef={marginViewportRef}
                 column={visibleLayout.primary === 'translation' ? 'TRANSLATION' : 'SOURCE'}
                 jobId={document.jobId}
+                bookName={document.name}
                 quotes={bookQuotes}
                 aboutBook={bookNotes.aboutBook}
                 layoutKey={markersLayoutKey}
@@ -712,6 +738,7 @@ function DocumentWorkspace({
                   isScrollSyncEnabled={isScrollSyncEnabled}
                   onToggleScrollSync={handleToggleScrollSync}
                   notes={{ isOpen: isNotesShown, panelId: notesPanelId, onToggle: toggleNotes }}
+                  summary={document.jobId ? { onToggle: () => openSummary('toggle') } : undefined}
                   onOpenFullscreen={() => onFullscreenLayoutChange(layout)}
                 />
               }

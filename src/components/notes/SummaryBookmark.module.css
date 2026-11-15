@@ -1,0 +1,143 @@
+/* Закладка конспекта. Цвет конспекта — тон обложки его книги (--summary-tone), а не
+   оранжевый акцент заметок: тетрадь подшита к своей книге, и это видно с первого взгляда. */
+.bookmark {
+  /* Над карточками абзацев: те проезжают под закладкой, как под липкой шапкой. */
+  z-index: 2;
+  padding-left: 18px;
+  overflow: hidden;
+  /* Место закладки задаёт прокрутка, без анимации — иначе она отставала бы от текста. */
+  transition: border-color 120ms ease;
+}
+
+/* Корешок тетради. */
+.bookmark::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 6px;
+  background: var(--summary-tone);
+  box-shadow: inset -2px 0 0 rgb(0 0 0 / 22%);
+}
+
+.bookmark:hover {
+  border-color: var(--color-border-strong);
+}
+
+.open,
+.open:hover {
+  border-color: var(--summary-tone);
+  box-shadow: 0 0 0 1px var(--summary-tone);
+}
+
+/* Свёрнутая закладка целиком — кнопка. */
+.strip {
+  display: grid;
+  gap: 1px;
+  margin: -10px -12px -10px -18px;
+  padding: 8px 12px 8px 18px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+}
+
+.strip:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.caption {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-soft);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.captionText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+.peek {
+  overflow: hidden;
+  color: var(--color-text);
+  font-family: var(--font-serif);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.tabList {
+  display: contents;
+}
+
+.tab,
+.newTab {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 2px 9px;
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab:hover,
+.newTab:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
+
+.tab[aria-selected='true'],
+.newTab[aria-pressed='true'] {
+  color: #ffffff;
+  background: var(--summary-tone);
+  border-color: var(--summary-tone);
+}
+
+.newTab {
+  border-style: dashed;
+}
+
+.tab:focus-visible,
+.newTab:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
