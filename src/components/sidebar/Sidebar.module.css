@@ -28,7 +28,8 @@
   height: 100vh;
   display: grid;
   grid-template-columns: var(--rail-width) minmax(0, 1fr);
-  overflow: hidden;
+  /* Без обрезки: меню аккаунта открывается вправо от рельса поверх панели и книги. */
+  overflow: visible;
   color: var(--sidebar-text);
   background: var(--sidebar-bg);
   border-right: 1px solid var(--sidebar-border);
@@ -124,8 +125,6 @@
 
 .collapsed {
   grid-template-columns: var(--rail-width);
-  /* Меню аккаунта открывается вправо от рельса: свёрнутая панель не должна его обрезать. */
-  overflow: visible;
 }
 
 .collapsed .panel {

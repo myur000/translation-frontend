@@ -123,6 +123,12 @@ describe('plans UI and account state', () => {
     renderPage()
     await screen.findByText('Осталось страниц: 7')
     await userEvent.click(screen.getByRole('button', { name: 'Открыть меню пользователя' }))
+    // В меню — кто вошёл и сколько страниц осталось до обновления лимита.
+    const menu = screen.getByRole('menu', { name: 'Аккаунт' })
+    expect(menu.textContent).toContain('reader@example.com')
+    expect(within(menu).getByText('7 из 10 стр.')).toBeTruthy()
+    expect((within(menu).getByRole('progressbar', { name: 'Осталось 7 из 10 страниц' }) as HTMLProgressElement).value).toBe(7)
+    expect(within(menu).getByText(/^обновится \d{1,2} [а-я]+( \d{4} г\.)?$/)).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: 'Тариф и лимиты' }).getAttribute('href')).toBe('/plans')
     expect(screen.getByRole('menuitem', { name: 'Профиль' }).getAttribute('href')).toBe('/profile')
     await userEvent.click(screen.getByRole('menuitem', { name: 'Тариф и лимиты' }))

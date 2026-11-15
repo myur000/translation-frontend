@@ -53,7 +53,7 @@
   right: 0;
   bottom: calc(100% + 8px);
   left: 0;
-  min-width: 226px;
+  width: 256px;
   padding: 0;
   overflow: hidden;
   background: var(--color-surface);
@@ -62,29 +62,108 @@
   box-shadow: var(--shadow-popover);
 }
 
+/* Кто вошёл: аватар, имя и почта. */
 .accountHeader {
-  display: grid;
-  gap: 1px;
-  padding: 13px 14px 12px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 14px 14px 12px;
 }
 
-.accountHeader strong {
+.accountText {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.accountText strong,
+.accountText span {
   overflow: hidden;
-  color: var(--color-text);
-  font-size: 13px;
-  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.accountHeader span {
+.accountText strong {
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.accountText span {
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: 12px;
+}
+
+/* Тариф: название, остаток страниц полоской и когда он обновится. */
+.plan {
+  display: grid;
+  gap: 6px;
+  padding: 0 14px 12px;
+}
+
+.planRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.planName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planLeft {
+  flex: none;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.meter {
+  width: 100%;
+  height: 4px;
+  appearance: none;
+  overflow: hidden;
+  background: var(--sidebar-tile, rgb(143 177 201 / 12%));
+  border: 0;
+  border-radius: 999px;
+}
+
+.meter::-webkit-progress-bar {
+  background: var(--sidebar-tile, rgb(143 177 201 / 12%));
+}
+
+.meter::-webkit-progress-value {
+  background: var(--sidebar-accent, var(--color-accent));
+  border-radius: 999px;
+}
+
+.meter::-moz-progress-bar {
+  background: var(--sidebar-accent, var(--color-accent));
+  border-radius: 999px;
+}
+
+.meterLow::-webkit-progress-value {
+  background: var(--sidebar-danger, var(--color-danger));
+}
+
+.meterLow::-moz-progress-bar {
+  background: var(--sidebar-danger, var(--color-danger));
+}
+
+.resets {
+  color: var(--color-text-soft, var(--color-text-muted));
+  font-size: 11.5px;
 }
 
 .menuSection {
   display: grid;
-  gap: 1px;
+  gap: 2px;
   padding: 6px;
   border-top: 1px solid var(--color-border);
 }
@@ -92,22 +171,36 @@
 .menuSection a,
 .menuSection button {
   width: 100%;
-  min-height: 34px;
+  min-height: 36px;
   display: flex;
   align-items: center;
-  padding: 7px 9px;
+  gap: 10px;
+  padding: 7px 10px;
   color: var(--color-text);
   text-align: left;
+  text-decoration: none;
   background: transparent;
   border: 0;
-  border-radius: 5px;
-  font-size: 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
 }
 
 .menuSection a:hover,
 .menuSection button:hover,
+.menuSection :is(a, button):focus-visible,
 .activeItem {
   background: var(--color-bg) !important;
+}
+
+.itemIcon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.logout {
+  color: var(--color-text-muted) !important;
 }
 
 .collapsed .identity,
@@ -141,6 +234,6 @@
     right: 0;
     bottom: auto;
     left: auto;
-    width: min(226px, calc(100vw - 28px));
+    width: min(256px, calc(100vw - 28px));
   }
 }

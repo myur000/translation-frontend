@@ -1,6 +1,7 @@
 import styles from './GlyphIcon.module.css'
 
 export type GlyphName = 'plus' | 'arrowLeft' | 'history' | 'notes' | 'graph' | 'books' | 'glossary' | 'search' | 'chevronUp' | 'check' | 'warning'
+  | 'user' | 'card' | 'gear' | 'logout'
 
 /** Контуры в сетке 16×16, рисуются линией цвета текста. */
 const GLYPH_PATHS: Record<GlyphName, string> = {
@@ -19,6 +20,11 @@ const GLYPH_PATHS: Record<GlyphName, string> = {
   check: 'm3.5 8.5 3 3 6-7',
   // Треугольник с восклицательным знаком: предупреждение читается не только цветом.
   warning: 'M8 2.4 14.2 13.2H1.8ZM8 6.4v3M8 11.2v.1',
+  // Пункты меню аккаунта: профиль, тариф, настройки, выход.
+  user: 'M8 8a2.8 2.8 0 1 0 0-5.6A2.8 2.8 0 0 0 8 8zM2.8 13.6c.6-2.6 2.7-4 5.2-4s4.6 1.4 5.2 4',
+  card: 'M2 4.2h12v7.6H2zM2 6.8h12M4.4 9.6h2.4',
+  gear: 'M8 10.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4zM8 1.8v1.9M8 12.3v1.9M1.8 8h1.9M12.3 8h1.9M3.6 3.6l1.3 1.3M11.1 11.1l1.3 1.3M3.6 12.4l1.3-1.3M11.1 4.9l1.3-1.3',
+  logout: 'M6.5 2.5H3.2v11h3.3M7 8h6.5M10.8 5.2 13.5 8l-2.7 2.8',
 }
 
 interface GlyphIconProps {
