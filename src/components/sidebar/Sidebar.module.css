@@ -397,6 +397,7 @@
 }
 
 .documentInfo {
+  position: relative;
   min-width: 0;
   /* Место под кнопку «⋯», чтобы она никогда не закрывала название. */
   padding-right: 24px;
@@ -420,11 +421,15 @@
   font-size: 11px;
 }
 
-/* Сколько прочитано: тонкая полоска под подписью, число — в самой подписи. */
+/* Сколько прочитано: тонкая полоска под подписью, число — в самой подписи.
+   Лежит в нижнем отступе строки: когда книгу начинают читать, строка не растёт и список не прыгает. */
 .readingBar {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 24px;
   display: block;
   height: 2px;
-  margin-top: 5px;
   overflow: hidden;
   background: var(--color-border-strong);
   border-radius: 2px;

@@ -191,9 +191,14 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
       window.cancelAnimationFrame(frame)
       mutations.disconnect()
       resizes?.disconnect()
-      host.style.removeProperty('--margin-notes-space')
     }
   }, [column, host, quotes])
+  // Отступ снимаем, только когда поля уходят из колонки. При пересчёте (новая цитата,
+  // перечитанные заметки) он остаётся до следующего кадра, иначе страница отъезжает и возвращается.
+  useEffect(() => {
+    if (!host) return
+    return () => { host.style.removeProperty('--margin-notes-space') }
+  }, [host])
 
   // Высоты карточек: раскладка без наложений зависит от них.
   const resizeObserver = useMemo(() => typeof ResizeObserver === 'undefined' ? null : new ResizeObserver((entries) => {

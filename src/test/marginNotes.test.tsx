@@ -106,6 +106,23 @@ describe('margin notes', () => {
     expect(card.style.width).toBe('260px')
   })
 
+  it('keeps the freed margin while the quotes change, so the page does not jump', async () => {
+    mockGeometry(560)
+    const { rerender, unmount } = render(<Book quotes={[quote(storm, 1)]} />)
+    await nextFrame()
+    const column = screen.getByRole('region', { name: 'Колонка' })
+    expect(column.style.getPropertyValue('--margin-notes-space')).toBe('292px')
+
+    // Новая цитата приходит сразу после сохранения, до следующего кадра: отступ на месте.
+    rerender(<Book quotes={[quote(storm, 1), { ...quote(storm, 2), id: 'q-2' }]} />)
+    expect(column.style.getPropertyValue('--margin-notes-space')).toBe('292px')
+    await nextFrame()
+    expect(column.style.getPropertyValue('--margin-notes-space')).toBe('292px')
+
+    unmount()
+    expect(column.style.getPropertyValue('--margin-notes-space')).toBe('')
+  })
+
   it('opens a card and edits the note in place with the caret at the end', async () => {
     mockGeometry(560)
     const user = userEvent.setup()
