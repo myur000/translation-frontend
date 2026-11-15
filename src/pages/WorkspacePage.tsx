@@ -864,7 +864,7 @@ function DocumentWorkspace({
               setDialog(null)
               setRetranslateWithGlossary(false)
             }}
-            withGlossary={isRetranslateWithGlossary}
+            preset={isRetranslateWithGlossary ? { useGlossary: true } : undefined}
           />
         ) : null}
         {dialog === 'delete' ? (

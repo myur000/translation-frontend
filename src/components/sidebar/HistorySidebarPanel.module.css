@@ -1,0 +1,126 @@
+/* Панель истории: списки фильтров как «Книги» в панели графа, внизу — расход страниц. */
+.panel {
+  display: grid;
+  gap: 18px;
+  padding: 0 12px 16px;
+}
+
+.section {
+  display: grid;
+  gap: 6px;
+}
+
+.section h3,
+.usage h3 {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+}
+
+.row:hover {
+  background: var(--sidebar-tile, rgb(143 177 201 / 10%));
+}
+
+.row[aria-pressed='true'] {
+  background: var(--sidebar-active);
+}
+
+.failed > span:first-child {
+  color: var(--sidebar-danger);
+}
+
+.count {
+  color: var(--color-text-soft);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage {
+  display: grid;
+  gap: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.spent {
+  margin: 2px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.spent strong {
+  margin-right: 2px;
+  color: var(--color-text);
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.meter {
+  width: 100%;
+  height: 5px;
+  appearance: none;
+  overflow: hidden;
+  background: var(--sidebar-tile, rgb(143 177 201 / 10%));
+  border: 0;
+  border-radius: 999px;
+}
+
+.meter::-webkit-progress-bar {
+  background: var(--sidebar-tile, rgb(143 177 201 / 10%));
+}
+
+.meter::-webkit-progress-value {
+  background: var(--sidebar-accent);
+  border-radius: 999px;
+}
+
+.meter::-moz-progress-bar {
+  background: var(--sidebar-accent);
+  border-radius: 999px;
+}
+
+.left {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: 12.5px;
+}
+
+.plans {
+  justify-self: start;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-decoration-color: var(--color-border-strong);
+  text-underline-offset: 3px;
+}
+
+.plans:hover {
+  color: var(--color-text);
+}

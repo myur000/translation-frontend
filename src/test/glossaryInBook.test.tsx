@@ -293,7 +293,7 @@ describe('after a new term', () => {
   it('opens «Translate again» into the same language with the glossary ticked', async () => {
     api.getTerms.mockResolvedValue({ items: [], page: 0, size: 1, total_elements: 3, total_pages: 3 })
     const book = { id: 'd1', jobId: 'j1', name: 'ledger.docx', sourceLanguage: 'eng_Latn', targetLanguage: 'rus_Cyrl', pages: 3, status: 'ready' } as DocumentItem
-    render(<RetranslateDialog document={book} onSubmit={vi.fn()} onClose={vi.fn()} withGlossary />, { wrapper })
+    render(<RetranslateDialog document={book} onSubmit={vi.fn()} onClose={vi.fn()} preset={{ useGlossary: true }} />, { wrapper })
     const glossary = await screen.findByRole('checkbox', { name: /глоссарий/i })
     expect((glossary as HTMLInputElement).checked).toBe(true)
     expect(api.getTerms).toHaveBeenCalledWith({ source_lang: 'eng_Latn', target_lang: 'rus_Cyrl', size: 1 }, expect.anything())

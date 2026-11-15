@@ -438,26 +438,27 @@ describe('workspace interactions', () => {
     render(<RouterProvider router={router} />)
     await findWorkspaceRegion('Оригинал')
 
+    // Боковая панель целиком: рельс разделов виден, пока нет полноэкранного режима.
+    const rail = () => screen.queryByRole('navigation', { name: 'Разделы' })
     fireEvent.keyDown(window, { key })
-    expect(screen.queryByText('Мои книги')).toBeNull()
+    expect(rail()).toBeNull()
     expect(screen.queryByRole('button', { name: 'Открыть оригинал и перевод на весь экран' })).toBeNull()
 
     await act(async () => { await router.navigate(-1) })
     expect(screen.getByRole('heading', { name: heading, level: 1 })).toBeTruthy()
-    expect(screen.getByText('Мои книги')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Добавить книгу' })).toBeTruthy()
+    expect(rail()).toBeTruthy()
 
     await act(async () => { await router.navigate(1) })
-    expect(screen.getByText('Мои книги')).toBeTruthy()
+    expect(rail()).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Открыть оригинал и перевод на весь экран' })).toBeTruthy()
     expect(screen.getByRole('region', { name: 'Оригинал' })).toBeTruthy()
     expect(screen.getByRole('region', { name: 'Перевод' })).toBeTruthy()
 
     // Полноэкранный режим снова включается после возврата в рабочую область.
     fireEvent.keyDown(window, { key: 'f' })
-    expect(screen.queryByText('Мои книги')).toBeNull()
+    expect(rail()).toBeNull()
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(screen.getByText('Мои книги')).toBeTruthy()
+    expect(rail()).toBeTruthy()
   })
 
   it('resets fullscreen between history entries with the same pathname', async () => {
@@ -1237,10 +1238,13 @@ describe('history integration', () => {
   it('restores backend jobs, statuses and job ids', async () => {
     renderApp('/history')
 
-    expect(await screen.findAllByText('english_course_book.pdf')).toHaveLength(1)
-    expect(within(sidebarList()).getByText('English course book')).toBeTruthy()
-    expect(screen.getByText('00000000-0000-0000-0000-000000000101')).toBeTruthy()
-    expect(screen.getAllByText(/Готов · 100%/).length).toBeGreaterThan(0)
+    // История — по дням, название книги вместо имени файла, без технического job id.
+    const title = await screen.findByRole('button', { name: 'English course book' })
+    const row = title.closest('li')!
+    expect(within(row).getByText(/^EN → /)).toBeTruthy()
+    expect(within(row).getByText('Готов')).toBeTruthy()
+    expect(screen.queryByText('00000000-0000-0000-0000-000000000101')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Статус' })).toBeTruthy()
     expect(globalThis.fetch).toHaveBeenCalledWith(
       '/api/documents/history?page=0&size=100',
       expect.objectContaining({ method: 'GET' }),

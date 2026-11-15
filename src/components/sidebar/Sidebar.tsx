@@ -6,11 +6,13 @@ import {
   type KeyboardEventHandler,
   type PointerEventHandler,
 } from 'react'
-import { Link, NavLink, useMatch, useNavigate } from 'react-router'
+import { Link, useMatch, useNavigate } from 'react-router'
 import { GRAPH_PATH } from '../../graph/graphQuery.ts'
 import { GraphSidebarPanel } from './GraphSidebarPanel.tsx'
 import { GlossarySidebarPanel } from './GlossarySidebarPanel.tsx'
 import { GLOSSARY_PATH } from '../../glossary/glossaryQuery.ts'
+import { HISTORY_PATH } from '../../history/historyQuery.ts'
+import { HistorySidebarPanel } from './HistorySidebarPanel.tsx'
 import { bookSummaryHref } from '../../notes/noteBooks.ts'
 import { DocumentActionsMenu } from '../toolbar/DocumentActionsMenu.tsx'
 import { DeleteDocumentDialog } from '../workspace/DeleteDocumentDialog.tsx'
@@ -55,7 +57,7 @@ interface SidebarProps {
   onResetWidth: () => void
 }
 
-type SidebarSection = 'books' | 'notes' | 'graph' | 'glossary'
+type SidebarSection = 'books' | 'notes' | 'graph' | 'glossary' | 'history'
 
 export function Sidebar({
   documents,
@@ -87,9 +89,10 @@ export function Sidebar({
   const isNotesRoute = useMatch('/notes/*') !== null
   const isGraphRoute = useMatch(GRAPH_PATH) !== null
   const isGlossaryRoute = useMatch(GLOSSARY_PATH) !== null
+  const isHistoryRoute = useMatch(HISTORY_PATH) !== null
   const navigate = useNavigate()
   // Раздел панели; на странице заметок она открывается сразу с заметками.
-  const [section, setSection] = useState<SidebarSection>(() => (isNotesRoute ? 'notes' : isGraphRoute ? 'graph' : isGlossaryRoute ? 'glossary' : 'books'))
+  const [section, setSection] = useState<SidebarSection>(() => (isNotesRoute ? 'notes' : isGraphRoute ? 'graph' : isGlossaryRoute ? 'glossary' : isHistoryRoute ? 'history' : 'books'))
   const shown = documents.filter((document) => matchesBookQuery(document.name, query))
   // Закреплённые идут отдельным разделом в порядке закрепления; остальные — как пришли.
   const pinned = pinnedJobIds.flatMap((jobId) => shown.filter((document) => document.jobId === jobId))
@@ -252,14 +255,25 @@ export function Sidebar({
           <GlyphIcon name="glossary" />
           <span className={styles.visuallyHidden}>{t('sidebar.glossary')}</span>
         </button>
-        <NavLink
-          to="/history"
-          className={({ isActive }) => `${styles.railItem} ${isActive ? styles.railItemActive : ''}`}
+        <button
+          type="button"
+          className={`${styles.railItem} ${isSectionOpen('history') ? styles.railItemOpen : ''} ${isHistoryRoute ? styles.railItemActive : ''}`}
+          onClick={() => {
+            if (!isHistoryRoute) {
+              setSection('history')
+              if (isCollapsed) onToggleCollapsed()
+              void navigate(HISTORY_PATH)
+              return
+            }
+            openSection('history')
+          }}
+          aria-expanded={isSectionOpen('history')}
+          aria-controls={panelId}
           title={t('sidebar.history')}
         >
           <GlyphIcon name="history" />
           <span className={styles.visuallyHidden}>{t('sidebar.history')}</span>
-        </NavLink>
+        </button>
         <div className={styles.railFooter}>
           <UserMenu isCollapsed />
         </div>
@@ -272,6 +286,10 @@ export function Sidebar({
           {visibleSection === 'graph' ? (
             <Link to={GRAPH_PATH} className={`${styles.panelTitle} ${styles.panelTitleLink}`} title={t('graph.openSection')}>
               {t('sidebar.graph')}
+            </Link>
+          ) : visibleSection === 'history' ? (
+            <Link to={HISTORY_PATH} className={`${styles.panelTitle} ${styles.panelTitleLink}`}>
+              {t('sidebar.history')}
             </Link>
           ) : visibleSection === 'glossary' ? (
             <Link to={GLOSSARY_PATH} className={`${styles.panelTitle} ${styles.panelTitleLink}`} title={t('glossary.openSection')}>
@@ -330,6 +348,10 @@ export function Sidebar({
 
         <div className={styles.sectionBody} hidden={visibleSection !== 'graph'}>
           <GraphSidebarPanel isActive={isSectionOpen('graph')} />
+        </div>
+
+        <div className={styles.sectionBody} hidden={visibleSection !== 'history'}>
+          <HistorySidebarPanel documents={documents} />
         </div>
 
         <div className={styles.sectionBody} hidden={visibleSection !== 'glossary'}>

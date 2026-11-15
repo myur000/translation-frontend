@@ -129,6 +129,8 @@
   --sidebar-tile-active-border: rgb(202 220 234 / 32%);
   /* Боковая панель тёмная в обеих темах: акцент на ней всегда светлый. */
   --sidebar-accent: var(--palette-ember-400);
+  /* Ошибки на тёмной панели — светлый красный в обеих темах. */
+  --sidebar-danger: #f4a9a9;
   --sidebar-accent-focus-ring: rgb(242 140 58 / 32%);
 
   /* Тона обложек книг (`coverTone` в documents/bookTitle.ts): полка, корешки у
