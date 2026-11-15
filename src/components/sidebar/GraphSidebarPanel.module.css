@@ -1,0 +1,154 @@
+/* Панель графа на тёмной боковой панели: те же отступы и шрифты, что у панели заметок. */
+.panel {
+  display: grid;
+  gap: 14px;
+  padding: 0 12px 16px;
+}
+
+.search {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  color: var(--color-text-muted);
+  background: var(--sidebar-tile, rgb(143 177 201 / 10%));
+  border: 1px solid var(--sidebar-tile-border, rgb(143 177 201 / 22%));
+  border-radius: var(--radius-sm);
+}
+
+.search input {
+  min-width: 0;
+  flex: 1;
+  color: var(--color-text);
+  background: none;
+  border: 0;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+}
+
+.filters {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.filters legend,
+.books h3 {
+  margin: 0 0 6px;
+  padding: 0;
+  color: var(--color-text-soft);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  color: var(--color-text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.filter input {
+  accent-color: var(--color-accent);
+}
+
+/* Знаки — как на карте: тетрадь у конспекта, пунктир у несозданной, «таблетка» у тега. */
+.mark {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  background: var(--color-text-muted);
+  border-radius: 50%;
+}
+
+.mark_book {
+  width: 8px;
+  height: 12px;
+  background: #7a5a2e;
+  border-radius: 1px 2px 2px 1px;
+}
+
+.mark_summary {
+  width: 9px;
+  height: 11px;
+  background: #7a5a2e;
+  border-radius: 1px 2px 2px 1px;
+  box-shadow: inset 2px 0 0 rgb(0 0 0 / 28%), 0 0 0 1px var(--color-text-muted);
+}
+
+.mark_tag {
+  width: 14px;
+  height: 8px;
+  background: none;
+  border: 1px solid var(--color-text-muted);
+  border-radius: 999px;
+}
+
+.mark_missing {
+  background: none;
+  border: 1px dashed var(--color-text-muted);
+}
+
+.mark_lonely {
+  width: 6px;
+  height: 6px;
+}
+
+.books ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.book {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.book:hover,
+.bookActive {
+  background: var(--sidebar-tile, rgb(143 177 201 / 10%));
+}
+
+.cover {
+  width: 12px;
+  height: 17px;
+  flex: none;
+  background: var(--node-tone);
+  border-radius: 1px 3px 3px 1px;
+  box-shadow: inset 2px 0 0 rgb(0 0 0 / 24%);
+}
+
+.bookTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}

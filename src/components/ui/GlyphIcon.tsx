@@ -1,6 +1,6 @@
 import styles from './GlyphIcon.module.css'
 
-export type GlyphName = 'plus' | 'arrowLeft' | 'history' | 'notes' | 'books' | 'search' | 'chevronUp' | 'check' | 'warning'
+export type GlyphName = 'plus' | 'arrowLeft' | 'history' | 'notes' | 'graph' | 'books' | 'search' | 'chevronUp' | 'check' | 'warning'
 
 /** Контуры в сетке 16×16, рисуются линией цвета текста. */
 const GLYPH_PATHS: Record<GlyphName, string> = {
@@ -8,6 +8,8 @@ const GLYPH_PATHS: Record<GlyphName, string> = {
   arrowLeft: 'M13 8H3.5m0 0L7 4.5M3.5 8 7 11.5',
   history: 'M3.2 6.2A5.2 5.2 0 1 1 3 9.6M3 3v3.4h3.4M8 5.3V8l1.9 1.4',
   notes: 'M4 2.5h5.2L12 5.3v8.2H4zM9.2 2.5v2.8H12M6.2 8.2h3.6M6.2 10.7h2.4',
+  // Три узла и связи между ними — граф заметок.
+  graph: 'M5.5 5a1.5 1.5 0 1 1-3 0a1.5 1.5 0 1 1 3 0M13.5 4a1.5 1.5 0 1 1-3 0a1.5 1.5 0 1 1 3 0M9.5 12a1.5 1.5 0 1 1-3 0a1.5 1.5 0 1 1 3 0M5.5 4.8l5-.6M4.8 6.4l2.5 4.2M11.3 5.4l-2.5 5.2',
   // Три корешка на полке, крайний наклонён.
   books: 'M2.8 2.8h2.6v10.4H2.8zM6.7 2.8h2.6v10.4H6.7zM10.4 3.6l2.5-.7 2.1 9.9-2.5.6z',
   search: 'M7 11.6a4.6 4.6 0 1 0 0-9.2 4.6 4.6 0 0 0 0 9.2zM10.4 10.4l3.2 3.2',

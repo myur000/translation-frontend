@@ -1,0 +1,141 @@
+/* Раздел «Граф»: заголовок, под ним холст на всю высоту и карточка узла справа. */
+.page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 28px;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+
+.header h1 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.counts {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.notice {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.body {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+.body > aside {
+  width: 280px;
+  max-height: 100%;
+  overflow: auto;
+}
+
+.canvasArea {
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.canvasArea > :first-child {
+  flex: 1;
+}
+
+.hint {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: 11.5px;
+  pointer-events: none;
+}
+
+.state {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.state button {
+  padding: 6px 12px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.empty {
+  max-width: 520px;
+  padding: 28px;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.empty h2 {
+  margin: 0 0 8px;
+  font-family: var(--font-serif);
+  font-size: 20px;
+}
+
+.empty p {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Список узлов виден, когда по нему ходят с клавиатуры. */
+.visuallyHidden:focus-within {
+  position: static;
+  width: auto;
+  height: auto;
+  max-height: 160px;
+  overflow: auto;
+  clip-path: none;
+  margin: 8px 0 0;
+  padding: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  list-style: none;
+}
+
+@media (max-width: 860px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(320px, 1fr) auto;
+  }
+
+  .body > aside {
+    width: auto;
+  }
+}

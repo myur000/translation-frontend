@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router'
-import type { NoteSummary } from '../api/contracts/notes.ts'
+import type { NoteGraphResponse, NoteSummary } from '../api/contracts/notes.ts'
 import { getNoteGraph, listNotes } from '../api/notes.ts'
 import { useAuth } from '../auth/useAuth.ts'
 import { NotesContext, type NoteDraft, type NoteDrafts, type NotesContextValue, type NotesGraphState, type NoteTagCount } from './NotesContext.ts'
@@ -11,7 +11,7 @@ import { buildNotesTree, type NotesTree } from './notesTree.ts'
 interface LoadedGraph {
   key: string
   owner: string
-  value: { status: 'ready'; tree: NotesTree; tags: NoteTagCount[] } | { status: 'error' }
+  value: { status: 'ready'; tree: NotesTree; tags: NoteTagCount[]; response: NoteGraphResponse } | { status: 'error' }
 }
 
 interface LoadedList {
@@ -73,7 +73,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController()
     getNoteGraph([...NOTES_GRAPH_TYPES], { accessToken: token, signal: controller.signal }).then((response) => {
       if (!controller.signal.aborted) {
-        setGraph({ key: graphKey, owner, value: { status: 'ready', tree: buildNotesTree(response), tags: tagCounts(response) } })
+        setGraph({ key: graphKey, owner, value: { status: 'ready', tree: buildNotesTree(response), tags: tagCounts(response), response } })
       }
     }, () => {
       if (!controller.signal.aborted) setGraph({ key: graphKey, owner, value: { status: 'error' } })
@@ -122,7 +122,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     const graphShown = graph && (graph.key === graphKey || (graph.owner === owner && graph.value.status === 'ready')) ? graph.value : null
     const notesGraph: NotesGraphState = !graphKey ? { status: 'idle' }
       : !graphShown ? { status: 'loading' }
-        : graphShown.status === 'ready' ? { status: 'ready', tree: graphShown.tree } : { status: 'error' }
+        : graphShown.status === 'ready' ? { status: 'ready', tree: graphShown.tree, response: graphShown.response } : { status: 'error' }
     return {
       query,
       items: shown?.items ?? [],

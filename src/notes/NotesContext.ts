@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { NoteSummary } from '../api/contracts/notes.ts'
+import type { NoteGraphResponse, NoteSummary } from '../api/contracts/notes.ts'
 import type { NotesQuery } from './notesQuery.ts'
 import type { NotesTree } from './notesTree.ts'
 
@@ -33,7 +33,7 @@ export type NotesGraphState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'error' }
-  | { status: 'ready'; tree: NotesTree }
+  | { status: 'ready'; tree: NotesTree; response: NoteGraphResponse }
 
 export interface NotesContextValue {
   query: NotesQuery

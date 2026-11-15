@@ -7,6 +7,8 @@ import {
   type PointerEventHandler,
 } from 'react'
 import { Link, NavLink, useMatch, useNavigate } from 'react-router'
+import { GRAPH_PATH } from '../../graph/graphQuery.ts'
+import { GraphSidebarPanel } from './GraphSidebarPanel.tsx'
 import { bookSummaryHref } from '../../notes/noteBooks.ts'
 import { DocumentActionsMenu } from '../toolbar/DocumentActionsMenu.tsx'
 import { DeleteDocumentDialog } from '../workspace/DeleteDocumentDialog.tsx'
@@ -51,7 +53,7 @@ interface SidebarProps {
   onResetWidth: () => void
 }
 
-type SidebarSection = 'books' | 'notes'
+type SidebarSection = 'books' | 'notes' | 'graph'
 
 export function Sidebar({
   documents,
@@ -81,9 +83,10 @@ export function Sidebar({
   const [query, setQuery] = useState('')
   const panelId = useId()
   const isNotesRoute = useMatch('/notes/*') !== null
+  const isGraphRoute = useMatch(GRAPH_PATH) !== null
   const navigate = useNavigate()
   // Раздел панели; на странице заметок она открывается сразу с заметками.
-  const [section, setSection] = useState<SidebarSection>(() => (isNotesRoute ? 'notes' : 'books'))
+  const [section, setSection] = useState<SidebarSection>(() => (isNotesRoute ? 'notes' : isGraphRoute ? 'graph' : 'books'))
   const shown = documents.filter((document) => matchesBookQuery(document.name, query))
   // Закреплённые идут отдельным разделом в порядке закрепления; остальные — как пришли.
   const pinned = pinnedJobIds.flatMap((jobId) => shown.filter((document) => document.jobId === jobId))
@@ -206,6 +209,27 @@ export function Sidebar({
           <GlyphIcon name="notes" />
           <span className={styles.visuallyHidden}>{t('sidebar.modeNotes')}</span>
         </button>
+        {/* Граф — отдельный раздел: карта всех заметок, книг и конспектов. Как «Заметки»:
+            ведёт в раздел и открывает его панель (поиск, фильтры, книги). */}
+        <button
+          type="button"
+          className={`${styles.railItem} ${isSectionOpen('graph') ? styles.railItemOpen : ''} ${isGraphRoute ? styles.railItemActive : ''}`}
+          onClick={() => {
+            if (!isGraphRoute) {
+              setSection('graph')
+              if (isCollapsed) onToggleCollapsed()
+              void navigate(GRAPH_PATH)
+              return
+            }
+            openSection('graph')
+          }}
+          aria-expanded={isSectionOpen('graph')}
+          aria-controls={panelId}
+          title={t('sidebar.graph')}
+        >
+          <GlyphIcon name="graph" />
+          <span className={styles.visuallyHidden}>{t('sidebar.graph')}</span>
+        </button>
         <NavLink
           to="/history"
           className={({ isActive }) => `${styles.railItem} ${isActive ? styles.railItemActive : ''}`}
@@ -223,7 +247,11 @@ export function Sidebar({
           размонтирована: поиск, раскрытые группы и начатая загрузка сохраняются. */}
       <div id={panelId} className={styles.panel}>
         <div className={styles.panelHeader}>
-          {visibleSection === 'notes' ? (
+          {visibleSection === 'graph' ? (
+            <Link to={GRAPH_PATH} className={`${styles.panelTitle} ${styles.panelTitleLink}`} title={t('graph.openSection')}>
+              {t('sidebar.graph')}
+            </Link>
+          ) : visibleSection === 'notes' ? (
             <>
               <Link to="/notes" className={`${styles.panelTitle} ${styles.panelTitleLink}`} title={t('notesPanel.openSection')}>
                 {t('sidebar.modeNotes')}
@@ -272,6 +300,10 @@ export function Sidebar({
 
         <div className={styles.sectionBody} hidden={visibleSection !== 'notes'}>
           <NotesSidebarPanel isActive={isSectionOpen('notes')} />
+        </div>
+
+        <div className={styles.sectionBody} hidden={visibleSection !== 'graph'}>
+          <GraphSidebarPanel isActive={isSectionOpen('graph')} />
         </div>
 
         <div className={styles.sectionBody} hidden={visibleSection !== 'books'}>

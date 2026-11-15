@@ -21,6 +21,8 @@ import { PreferencesProvider } from './preferences/PreferencesProvider.tsx'
 // Раздел заметок со своим парсером Markdown грузится при первом открытии,
 // а не вместе с основным кодом: большинство сессий начинается с книг.
 const NotesPage = lazy(() => import('./pages/NotesPage.tsx').then((module) => ({ default: module.NotesPage })))
+// Граф с холстом и раскладкой нужен только в своём разделе — отдельный кусок кода.
+const GraphPage = lazy(() => import('./pages/GraphPage.tsx').then((module) => ({ default: module.GraphPage })))
 
 function App() {
   return (
@@ -44,6 +46,7 @@ function App() {
               <Route path="/notes" element={<Suspense><NotesPage /></Suspense>} />
               <Route path="/notes/new" element={<Suspense><NotesPage isNew /></Suspense>} />
               <Route path="/notes/:noteId" element={<Suspense><NotesPage /></Suspense>} />
+              <Route path="/graph" element={<Suspense><GraphPage /></Suspense>} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/plans" element={<PlansPage />} />
               <Route path="/profile" element={<ProfilePage />} />
