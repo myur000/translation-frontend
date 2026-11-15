@@ -124,6 +124,8 @@
 
 .collapsed {
   grid-template-columns: var(--rail-width);
+  /* Меню аккаунта открывается вправо от рельса: свёрнутая панель не должна его обрезать. */
+  overflow: visible;
 }
 
 .collapsed .panel {
