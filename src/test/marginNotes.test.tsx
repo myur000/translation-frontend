@@ -26,7 +26,7 @@ const note = (id: string, title: string, body: string): NoteResponse => ({
 const storm = note('n-1', 'Шторм', 'Ветер — важная деталь.\n\nВторая мысль.')
 const quote = (target: NoteResponse, paragraphIndex: number): BookQuote => ({
   id: `q-${target.id}`, noteId: target.id, noteTitle: target.title, side: 'TRANSLATION', paragraphIndex,
-  quote: paragraphIndex === 1 ? 'Ветер дул' : 'увидел свет', pairedText: null, note: target,
+  quote: paragraphIndex === 1 ? 'Ветер дул' : 'увидел свет', pairedText: null, paragraphText: null, note: target,
 })
 
 /** Сколько раз заметки менялись: по этому числу рабочая область перечитывает цитаты и конспекты. */

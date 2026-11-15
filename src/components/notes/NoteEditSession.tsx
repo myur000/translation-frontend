@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react'
 import type { NoteLinkResponse, NoteResponse } from '../../api/contracts/notes.ts'
 import { useAuth } from '../../auth/useAuth.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
@@ -58,8 +58,10 @@ export function NoteEditSession({ note, knownLinks, compact = false, afterTitle,
   const timer = useRef(0)
   const inFlight = useRef<Promise<boolean> | null>(null)
   const isConflict = useRef(false)
+  // Правили ли текст в этой сессии и закрыта ли она через «Готово» (тогда всё уже сохранено).
+  const hasEdited = useRef(false)
+  const isFinished = useRef(false)
 
-  useEffect(() => () => window.clearTimeout(timer.current), [])
   // Несохранённая правка — браузер переспросит при закрытии вкладки.
   useEffect(() => {
     if (status !== 'pending' && status !== 'saving' && status !== 'waitTitle') return
@@ -117,10 +119,27 @@ export function NoteEditSession({ note, knownLinks, compact = false, afterTitle,
     window.clearTimeout(timer.current)
     if (!(await save())) return
     drafts.clear(note.id)
+    isFinished.current = true
     // Списки, метки и карточки перечитываются один раз — когда правка закончена.
     if (hasSaved.current) notesChanged()
     onClose(hasSaved.current)
   }
+
+  // Редактор закрыли, не дождавшись автосохранения (клик мимо карточки, переход по
+  // ссылке): последняя правка уходит на сервер сразу, а не остаётся только черновиком,
+  // и списки с карточками перечитываются — иначе заметка выглядит несохранённой.
+  const flushOnClose = useEffectEvent(() => {
+    window.clearTimeout(timer.current)
+    if (isFinished.current) return
+    // Восстановленный черновик, который не трогали, молча не отправляется: он остаётся черновиком.
+    const hasPending = hasEdited.current && !isConflict.current && !isSaved()
+    if (!hasPending) {
+      if (hasSaved.current) notesChanged()
+      return
+    }
+    void save().then(() => { if (hasSaved.current) notesChanged() })
+  })
+  useEffect(() => () => flushOnClose(), [])
 
   const statusText = {
     idle: t('notes.autosave.idle'),
@@ -184,6 +203,7 @@ export function NoteEditSession({ note, knownLinks, compact = false, afterTitle,
       autoFocus="body"
       autosave={{ status: statusText, onDone: () => void finish() }}
       onChange={(title, body) => {
+        hasEdited.current = true
         current.current = { title, body }
         if (title === saved.current.title && body === saved.current.body) drafts.clear(note.id)
         else drafts.set(note.id, { title, body, baseVersion: baseVersion.current })

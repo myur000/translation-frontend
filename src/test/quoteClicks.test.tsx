@@ -8,7 +8,7 @@ import { notesAtPoint, type QuoteHit } from '../notes/quoteMarkerLayout.ts'
 
 const note = { id: 'n-1', title: 'Шторм', body: '', version: 1, created_at: '', updated_at: '', tags: [], links: [], quotes: [] } as NoteResponse
 const quote: BookQuote = { id: 'q-1', noteId: 'n-1', noteTitle: 'Шторм', side: 'TRANSLATION', paragraphIndex: 1,
-  quote: 'ветер дул', pairedText: null, note }
+  quote: 'ветер дул', pairedText: null, paragraphText: null, note }
 /** Прямоугольник цитаты на экране: строка 100…300 по горизонтали, 40…60 по вертикали. */
 const quoteRect = { left: 100, right: 300, top: 40, bottom: 60, width: 200, height: 20, x: 100, y: 40, toJSON: () => ({}) } as DOMRect
 

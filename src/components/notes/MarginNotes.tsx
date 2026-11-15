@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import type { NoteQuoteSide, NoteResponse, NoteSummary } from '../../api/contracts/notes.ts'
+import { getNote } from '../../api/notes.ts'
+import { useAuth } from '../../auth/useAuth.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import type { BookQuote } from '../../notes/bookQuotes.ts'
 import {
@@ -50,6 +52,8 @@ interface MarginNotesProps {
   linkedNoteIds?: readonly string[]
   draft: MarginDraft | null
   onDraftDone: () => void
+  /** Заметка сохранена (правка на полях, новая цитата): показать её сразу, не дожидаясь перечитывания книги. */
+  onNoteSaved?: (note: NoteResponse) => void
 }
 
 interface CardGroup {
@@ -57,6 +61,8 @@ interface CardGroup {
   key: string
   anchor: number
   noteIds: string[]
+  /** Номер абзаца, у которого стоит карточка («¶6»), — этого абзаца, а не первой цитаты заметки. */
+  paragraph: number | null
 }
 
 interface Measured {
@@ -91,7 +97,7 @@ const ANCHOR_OFFSET = 4
  * остаются метки, а карточка всплывает у абзаца поверх края текста.
  * Слой лежит внутри прокручиваемой колонки, поэтому карточки едут вместе с текстом.
  */
-export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO_NOTES, layoutKey, request, linkedNoteIds = NO_IDS, draft, onDraftDone }: MarginNotesProps) {
+export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO_NOTES, layoutKey, request, linkedNoteIds = NO_IDS, draft, onDraftDone, onNoteSaved }: MarginNotesProps) {
   const { t } = useTranslation()
   const [host, setHost] = useState<HTMLDivElement | null>(null)
   const [measured, setMeasured] = useState<Measured | null>(null)
@@ -109,6 +115,7 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
   }, [viewportRef, layoutKey])
   const isSettling = useLayoutSettling(host)
   const { notesChanged } = useNotes()
+  const { session } = useAuth()
 
   // Свободное место справа от страницы, отступ под карточки и места абзацев.
   useEffect(() => {
@@ -128,6 +135,7 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
           key: marker.key,
           anchor: Math.max(0, marker.top - ANCHOR_OFFSET),
           noteIds: marker.noteIds,
+          paragraph: marker.paragraphIndex,
         }))
         const hostRect = host.getBoundingClientRect()
         const pageRect = page.getBoundingClientRect()
@@ -272,14 +280,6 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
   }, [column, highlightedIds, host, quotes])
 
   const notesById = useMemo(() => new Map(quotes.map((quote) => [quote.noteId, quote.note])), [quotes])
-  const paragraphOf = useMemo(() => {
-    const first = new Map<string, number>()
-    for (const quote of quotes) {
-      const known = first.get(quote.noteId)
-      if (known === undefined || quote.paragraphIndex < known) first.set(quote.noteId, quote.paragraphIndex)
-    }
-    return first
-  }, [quotes])
   const bookNotes = useMemo<NoteSummary[]>(() => [...notesById.values()].map((note) => ({
     id: note.id, title: note.title, excerpt: plainExcerpt(note.body), tags: note.tags,
     quote_count: note.quotes.length, version: note.version, updated_at: note.updated_at,
@@ -287,8 +287,13 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
 
   if (!host || !fit) return null
 
-  /** Черновик сохранён: заметки перечитываются (новая метка, карточка, конспект). */
-  const finishDraft = () => {
+  /**
+   * Черновик сохранён. Заметка с новой цитатой сразу читается одна и встаёт в метки и
+   * карточки; заметки книги перечитываются целиком в фоне (новая метка, карточка, конспект).
+   */
+  const finishDraft = (noteId: string) => {
+    const token = session?.accessToken
+    if (token && onNoteSaved) void getNote(noteId, { accessToken: token }).then(onNoteSaved, () => {})
     // Созданный конспект сразу виден раскрытым: карточка появится, когда заметки перечитаются.
     setActive(draft?.kind === 'new' && draft.summary ? { key: ABOUT_KEY, noteId: null } : null)
     notesChanged()
@@ -348,6 +353,7 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
           onActivate={(noteId) => setActive({ key: ABOUT_KEY, noteId })}
           onHover={(isHovered) => setHoveredKey((current) => (isHovered ? ABOUT_KEY : current === ABOUT_KEY ? null : current))}
           onKeyDown={handleKeyDown}
+          onNoteSaved={onNoteSaved}
         />
       ) : null}
       {groups.map((group) => {
@@ -362,13 +368,14 @@ export function MarginNotes({ viewportRef, column, jobId, quotes, aboutBook = NO
             style={cardStyle(group.key, group.anchor)}
             isPopover={isPopover}
             notes={group.noteIds.flatMap((id) => notesById.get(id) ?? [])}
-            paragraph={paragraphOf.get(group.noteIds[0]) ?? null}
+            paragraph={group.paragraph}
             isActive={isActive}
             isLinked={group.noteIds.some((id) => linkedNoteIds.includes(id))}
             activeNoteId={isActive ? active?.noteId ?? null : null}
             onActivate={(noteId) => setActive({ key: group.key, noteId })}
             onHover={(isHovered) => setHoveredKey((current) => (isHovered ? group.key : current === group.key ? null : current))}
             onKeyDown={handleKeyDown}
+            onNoteSaved={onNoteSaved}
           />
         )
       })}
@@ -418,6 +425,7 @@ interface MarginCardProps {
   /** Какая заметка абзаца раскрыта; `null` — первая. */
   activeNoteId: string | null
   onActivate: (noteId: string | null) => void
+  onNoteSaved?: (note: NoteResponse) => void
   onHover: (isHovered: boolean) => void
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
 }
@@ -429,7 +437,7 @@ interface MarginCardProps {
  * заметка целиком, остальные строками; клик по строке раскрывает её.
  * Сворачивается кликом мимо или Esc.
  */
-function MarginCard({ cardRef, cardKey, style, isPopover, notes, paragraph, isActive, isAbout = false, isLinked, activeNoteId, onActivate, onHover, onKeyDown }: MarginCardProps) {
+function MarginCard({ cardRef, cardKey, style, isPopover, notes, paragraph, isActive, isAbout = false, isLinked, activeNoteId, onActivate, onHover, onKeyDown, onNoteSaved }: MarginCardProps) {
   const { t } = useTranslation()
   const { drafts } = useNotes()
   const open = notes.find((note) => note.id === activeNoteId) ?? notes[0] ?? null
@@ -500,7 +508,7 @@ function MarginCard({ cardRef, cardKey, style, isPopover, notes, paragraph, isAc
               {notes.map((note) => (
                 <li key={note.id}>
                   {note.id === open.id ? (
-                    <OpenNote note={note} isEditing={editingId === note.id} onEdit={() => setEditingId(note.id)} onDone={() => setEditingId(null)} />
+                    <OpenNote note={note} isEditing={editingId === note.id} onEdit={() => setEditingId(note.id)} onDone={() => setEditingId(null)} onSaved={onNoteSaved} />
                   ) : (
                     <button type="button" className={styles.threadItem} onClick={() => { setEditingId(null); onActivate(note.id) }}>
                       <strong className={styles.cardTitle}>{note.title}</strong>
@@ -511,7 +519,7 @@ function MarginCard({ cardRef, cardKey, style, isPopover, notes, paragraph, isAc
               ))}
             </ul>
           ) : (
-            <OpenNote note={open} isEditing={editingId === open.id} onEdit={() => setEditingId(open.id)} onDone={() => setEditingId(null)} />
+            <OpenNote note={open} isEditing={editingId === open.id} onEdit={() => setEditingId(open.id)} onDone={() => setEditingId(null)} onSaved={onNoteSaved} />
           )}
         </>
       )}
@@ -524,6 +532,8 @@ interface OpenNoteProps {
   isEditing: boolean
   onEdit: () => void
   onDone: () => void
+  /** Каждое автосохранение: карточка и метки сразу показывают новую версию. */
+  onSaved?: (note: NoteResponse) => void
 }
 
 /**
@@ -531,7 +541,7 @@ interface OpenNoteProps {
  * тексту, «Дописать…» или карандаш открывают редактор с курсором в конце; черновик
  * и конфликт версий — те же, что на странице заметки (`NoteEditSession`).
  */
-function OpenNote({ note, isEditing, onEdit, onDone }: OpenNoteProps) {
+function OpenNote({ note, isEditing, onEdit, onDone, onSaved }: OpenNoteProps) {
   const { t } = useTranslation()
   // После конфликта пользователь может взять актуальную версию — до перечитывания цитат она здесь.
   const [latest, setLatest] = useState<NoteResponse | null>(null)
@@ -544,8 +554,14 @@ function OpenNote({ note, isEditing, onEdit, onDone }: OpenNoteProps) {
           note={current}
           knownLinks={current.links}
           compact
-          onSaved={setLatest}
-          onLatest={setLatest}
+          onSaved={(saved) => {
+            setLatest(saved)
+            onSaved?.(saved)
+          }}
+          onLatest={(latestNote) => {
+            setLatest(latestNote)
+            onSaved?.(latestNote)
+          }}
           onClose={onDone}
         />
       </div>

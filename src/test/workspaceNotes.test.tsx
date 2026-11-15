@@ -6,6 +6,7 @@ import { ApiClientError } from '../api/client.ts'
 import type { NoteResponse, NoteSummary } from '../api/contracts/notes.ts'
 import type { DocumentText } from '../api/documentText.ts'
 import { WorkspaceNotesPanel } from '../components/notes/WorkspaceNotesPanel.tsx'
+import { NoteEditSession } from '../components/notes/NoteEditSession.tsx'
 import type { BookQuote } from '../notes/bookQuotes.ts'
 import { DeleteDocumentDialog } from '../components/workspace/DeleteDocumentDialog.tsx'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
@@ -50,7 +51,7 @@ const conflict = (message: string) =>
 const page = (items: NoteSummary[]) => ({ items, page: 0, size: 50, total_elements: items.length, total_pages: 1 })
 
 const bookQuote = (noteId: string, paragraphIndex: number): BookQuote => ({ id: `q-${noteId}`, noteId, noteTitle: '', side: 'TRANSLATION',
-  paragraphIndex, quote: '', pairedText: null, note: storm })
+  paragraphIndex, quote: '', pairedText: null, paragraphText: null, note: storm })
 
 function renderPanel(props: Partial<Parameters<typeof WorkspaceNotesPanel>[0]> = {}) {
   const handlers = { onQuoteFinished: vi.fn(), onShowQuote: vi.fn(() => 'shown' as const), onClose: vi.fn() }
@@ -231,5 +232,37 @@ describe('deleting a quoted book', () => {
     )
     await waitFor(() => expect(screen.getByRole('alertdialog').textContent).toContain('останутся в заметках (3)'))
     expect(api.listNotes).toHaveBeenCalledWith({ job_id: 'job-1', size: 1 }, expect.anything())
+  })
+})
+
+describe('closing the note editor before autosave', () => {
+  const renderSession = (onSaved = vi.fn()) => render(
+    <PreferencesProvider>
+      <MemoryRouter>
+        <NotesProvider>
+          <NoteEditSession note={storm} knownLinks={[]} compact onSaved={onSaved} onLatest={vi.fn()} onClose={vi.fn()} />
+        </NotesProvider>
+      </MemoryRouter>
+    </PreferencesProvider>,
+  )
+
+  it('saves the last edit right away instead of dropping it', async () => {
+    const user = userEvent.setup()
+    const onSaved = vi.fn()
+    api.updateNote.mockResolvedValue({ ...storm, body: 'Ветер — важная деталь. Шторм', version: 2 })
+    const { unmount } = renderSession(onSaved)
+    await user.type(screen.getByRole('textbox', { name: 'Текст заметки' }), ' Шторм')
+    // Клик мимо карточки закрывает редактор раньше, чем пройдёт секунда автосохранения.
+    expect(api.updateNote).not.toHaveBeenCalled()
+    unmount()
+    await waitFor(() => expect(api.updateNote).toHaveBeenCalledWith('n-1',
+      { title: 'Шторм', body: 'Ветер — важная деталь. Шторм', version: 1 }, expect.anything()))
+  })
+
+  it('sends nothing when nothing was edited', async () => {
+    const { unmount } = renderSession()
+    unmount()
+    await new Promise((resolve) => window.setTimeout(resolve, 0))
+    expect(api.updateNote).not.toHaveBeenCalled()
   })
 })

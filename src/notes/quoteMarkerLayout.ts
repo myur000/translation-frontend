@@ -15,19 +15,23 @@ export interface QuoteMarker {
   left: number
   noteIds: string[]
   titles: string[]
+  /** Номер абзаца (как в `/text`), у которого стоит метка; `null` — у строки PDF без номера. */
+  paragraphIndex: number | null
 }
 
 /** Координаты меток в системе прокручиваемого содержимого колонки. */
 export function placeMarkers(host: HTMLElement, column: NoteQuoteSide, quotes: BookQuote[]): QuoteMarker[] {
   const index = indexQuoteBlocks(host)
   const hostRect = host.getBoundingClientRect()
-  const groups = new Map<HTMLElement, { noteIds: string[]; titles: string[] }>()
+  const groups = new Map<HTMLElement, { noteIds: string[]; titles: string[]; paragraphIndex: number | null }>()
   for (const quote of quotes) {
-    const text = quote.side === column ? quote.quote : quote.pairedText
+    const isOwn = quote.side === column
+    const text = isOwn ? quote.quote : quote.pairedText
     if (!text) continue
-    const element = locateQuote(index, quote.paragraphIndex, text)
+    // В «чужой» колонке весь абзац — это и есть парный текст.
+    const element = locateQuote(index, quote.paragraphIndex, text, isOwn ? quote.paragraphText : quote.pairedText)
     if (!element) continue
-    const group = groups.get(element) ?? { noteIds: [], titles: [] }
+    const group = groups.get(element) ?? { noteIds: [], titles: [], paragraphIndex: quote.paragraphIndex }
     if (!group.noteIds.includes(quote.noteId)) {
       group.noteIds.push(quote.noteId)
       group.titles.push(quote.noteTitle)
@@ -82,7 +86,7 @@ export function quoteHits(host: HTMLElement, column: NoteQuoteSide, quotes: Book
   const index = indexQuoteBlocks(host)
   const hits: QuoteHit[] = []
   for (const quote of own) {
-    const element = locateQuote(index, quote.paragraphIndex, quote.quote)
+    const element = locateQuote(index, quote.paragraphIndex, quote.quote, quote.paragraphText)
     const range = element ? findQuoteRange(element, quote.quote) : null
     if (range) hits.push({ noteId: quote.noteId, range })
   }

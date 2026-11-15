@@ -293,8 +293,8 @@ function DocumentWorkspace({
     const own = quote.side === 'SOURCE' ? synchronizedScroll.originalRef.current : synchronizedScroll.translationRef.current
     const other = quote.side === 'SOURCE' ? synchronizedScroll.translationRef.current : synchronizedScroll.originalRef.current
     const element = own
-      ? findQuoteElement(own, quote.paragraphIndex, quote.quote)
-      : other && quote.pairedText ? findQuoteElement(other, quote.paragraphIndex, quote.pairedText) : null
+      ? findQuoteElement(own, quote.paragraphIndex, quote.quote, quote.paragraphText)
+      : other && quote.pairedText ? findQuoteElement(other, quote.paragraphIndex, quote.pairedText, quote.pairedText) : null
     if (element) revealQuoteElement(element)
   }
 
@@ -678,6 +678,7 @@ function DocumentWorkspace({
                 linkedNoteIds={textHoverNoteIds}
                 draft={marginDraft}
                 onDraftDone={() => { setMarginDraft(null); quoteSelection.clear() }}
+                onNoteSaved={bookNotes.upsertNote}
               />
             </Suspense>
           ) : null}

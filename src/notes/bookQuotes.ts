@@ -1,6 +1,7 @@
 import type { NoteQuoteSide, NoteResponse } from '../api/contracts/notes.ts'
 import { getNote, listNotes } from '../api/notes.ts'
 import type { AuthenticatedApiCallOptions } from '../api/client.ts'
+import type { DocumentText } from '../api/documentText.ts'
 
 /** Цитата из открытой книги вместе с заметкой, в которой она лежит. */
 export interface BookQuote {
@@ -12,6 +13,12 @@ export interface BookQuote {
   quote: string
   /** Абзац другой колонки: по нему цитата находится, когда её колонка скрыта. */
   pairedText: string | null
+  /**
+   * Весь абзац цитаты в её колонке по тексту с сервера (`/text`). По нему находится
+   * именно этот абзац, а не первый, где встречается короткая цитата. `null` — текст
+   * книги не загружен: тогда абзац ищется по номеру.
+   */
+  paragraphText: string | null
   /** Заметка целиком (её и так читаем ради цитат): текст и версия для карточек на полях. */
   note: NoteResponse
 }
@@ -44,25 +51,39 @@ export async function loadBookNotes(jobId: string, options: AuthenticatedApiCall
     for (let noteId = queue.shift(); noteId; noteId = queue.shift()) {
       const note = await getNote(noteId, options)
       if (note.documents?.some((document) => document.job_id === jobId)) aboutBook.push(note)
-      for (const quote of note.quotes) {
-        if (quote.job_id !== jobId) continue
-        quotes.push({
-          id: quote.id,
-          noteId: note.id,
-          noteTitle: note.title,
-          side: quote.side,
-          paragraphIndex: quote.paragraph_index,
-          quote: quote.quote,
-          pairedText: quote.paired_text,
-          note,
-        })
-      }
+      quotes.push(...noteBookQuotes(note, jobId))
     }
   }
   await Promise.all(Array.from({ length: PARALLEL_REQUESTS }, worker))
   // Запросы идут параллельно: порядок конспектов — по названию, а не по скорости ответа.
   aboutBook.sort((first, second) => first.title.localeCompare(second.title))
   return { quotes, aboutBook }
+}
+
+/** Цитаты одной заметки из этой книги — после сохранения заметки, без перечитывания всей книги. */
+export function noteBookQuotes(note: NoteResponse, jobId: string): BookQuote[] {
+  return note.quotes.filter((quote) => quote.job_id === jobId).map((quote) => ({
+    id: quote.id,
+    noteId: note.id,
+    noteTitle: note.title,
+    side: quote.side,
+    paragraphIndex: quote.paragraph_index,
+    quote: quote.quote,
+    pairedText: quote.paired_text,
+    paragraphText: null,
+    note,
+  }))
+}
+
+/** Добавляет к цитатам текст их абзацев из `/text` (номера абзацев — как у сервера). */
+export function withParagraphTexts(quotes: readonly BookQuote[], text: DocumentText | null): BookQuote[] {
+  if (!text) return [...quotes]
+  const byIndex = new Map(text.paragraphs.map((paragraph) => [paragraph.index, paragraph]))
+  return quotes.map((quote) => {
+    const paragraph = byIndex.get(quote.paragraphIndex)
+    const own = quote.side === 'SOURCE' ? paragraph?.source : paragraph?.translation
+    return { ...quote, paragraphText: own ?? null }
+  })
 }
 
 /** Только цитаты книги. */

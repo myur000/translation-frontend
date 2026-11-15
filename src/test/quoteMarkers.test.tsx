@@ -15,7 +15,7 @@ const noteOf = (id: string, title: string): NoteResponse => ({
 })
 const quote = (overrides: Partial<BookQuote>): BookQuote => ({
   id: 'q-1', noteId: 'n-1', noteTitle: 'Шторм', side: 'TRANSLATION', paragraphIndex: 1,
-  quote: 'Ветер дул с северо-востока', pairedText: 'The wind came from the north-east.',
+  quote: 'Ветер дул с северо-востока', pairedText: 'The wind came from the north-east.', paragraphText: null,
   note: noteOf(overrides.noteId ?? 'n-1', overrides.noteTitle ?? 'Шторм'), ...overrides,
 })
 
@@ -100,7 +100,7 @@ describe('book quotes', () => {
     expect(api.listNotes).toHaveBeenCalledWith({ job_id: 'job-1', size: 100 }, { accessToken: 'jwt' })
     expect(api.getNote).toHaveBeenCalledTimes(1)
     expect(quotes).toEqual([{ id: 'q-job-1', noteId: 'n-1', noteTitle: 'Заметка n-1', side: 'SOURCE',
-      paragraphIndex: 3, quote: 'wind', pairedText: 'ветер', note: expect.objectContaining({ id: 'n-1' }) }])
+      paragraphIndex: 3, quote: 'wind', pairedText: 'ветер', paragraphText: null, note: expect.objectContaining({ id: 'n-1' }) }])
   })
 
   it('reads the summaries of the book: notes linked to it without a quote', async () => {
