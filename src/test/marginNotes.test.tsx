@@ -223,13 +223,16 @@ describe('margin notes', () => {
 
     const bookmark = await screen.findByRole('region', { name: 'Конспект книги' })
     expect(bookmark.textContent).toContain('Конспекты · 2')
-    expect(bookmark.textContent).toContain('Конспект')
-    // В начале книги — у верха страницы, дальше держится под шапкой: книга едет, закладка нет.
+    // Закладка «липкая»: в начале книги — у верха страницы, дальше держится под шапкой.
+    // Её ведёт браузер (position: sticky) в одном кадре с прокруткой — скрипт её не двигает,
+    // поэтому ей и дёргаться нечему.
+    expect(bookmark.style.position).toBe('sticky')
     expect(bookmark.style.top).toBe('12px')
+    expect((bookmark.parentElement as HTMLElement).style.top).toBe('12px')
     const column = screen.getByRole('region', { name: 'Колонка' })
     column.scrollTop = 900
     column.dispatchEvent(new Event('scroll'))
-    expect(bookmark.style.top).toBe('912px')
+    expect(bookmark.style.top).toBe('12px')
   })
 
   it('opens the current summary, switches between summaries and remembers the choice', async () => {

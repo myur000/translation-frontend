@@ -77,6 +77,14 @@ interface Measured {
   pageRight: number
   /** Верх страницы в тех же координатах: там закладка конспекта в начале книги. */
   pageTop: number
+  /** Низ страницы: до него закладка держится вверху полей, дальше уходит с концом книги. */
+  pageBottom: number
+  /**
+   * «Липкий» отступ закладки. Chrome отсчитывает его от края содержимого колонки, то есть
+   * под её внутренним отступом сверху (шапка и подпись колонки), поэтому отступ — разница
+   * между желаемым местом (под шапкой) и этим краем.
+   */
+  stickyTop: number
 }
 
 const DRAFT_KEY = 'draft'
@@ -156,7 +164,11 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
         const pageRect = page.getBoundingClientRect()
         const pageRight = pageRect.right - hostRect.left + host.scrollLeft
         const pageTop = pageRect.top - hostRect.top + host.scrollTop
-        setMeasured({ host, fit, groups, pageRight, pageTop })
+        const pageBottom = pageRect.bottom - hostRect.top + host.scrollTop
+        const hostStyle = getComputedStyle(host)
+        const chromeTop = parseFloat(hostStyle.getPropertyValue('--chrome-top')) || 0
+        const stickyTop = chromeTop + ABOUT_OFFSET - (parseFloat(hostStyle.paddingTop) || 0)
+        setMeasured({ host, fit, groups, pageRight, pageTop, pageBottom, stickyTop })
       })
     }
     recompute()
@@ -208,6 +220,8 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
   const fit = measured?.host === host ? measured.fit : null
   const pageRight = measured?.host === host ? measured.pageRight : 0
   const aboutAnchor = (measured?.host === host ? measured.pageTop : 0) + ABOUT_OFFSET
+  const pageBottom = measured?.host === host ? measured.pageBottom : 0
+  const stickyTop = measured?.host === host ? measured.stickyTop : ABOUT_OFFSET
 
   // Конспект из меню «+», кнопки «Конспект» или клавиши K: раскрыть закладку (или свернуть).
   if (request?.about && request.nonce !== handledRequest) {
@@ -266,23 +280,6 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
     const element = cardRefs.current.get(activeKey)
     if (element && !element.contains(document.activeElement)) element.focus({ preventScroll: true })
   }, [activeKey, isPopover])
-
-  // Закладка конспекта не уезжает с текстом: в начале книги она у верха страницы, дальше
-  // держится под шапкой. Верх ставится прямо в обработчике прокрутки, без перерисовки
-  // React, — иначе закладка отставала бы от текста на кадр и дрожала.
-  useLayoutEffect(() => {
-    if (!host || !fit) return
-    const chromeTop = parseFloat(getComputedStyle(host).getPropertyValue('--chrome-top')) || 0
-    const place = () => {
-      const element = cardRefs.current.get(ABOUT_KEY)
-      if (!element) return
-      const pinned = host.scrollTop + chromeTop + ABOUT_OFFSET
-      element.style.top = `${isPopover ? pinned : Math.max(aboutAnchor, pinned)}px`
-    }
-    place()
-    host.addEventListener('scroll', place, { passive: true })
-    return () => host.removeEventListener('scroll', place)
-  }, [aboutAnchor, activeKey, fit, host, isPopover, isCreatingSummary, aboutBook.length])
 
   // Esc, нажатый вне карточек (фокус ушёл на страницу), тоже закрывает открытую карточку —
   // раньше обработчика полноэкранного режима, чтобы тот же Esc не выводил из него.
@@ -398,39 +395,53 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
     <div className={`${styles.layer} ${isPopover ? styles.popoverLayer : ''} ${isSettling ? styles.settling : ''}`} data-margin-notes="" data-quote-ignore="">
       {/* Без места на полях свёрнутая закладка не закрывает текст: конспект — по кнопке и K. */}
       {!isPopover || isBookmarkOpen ? (
-        <SummaryBookmark
-          cardRef={cardRef(ABOUT_KEY)}
-          cardKey={ABOUT_KEY}
-          style={isPopover ? { left: host.scrollLeft + VIEWPORT_SIDE_PADDING, width: cardWidth } : { left: marginLeft, width: cardWidth }}
-          isPopover={isPopover}
-          isOpen={isBookmarkOpen}
-          summaries={aboutBook}
-          current={currentSummary}
-          isCreating={isCreatingSummary || !currentSummary}
-          bookTitle={bookTitle}
-          tone={coverTone(bookName)}
-          newSummary={newSummary}
-          onOpen={() => {
-            setCreatingSummary(!currentSummary)
-            setActive({ key: ABOUT_KEY, noteId: null })
+        // Закладка не уезжает с текстом: она «липкая» (position: sticky) внутри полосы от
+        // верха до низа страницы. Положение ведёт сам браузер в том же кадре, что и
+        // прокрутку. Раньше верх ставился в обработчике прокрутки — он срабатывает
+        // позже прокрутки, и закладка на кадр уезжала с текстом и дёргалась обратно.
+        <div
+          className={styles.bookmarkRail}
+          style={{
+            top: aboutAnchor,
+            left: isPopover ? host.scrollLeft + VIEWPORT_SIDE_PADDING : marginLeft,
+            width: cardWidth,
+            height: Math.max(0, pageBottom - aboutAnchor),
           }}
-          onClose={() => {
-            setCreatingSummary(false)
-            setActive(null)
-          }}
-          onSelect={(noteId) => {
-            setCreatingSummary(false)
-            chooseSummary(noteId)
-          }}
-          onCreate={() => setCreatingSummary(true)}
-          onCreated={finishSummary}
-          onCancelCreate={() => {
-            setCreatingSummary(false)
-            if (!currentSummary) setActive(null)
-          }}
-          onNoteSaved={onNoteSaved}
-          onKeyDown={handleKeyDown}
-        />
+        >
+          <SummaryBookmark
+            cardRef={cardRef(ABOUT_KEY)}
+            cardKey={ABOUT_KEY}
+            style={{ position: 'sticky', top: stickyTop }}
+            isPopover={isPopover}
+            isOpen={isBookmarkOpen}
+            summaries={aboutBook}
+            current={currentSummary}
+            isCreating={isCreatingSummary || !currentSummary}
+            bookTitle={bookTitle}
+            tone={coverTone(bookName)}
+            newSummary={newSummary}
+            onOpen={() => {
+              setCreatingSummary(!currentSummary)
+              setActive({ key: ABOUT_KEY, noteId: null })
+            }}
+            onClose={() => {
+              setCreatingSummary(false)
+              setActive(null)
+            }}
+            onSelect={(noteId) => {
+              setCreatingSummary(false)
+              chooseSummary(noteId)
+            }}
+            onCreate={() => setCreatingSummary(true)}
+            onCreated={finishSummary}
+            onCancelCreate={() => {
+              setCreatingSummary(false)
+              if (!currentSummary) setActive(null)
+            }}
+            onNoteSaved={onNoteSaved}
+            onKeyDown={handleKeyDown}
+          />
+        </div>
       ) : null}
       {groups.map((group) => {
         const isActive = active?.key === group.key
