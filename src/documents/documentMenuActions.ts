@@ -12,6 +12,8 @@ interface DocumentMenuOptions {
   onRate: () => void
   /** Ручная отметка прочтения; только у готового перевода. */
   reading?: { isRead: boolean; onToggle: () => void }
+  /** Открыть книгу сразу с её конспектом; без него пункта нет (в самой книге есть кнопка и K). */
+  onOpenSummary?: () => void
   /** Перевод на другой язык; без него пункт не показывается. */
   onRetranslate?: () => void
   /** Отмена идущего перевода; пункт есть только у задач в `PENDING`/`PROCESSING`. */
@@ -32,6 +34,7 @@ export function documentMenuActions({
   onTogglePin,
   onRate,
   reading,
+  onOpenSummary,
   onRetranslate,
   onCancelTranslation,
   download,
@@ -65,6 +68,10 @@ export function documentMenuActions({
           icon: reading.isRead ? 'unread' as const : 'read' as const,
           onSelect: reading.onToggle,
         }]
+      : []),
+    // Конспект можно начать и пока книга переводится: он о книге целиком, а не о тексте.
+    ...(onOpenSummary
+      ? [{ id: 'summary', label: t('documentActions.summary'), icon: 'summary' as const, onSelect: onOpenSummary }]
       : []),
     ...(document.status === 'ready'
       ? [{ id: 'rate', label: t('documentActions.rate'), icon: 'star' as const, onSelect: onRate }]

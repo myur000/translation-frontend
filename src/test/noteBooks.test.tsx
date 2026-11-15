@@ -62,11 +62,12 @@ describe('books a note is about', () => {
     expect(within(section).getByRole('link', { name: 'Lighthouse keepers ledger' }).getAttribute('href')).toBe('/documents/job-1?note=n-1')
     expect(section.textContent).toContain('Конспект книги')
     // Уже привязанной книги среди вариантов нет.
-    const select = within(section).getByRole('combobox', { name: 'Привязать к книге' })
-    expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual(['Привязать к книге…', 'Salt and iron'])
+    // Привязка к книге целиком делает заметку конспектом — так и названо, чтобы последствие было понятно.
+    const select = within(section).getByRole('combobox', { name: 'Сделать конспектом книги' })
+    expect(within(select).getAllByRole('option').map((option) => option.textContent)).toEqual(['Сделать конспектом книги…', 'Salt and iron'])
 
     await user.selectOptions(select, 'job-2')
-    await user.click(within(section).getByRole('button', { name: 'Привязать' }))
+    await user.click(within(section).getByRole('button', { name: 'Сделать' }))
     expect(api.linkNoteDocument).toHaveBeenCalledWith('n-1', 'job-2', expect.objectContaining({ accessToken: 'jwt' }))
     expect(onChanged).toHaveBeenCalledWith(linked)
   })
@@ -77,7 +78,7 @@ describe('books a note is about', () => {
     api.unlinkNoteDocument.mockResolvedValue(undefined)
     render(<Page onChanged={onChanged} />)
 
-    await user.click(screen.getByRole('button', { name: 'Отвязать от «Lighthouse keepers ledger»' }))
+    await user.click(screen.getByRole('button', { name: 'Больше не конспект «Lighthouse keepers ledger»' }))
     expect(api.unlinkNoteDocument).toHaveBeenCalledWith('n-1', 'job-1', expect.objectContaining({ accessToken: 'jwt' }))
     expect(onChanged).toHaveBeenCalledWith({ ...note, documents: [] })
   })
@@ -88,8 +89,8 @@ describe('books a note is about', () => {
       { status: 404, code: 'DOCUMENT_NOT_FOUND', message: 'Документ не найден' } as never, null, null))
     render(<Page onChanged={vi.fn()} />)
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Привязать к книге' }), 'job-2')
-    await user.click(screen.getByRole('button', { name: 'Привязать' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Сделать конспектом книги' }), 'job-2')
+    await user.click(screen.getByRole('button', { name: 'Сделать' }))
     expect((await screen.findByRole('alert')).textContent).toBe('Книга удалена или недоступна. Обновите страницу.')
   })
 })

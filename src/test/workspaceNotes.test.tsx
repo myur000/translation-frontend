@@ -237,6 +237,12 @@ describe('opening notes from a margin marker', () => {
     await user.click(screen.getByRole('button', { name: 'Все заметки книги' }))
     expect(screen.getByRole('button', { name: /Маяк/ })).toBeTruthy()
   })
+
+  it('names a list narrowed to the summaries of the book as summaries, not paragraph notes', async () => {
+    api.listNotes.mockImplementation(async () => page([summary(storm), summary({ ...storm, id: 'n-3', title: 'Конспект' })]))
+    renderPanel({ request: { nonce: 1, noteIds: ['n-1', 'n-3'], about: true } })
+    expect((await screen.findByRole('status')).textContent).toContain('Конспекты книги: 2')
+  })
 })
 
 describe('deleting a quoted book', () => {

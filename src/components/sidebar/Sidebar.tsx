@@ -7,6 +7,7 @@ import {
   type PointerEventHandler,
 } from 'react'
 import { Link, NavLink, useMatch, useNavigate } from 'react-router'
+import { bookSummaryHref } from '../../notes/noteBooks.ts'
 import { DocumentActionsMenu } from '../toolbar/DocumentActionsMenu.tsx'
 import { DeleteDocumentDialog } from '../workspace/DeleteDocumentDialog.tsx'
 import { CancelTranslationDialog } from '../workspace/CancelTranslationDialog.tsx'
@@ -95,6 +96,7 @@ export function Sidebar({
     onTogglePin: () => { if (document.jobId) setPinned(document.jobId, !isPinned(document.jobId)) },
     onRate: () => onRateDocument(document.id),
     reading: document.jobId && document.status === 'ready' ? readingToggle(reading, document.jobId) : undefined,
+    onOpenSummary: document.jobId ? () => { void navigate(bookSummaryHref(document.jobId!)) } : undefined,
     onCancelTranslation: () => setPendingCancel(document),
     onDelete: () => document.jobId ? setPendingDelete(document) : void onDeleteDocument(document.id),
   })

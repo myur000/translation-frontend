@@ -84,14 +84,17 @@ export function WorkspaceNotesPanel({ document, bookQuotes, pendingQuote, pendin
   const owner = session?.email ?? ''
   const jobId = document.jobId ?? null
   const [view, setView] = useState<PanelView>(() => (request ? viewForRequest(request) : { kind: 'list' }))
-  // Заметки абзаца, по метке которого открыли панель; `null` — все заметки книги.
+  // Заметки абзаца, по метке которого открыли панель, или конспекты книги; `null` — все заметки книги.
   const [focusIds, setFocusIds] = useState<string[] | null>(() =>
     request && request.noteIds.length > 1 ? request.noteIds : null)
+  // Список сужен до конспектов («Конспект книги» без полей), а не до заметок абзаца.
+  const [isFocusOnSummaries, setFocusOnSummaries] = useState(Boolean(request?.about))
   const [handledNonce, setHandledNonce] = useState(request?.nonce ?? null)
   if (request && request.nonce !== handledNonce) {
     setHandledNonce(request.nonce)
     setView(viewForRequest(request))
     setFocusIds(request.noteIds.length > 1 ? request.noteIds : null)
+    setFocusOnSummaries(Boolean(request.about))
   }
   const [revision, setRevision] = useState(0)
 
@@ -157,7 +160,7 @@ export function WorkspaceNotesPanel({ document, bookQuotes, pendingQuote, pendin
       <div className={styles.body}>
         {focusIds ? (
           <div className={styles.focusBar} role="status">
-            <span>{t('notesPanel.paragraphNotes', { count: focusIds.length })}</span>
+            <span>{t(isFocusOnSummaries ? 'notesPanel.summaries' : 'notesPanel.paragraphNotes', { count: focusIds.length })}</span>
             <button type="button" onClick={() => setFocusIds(null)}>{t('notesPanel.showAllBookNotes')}</button>
           </div>
         ) : null}

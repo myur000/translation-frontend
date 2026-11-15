@@ -4,6 +4,13 @@ import { bookTitle } from '../documents/bookTitle.ts'
 /** Параметры адреса книги: открыть в ней эту заметку и прокрутить к цитате. */
 export const NOTE_PARAM = 'note'
 export const QUOTE_PARAM = 'quote'
+/** Открыть книгу сразу с её конспектом (закладка на полях раскрыта). */
+export const SUMMARY_PARAM = 'summary'
+
+/** Адрес книги с раскрытым конспектом: меню книги на полке, карточка книги. */
+export function bookSummaryHref(jobId: string) {
+  return `/documents/${encodeURIComponent(jobId)}?${SUMMARY_PARAM}=open`
+}
 
 /**
  * Адрес книги, который сразу показывает заметку: рабочая область читает

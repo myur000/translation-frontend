@@ -29,12 +29,14 @@ const graph: NoteGraphResponse = {
     { id: 'note:n-2', type: 'note', label: 'Ветер', ref: 'n-2', deleted: false },
     { id: 'note:n-3', type: 'note', label: 'Соль', ref: 'n-3', deleted: false },
     { id: 'note:n-4', type: 'note', label: 'Мысли', ref: 'n-4', deleted: false },
+    { id: 'note:n-5', type: 'note', label: 'Персонажи — Lighthouse keepers ledger', ref: 'n-5', deleted: false },
     { id: 'document:job-1', type: 'document', label: 'lighthouse-keepers-ledger.docx', ref: 'job-1', deleted: false },
     { id: 'document:job-2', type: 'document', label: 'salt_and_iron.pdf', ref: 'job-2', deleted: true },
     { id: 'tag:море', type: 'tag', label: '#море', ref: null, deleted: false },
   ],
   edges: [
     { source: 'note:n-1', target: 'document:job-1', type: 'about', weight: 1 },
+    { source: 'note:n-5', target: 'document:job-1', type: 'about', weight: 1 },
     { source: 'note:n-2', target: 'document:job-1', type: 'quotes', weight: 1 },
     { source: 'note:n-3', target: 'document:job-2', type: 'quotes', weight: 1 },
     { source: 'note:n-2', target: 'tag:море', type: 'tagged', weight: 1 },
@@ -79,6 +81,8 @@ describe('notes home: overview by books', () => {
     expect(within(wind).getByText('сегодня')).toBeTruthy()
     // Заметка без книги — без подписи книги.
     expect(within(list).getByRole('link', { name: /Мысли/ }).textContent).not.toContain('Lighthouse')
+    // Конспект отличается от заметки и в общем списке: «Конспект · Книга».
+    expect(within(within(list).getByRole('link', { name: /^Конспект/ })).getByText('Конспект · Lighthouse keepers ledger')).toBeTruthy()
   })
 
   it('lists books with notes, their summary and a way into the book', async () => {
@@ -88,8 +92,12 @@ describe('notes home: overview by books', () => {
     expect(api.getNoteGraph).toHaveBeenCalledTimes(1)
     expect(api.getNoteGraph).toHaveBeenCalledWith(['document', 'tag', 'missing'], expect.objectContaining({ accessToken: 'jwt' }))
     const lighthouse = await screen.findByRole('article', { name: 'Lighthouse keepers ledger' })
-    expect(lighthouse.textContent).toContain('2 заметки · конспект')
-    expect(within(lighthouse).getByRole('link', { name: 'Конспект книги «Lighthouse keepers ledger»' }).getAttribute('href')).toBe('/notes/n-1')
+    expect(lighthouse.textContent).toContain('3 заметки · 2 конспекта')
+    // Каждый конспект — своей строкой; название книги на нём не повторяется.
+    const summaries = within(lighthouse).getByRole('list', { name: 'Конспекты книги «Lighthouse keepers ledger»' })
+    expect(within(summaries).getAllByRole('link').map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Конспект', '/notes/n-1'], ['Персонажи', '/notes/n-5'],
+    ])
     expect(within(lighthouse).getByRole('link', { name: 'Открыть книгу «Lighthouse keepers ledger»' }).getAttribute('href')).toBe('/documents/job-1')
 
     // Удалённую книгу открыть нельзя, но её заметки на месте.

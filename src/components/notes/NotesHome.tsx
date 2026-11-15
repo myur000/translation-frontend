@@ -1,9 +1,10 @@
-import { useId, useMemo, useState } from 'react'
+import { useId, useMemo, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router'
 import type { NoteSummary } from '../../api/contracts/notes.ts'
 import { coverInitial, coverTone } from '../../documents/bookTitle.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import { notesSearch } from '../../notes/notesQuery.ts'
+import { summaryLabels } from '../../notes/bookSummaries.ts'
 import { bookOfNote, noteDay, RECENT_NOTES_LIMIT } from '../../notes/notesOverview.ts'
 import type { NotesTreeBook } from '../../notes/notesTree.ts'
 import { plainExcerpt } from '../../notes/noteSyntax.ts'
@@ -14,6 +15,7 @@ import styles from './NotesHome.module.css'
 import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 
 const NO_BOOKS: ReadonlyMap<string, NotesTreeBook> = new Map()
+const NO_TITLES: ReadonlyMap<string, string> = new Map()
 
 /**
  * `/notes`: обзор раздела. «Продолжить» — последние заметки, «Книги с
@@ -143,7 +145,7 @@ export function NotesHome() {
         <section className={styles.section} aria-labelledby={booksHeadingId}>
           <h2 id={booksHeadingId} className={styles.eyebrow}>{t('notes.home.books')}</h2>
           <ul className={styles.books}>
-            {books.map((book) => <li key={book.key}><BookCard book={book} /></li>)}
+            {books.map((book) => <li key={book.key}><BookCard book={book} titles={tree?.titles ?? NO_TITLES} /></li>)}
           </ul>
         </section>
       ) : null}
@@ -166,25 +168,32 @@ export function NotesHome() {
   )
 }
 
-/** Строка заметки: корешок книги, название, откуда она и когда её меняли. */
+/**
+ * Строка заметки: корешок книги, название, откуда она и когда её меняли. У конспекта
+ * вместо корешка — тетрадь цвета обложки и подпись «Конспект · Книга»: с заметкой его
+ * не спутать и в общем списке.
+ */
 function NoteRow({ note, book, search, now }: { note: NoteSummary; book: NotesTreeBook | undefined; search: string; now: Date }) {
   const { t, language } = useTranslation()
   const formatDate = useNoteDateFormat()
   const day = noteDay(note.updated_at, now, language === 'ru' ? 'ru-RU' : 'en-US')
   const dayText = day.kind === 'date' ? day.text : t(day.kind === 'today' ? 'notes.home.today' : 'notes.home.yesterday')
   const excerpt = note.excerpt ? plainExcerpt(note.excerpt) : ''
+  const isSummary = book?.summaryIds.includes(note.id) ?? false
   return (
     <Link className={styles.row} to={`/notes/${encodeURIComponent(note.id)}${search}`}>
       <span
-        className={`${styles.spine} ${book ? '' : styles.spineNone}`}
+        className={`${styles.spine} ${isSummary ? styles.summarySpine : ''} ${book ? '' : styles.spineNone}`}
         style={book ? { background: `var(--cover-${coverTone(book.fileName)})` } : undefined}
         aria-hidden="true"
-      />
+      >
+        {isSummary ? <NotebookGlyph /> : null}
+      </span>
       <span className={styles.rowText}>
         <span className={styles.rowTitle}>{note.title}</span>
         {book || excerpt ? (
           <span className={styles.rowMeta}>
-            {book ? <span className={styles.rowBook}>{book.title}</span> : null}
+            {book ? <span className={styles.rowBook}>{isSummary ? t('notes.home.summaryOf', { book: book.title }) : book.title}</span> : null}
             {excerpt ? <span className={styles.rowExcerpt}>{excerpt}</span> : null}
           </span>
         ) : null}
@@ -196,11 +205,13 @@ function NoteRow({ note, book, search, now }: { note: NoteSummary; book: NotesTr
   )
 }
 
-/** Карточка книги: обложка, сколько заметок, есть ли конспект и вход в книгу. */
-function BookCard({ book }: { book: NotesTreeBook }) {
+/** Карточка книги: обложка, сколько заметок, её конспекты и вход в книгу. */
+function BookCard({ book, titles }: { book: NotesTreeBook; titles: ReadonlyMap<string, string> }) {
   const { t, tc } = useTranslation()
   const countText = tc('notes.home.noteCount', book.noteIds.length)
-  const summaryId = book.summaryIds[0]
+  const summaries = book.summaryIds.map((id) => ({ id, title: titles.get(id) ?? '' }))
+  const labels = summaryLabels(summaries, book.title)
+  const tone = coverTone(book.fileName)
   return (
     <article className={`${styles.book} ${book.deleted ? styles.bookDeleted : ''}`} aria-label={book.title}>
       <span className={styles.cover} style={{ background: `var(--cover-${coverTone(book.fileName)})` }} aria-hidden="true">
@@ -209,15 +220,23 @@ function BookCard({ book }: { book: NotesTreeBook }) {
       <span className={styles.bookText}>
         <strong className={styles.bookTitle} title={book.fileName}>{book.title}</strong>
         <span className={styles.bookMeta}>
-          {countText}{summaryId ? ` · ${t('notes.home.hasSummary')}` : ''}
+          {countText}{summaries.length ? ` · ${tc('notes.home.summaryCount', summaries.length)}` : ''}
         </span>
+        {/* Конспекты книги — каждый своей строкой: их может быть несколько. */}
+        {summaries.length ? (
+          <ul className={styles.summaries} aria-label={t('notes.home.summariesOf', { book: book.title })}
+            style={{ '--summary-tone': `var(--cover-${tone})` } as CSSProperties}>
+            {summaries.map((summary) => (
+              <li key={summary.id}>
+                <Link className={styles.summaryLink} to={`/notes/${encodeURIComponent(summary.id)}`} title={summary.title}>
+                  <NotebookGlyph />
+                  <span>{labels.get(summary.id) ?? summary.title}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <span className={styles.bookActions}>
-          {summaryId ? (
-            <Link className={styles.quietLink} to={`/notes/${encodeURIComponent(summaryId)}`}
-              aria-label={t('notes.home.openSummaryNamed', { title: book.title })}>
-              {t('notesPanel.summary')}
-            </Link>
-          ) : null}
           {book.jobId ? (
             <Link className={styles.openBook} to={`/documents/${encodeURIComponent(book.jobId)}`}
               aria-label={t('notes.home.openBookNamed', { title: book.title })}>
@@ -229,5 +248,14 @@ function BookCard({ book }: { book: NotesTreeBook }) {
         </span>
       </span>
     </article>
+  )
+}
+
+/** Тетрадь с корешком — значок конспекта, тот же, что в книге и в боковой панели. */
+function NotebookGlyph() {
+  return (
+    <svg className={styles.notebook} viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M4 2.5h8.5v11H4zM4 2.5v11M2.5 5h3M2.5 8h3M2.5 11h3M7 6h3.5" />
+    </svg>
   )
 }

@@ -6,7 +6,7 @@ import type { ShowQuoteResult } from '../components/notes/PanelNoteView.tsx'
 import type { NotesPanelRequest } from '../components/notes/WorkspaceNotesPanel.tsx'
 import type { MarginDraft } from '../components/notes/MarginNotes.tsx'
 import { draftAnchor } from '../notes/marginNotesLayout.ts'
-import { NOTE_PARAM, QUOTE_PARAM } from '../notes/noteBooks.ts'
+import { NOTE_PARAM, QUOTE_PARAM, SUMMARY_PARAM } from '../notes/noteBooks.ts'
 import { bookTitle, coverTone } from '../documents/bookTitle.ts'
 import { nextSummaryTitle, textClickTarget } from '../notes/bookSummaries.ts'
 import { QuoteMarkers } from '../components/workspace/QuoteMarkers.tsx'
@@ -372,6 +372,16 @@ function DocumentWorkspace({
     // Срабатывает один раз на переход: параметры сразу убираются из адреса.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedNoteId, linkedQuoteId, bookNotes.isLoaded])
+
+  // «Конспект книги» из меню книги на полке: `?summary=open` — книга открывается сразу с
+  // раскрытым конспектом (на полях — закладка, иначе — колонка). Тоже один раз на переход.
+  const isSummaryLink = linkParams.has(SUMMARY_PARAM)
+  useEffect(() => {
+    if (!isSummaryLink || !bookNotes.isLoaded) return
+    openSummary('open')
+    void navigate({ pathname: location.pathname, search: '' }, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSummaryLink, bookNotes.isLoaded])
 
   const showQuote = (quote: NoteQuoteResponse): ShowQuoteResult => {
     // Колонка скрыта раскладкой: её ref пуст.

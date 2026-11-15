@@ -1812,6 +1812,22 @@ describe('document actions', () => {
     expect(router.state.location.pathname).toBe('/documents/00000000-0000-0000-0000-000000000102')
   })
 
+  it('opens a book with its summary from the book menu on the shelf', async () => {
+    const user = userEvent.setup()
+    const { router } = renderDocumentRoute(`/documents/${firstJob}`)
+
+    // Конспект вызывается и снаружи книги: пункт меню на полке открывает её с конспектом.
+    await user.click(within(await openBookActions(user, 'english_course_book.pdf'))
+      .getByRole('menuitem', { name: 'Конспект книги' }))
+    // У книги ещё нет конспекта — сразу форма нового, привязанного к ней.
+    const column = await screen.findByRole('complementary', { name: 'Заметки' })
+    expect((await within(column).findByRole('textbox', { name: 'Название' }) as HTMLInputElement).value)
+      .toBe('Конспект — English course book')
+    // Параметр сработал один раз и убран из адреса: обновление страницы не повторит переход.
+    await waitFor(() => expect(router.state.location.search).toBe(''))
+    expect(router.state.location.pathname).toBe(`/documents/${firstJob}`)
+  })
+
   it('keeps a document that is still being translated', async () => {
     const user = userEvent.setup()
     renderDocumentRoute(`/documents/${firstJob}`, {
