@@ -6,6 +6,8 @@
 /** Ширина карточки на полях: полная и минимальная, ниже которой карточки уходят с полей. */
 export const CARD_MAX_WIDTH = 260
 export const CARD_MIN_WIDTH = 200
+/** Раскрытый конспект: в нём пишут подолгу, поэтому поля под него шире, если есть место. */
+export const SUMMARY_MAX_WIDTH = 440
 /** Зазор между страницей и карточкой и между карточкой и краем колонки. */
 export const CARD_EDGE_GAP = 16
 /** Вертикальный зазор между соседними карточками. */
@@ -36,11 +38,11 @@ export interface MarginFit {
  * Страница центрируется в том, что осталось, поэтому при нехватке места она
  * сначала сдвигается влево, потом карточки сужаются до минимума.
  */
-export function fitMarginNotes(viewportWidth: number, pageWidth: number, current: MarginStage | null): MarginFit {
+export function fitMarginNotes(viewportWidth: number, pageWidth: number, current: MarginStage | null, maxWidth = CARD_MAX_WIDTH): MarginFit {
   const available = Math.floor(viewportWidth - 2 * VIEWPORT_SIDE_PADDING - pageWidth - 2 * CARD_EDGE_GAP)
   const threshold = current === 'popover' ? CARD_MIN_WIDTH + STAGE_HYSTERESIS : CARD_MIN_WIDTH
   if (available < threshold) return { stage: 'popover', cardWidth: 0, reservedSpace: 0 }
-  const cardWidth = Math.min(CARD_MAX_WIDTH, available)
+  const cardWidth = Math.min(maxWidth, available)
   return { stage: 'margin', cardWidth, reservedSpace: cardWidth + 2 * CARD_EDGE_GAP }
 }
 

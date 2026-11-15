@@ -36,6 +36,28 @@
   box-shadow: 0 0 0 1px var(--summary-tone);
 }
 
+/* Раскрытая: не выше видимой части колонки (max-height задают поля). Шапка и вкладки
+   остаются на месте, длинный конспект прокручивается внутри, а не уходит под нижнюю панель. */
+.open {
+  display: flex;
+  flex-direction: column;
+}
+
+.open > * {
+  flex: none;
+}
+
+.open > .panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-right: -12px;
+  padding-right: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Курсор в конце текста не прячется под панелью «Готово». */
+  scroll-padding-bottom: 56px;
+}
+
 /* Свёрнутая закладка целиком — кнопка. */
 .strip {
   display: grid;

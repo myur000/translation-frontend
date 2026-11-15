@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CARD_MAX_WIDTH, CARD_MIN_WIDTH, draftAnchor, fitMarginNotes, placeCards, STAGE_HYSTERESIS } from '../notes/marginNotesLayout.ts'
+import { CARD_MAX_WIDTH, CARD_MIN_WIDTH, draftAnchor, fitMarginNotes, placeCards, STAGE_HYSTERESIS, SUMMARY_MAX_WIDTH } from '../notes/marginNotesLayout.ts'
 
 const slot = (key: string, anchor: number, height = 60) => ({ key, anchor, height })
 
@@ -7,6 +7,12 @@ describe('margin notes fit', () => {
   // Колонка 1100px, отступы 2×24, зазоры 2×16: свободно 1100 − 48 − 32 − ширина страницы.
   it('puts full cards on the margin when there is room', () => {
     expect(fitMarginNotes(1100, 640, null)).toEqual({ stage: 'margin', cardWidth: CARD_MAX_WIDTH, reservedSpace: CARD_MAX_WIDTH + 32 })
+  })
+
+  it('gives an open summary a wider margin when there is room', () => {
+    expect(fitMarginNotes(1300, 640, 'margin', SUMMARY_MAX_WIDTH)).toEqual({ stage: 'margin', cardWidth: SUMMARY_MAX_WIDTH, reservedSpace: SUMMARY_MAX_WIDTH + 32 })
+    // Места меньше — сколько есть, как у обычных карточек.
+    expect(fitMarginNotes(1100, 640, 'margin', SUMMARY_MAX_WIDTH).cardWidth).toBe(380)
   })
 
   it('narrows the cards before giving up the margin', () => {

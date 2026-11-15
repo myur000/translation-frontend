@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useRef } from 'react'
 import { MemoryRouter } from 'react-router'
@@ -25,6 +25,11 @@ const note = (id: string, title: string, body: string): NoteResponse => ({
   id, title, body, version: 3, created_at: '', updated_at: '', tags: [], links: [], quotes: [],
 })
 const storm = note('n-1', 'Шторм', 'Ветер — важная деталь.\n\nВторая мысль.')
+/** Цитата в ответе сервера на её добавление. */
+const savedQuote = (id: string, text: string) => ({
+  id, job_id: 'job-1', document_name: 'lighthouse-keepers-ledger.docx', document_available: true, side: 'TRANSLATION',
+  paragraph_index: 1, quote: text, paired_text: null, source_lang: 'eng_Latn', target_lang: 'rus_Cyrl', created_at: '',
+})
 const quote = (target: NoteResponse, paragraphIndex: number): BookQuote => ({
   id: `q-${target.id}`, noteId: target.id, noteTitle: target.title, side: 'TRANSLATION', paragraphIndex,
   quote: paragraphIndex === 1 ? 'Ветер дул' : 'увидел свет', pairedText: null, paragraphText: null, note: target,
@@ -330,7 +335,7 @@ describe('margin notes', () => {
     mockGeometry(560)
     const user = userEvent.setup()
     const summary = note('n-9', 'Конспект — Lighthouse keepers ledger', 'О чём книга.')
-    api.addNoteQuote.mockResolvedValue({})
+    api.addNoteQuote.mockResolvedValue(savedQuote('q-9', 'северо-востока'))
     api.getNote.mockResolvedValue(summary)
     api.updateNote.mockResolvedValue({ ...summary, version: 4 })
     const onDone = vi.fn()
@@ -349,7 +354,12 @@ describe('margin notes', () => {
     await user.keyboard('{Control>}{Enter}{/Control}')
 
     expect(api.addNoteQuote).toHaveBeenCalledWith('n-9', expect.objectContaining({ paragraph_index: 1, quote: 'северо-востока' }), expect.anything())
-    expect(api.updateNote).toHaveBeenCalledWith('n-9', { title: summary.title, body: 'О чём книга.\n\nВетер — предвестник', version: 3 }, expect.anything())
+    // Цитата встаёт в текст конспекта, мысль — сразу под ней.
+    expect(api.updateNote).toHaveBeenCalledWith('n-9', {
+      title: summary.title,
+      body: 'О чём книга.\n\n> северо-востока\n> — [¶2 · перевод](quote:q-9)\n\nВетер — предвестник',
+      version: 3,
+    }, expect.anything())
     expect(onDone).toHaveBeenCalled()
     expect(JSON.parse(localStorage.getItem('parallel.current-summary.v1.reader@example.com')!)).toEqual({ 'job-1': 'n-9' })
   })
@@ -357,7 +367,8 @@ describe('margin notes', () => {
   it('starts a summary with the excerpt when the book has none and hints that the passage is already in a note', async () => {
     mockGeometry(560)
     const user = userEvent.setup()
-    api.createNote.mockResolvedValue(note('n-10', 'Конспект — Lighthouse keepers ledger', ''))
+    api.createNote.mockResolvedValue({ ...note('n-10', 'Конспект — Lighthouse keepers ledger', ''), quotes: [savedQuote('q-10', 'дул')] })
+    api.updateNote.mockImplementation(async (_id: string, request: { body: string }) => ({ ...note('n-10', 'Конспект — Lighthouse keepers ledger', request.body), version: 4 }))
     const selection: QuoteSelection = { side: 'TRANSLATION', text: 'дул', blockText: 'Ветер дул с северо-востока.', paragraphIndex: 1 }
     render(<Book quotes={[quote(storm, 1)]} summaryQuote={{ nonce: 1, selection }} />)
     await nextFrame()
@@ -371,5 +382,8 @@ describe('margin notes', () => {
       expect.objectContaining({ title: 'Конспект — Lighthouse keepers ledger', job_ids: ['job-1'], quote: expect.objectContaining({ quote: 'дул' }) }),
       expect.anything(),
     )
+    // Первая выписка тоже встаёт в текст нового конспекта.
+    await waitFor(() => expect(api.updateNote).toHaveBeenCalledWith('n-10',
+      { title: 'Конспект — Lighthouse keepers ledger', body: '> дул\n> — [¶2 · перевод](quote:q-10)', version: 3 }, expect.anything()))
   })
 })

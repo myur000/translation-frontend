@@ -4,6 +4,7 @@ import { deleteNote } from '../../api/notes.ts'
 import { useAuth } from '../../auth/useAuth.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import { noteErrorMessage } from '../../notes/noteErrors.ts'
+import { bookNoteHref } from '../../notes/noteBooks.ts'
 import { notesSearch, readNotesQuery } from '../../notes/notesQuery.ts'
 import { useNote } from '../../notes/useNote.ts'
 import { useNotes } from '../../notes/useNotes.ts'
@@ -100,18 +101,25 @@ export function NoteDetailView({ noteId }: { noteId: string }) {
                   />
                 </div>
               </header>
-              <NoteQuoteCards note={note} onChanged={applySaved} />
+              <NoteQuoteCards note={note} onChanged={applySaved} canInsert />
               {note.body.trim() ? (
                 <div
                   className={styles.editableBody}
                   title={t('marginNotes.editHint')}
                   onClick={(event) => {
                     // Ссылки в тексте ведут по ссылке, выделение текста — не повод открывать правку.
-                    if ((event.target as Element).closest('a') || !window.getSelection()?.isCollapsed) return
+                    if ((event.target as Element).closest('a, button') || !window.getSelection()?.isCollapsed) return
                     setEditing(true)
                   }}
                 >
-                  <NoteContent body={note.body} links={note.links} />
+                  <NoteContent
+                    body={note.body}
+                    links={note.links}
+                    quotes={note.quotes}
+                    quoteAction={(quote) => (quote.document_available && quote.job_id
+                      ? <Link to={bookNoteHref(quote.job_id, note.id, quote.id)}>{t('notes.quoteInBook')}</Link>
+                      : null)}
+                  />
                 </div>
               ) : (
                 <button type="button" className={styles.writePrompt} onClick={() => setEditing(true)}>{t('notes.writePrompt')}</button>

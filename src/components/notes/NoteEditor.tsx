@@ -1,11 +1,12 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import type { NoteLinkResponse, NoteSummary } from '../../api/contracts/notes.ts'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import type { NoteLinkResponse, NoteQuoteResponse, NoteSummary } from '../../api/contracts/notes.ts'
 import { listNotes } from '../../api/notes.ts'
 import { useAuth } from '../../auth/useAuth.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import { caretCoordinates, openWikiLinkAt } from '../../notes/caretCoordinates.ts'
 import type { NoteErrorMessage } from '../../notes/noteErrors.ts'
 import { NOTE_BODY_MAX_LENGTH, NOTE_TITLE_MAX_LENGTH, noteTitleProblem } from '../../notes/noteSyntax.ts'
+import { embeddedQuoteIds, quoteEmbed, quoteWhere } from '../../notes/quoteEmbeds.ts'
 import { NoteContent } from './NoteContent.tsx'
 import { NoteErrorText } from './NoteErrorText.tsx'
 import styles from './NoteEditor.module.css'
@@ -28,6 +29,8 @@ interface NoteEditorProps {
   notice?: ReactNode
   /** Между названием и текстом — цитаты заметки: при правке видно, к чему пишешь. */
   afterTitle?: ReactNode
+  /** Цитаты заметки: кнопка «Цитата» вставляет любую из них в текст у курсора. */
+  quotes?: readonly NoteQuoteResponse[]
   autoFocus?: 'title' | 'body'
   /** Узкая панель рядом с книгой: меньше заголовок и поле, без подсказки о клавишах. */
   compact?: boolean
@@ -60,6 +63,8 @@ export function NoteEditor(props: NoteEditorProps) {
   const [link, setLink] = useState<OpenLink | null>(null)
   const [suggestions, setSuggestions] = useState<{ fragment: string; items: NoteSummary[] } | null>(null)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [isQuoteMenuOpen, setQuoteMenuOpen] = useState(false)
+  const quotePickerRef = useRef<HTMLSpanElement>(null)
 
   const titleProblem = noteTitleProblem(title)
   // «Пусто» показываем только после попытки сохранить: пустое поле при открытии — не ошибка.
@@ -109,6 +114,16 @@ export function NoteEditor(props: NoteEditorProps) {
     textarea.style.height = 'auto'
     textarea.style.height = `${textarea.scrollHeight}px`
   }, [body, isPreview])
+
+  // Список цитат закрывается щелчком мимо; открытый с клавиатуры — фокус на первой.
+  useEffect(() => {
+    if (!isQuoteMenuOpen) return
+    const close = (event: PointerEvent) => {
+      if (!quotePickerRef.current?.contains(event.target as Node)) setQuoteMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [isQuoteMenuOpen])
 
   const fragment = link?.fragment ?? null
   useEffect(() => {
@@ -184,6 +199,38 @@ export function NoteEditor(props: NoteEditorProps) {
     pendingSelection.current = { start: start + prefix.length, end: start + prefix.length }
     update(title, next)
   }
+  /** Цитата отдельным блоком у курсора; курсор — после неё, чтобы сразу писать мысль. */
+  const insertQuote = (quote: NoteQuoteResponse) => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    setPreview(false)
+    setQuoteMenuOpen(false)
+    const before = body.slice(0, textarea.selectionStart).replace(/[ \t]+$/, '')
+    const after = body.slice(textarea.selectionEnd).replace(/^[ \t]+/, '')
+    const lead = !before || before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n'
+    const tail = after.startsWith('\n\n') ? '' : after.startsWith('\n') ? '\n' : '\n\n'
+    const side = t(quote.side === 'SOURCE' ? 'panel.original' : 'panel.translation')
+    const head = `${before}${lead}${quoteEmbed(quote, quoteWhere(quote.paragraph_index, side))}${tail}`
+    pendingSelection.current = { start: head.length, end: head.length }
+    update(title, `${head}${after}`)
+  }
+  const moveInQuoteMenu = (event: KeyboardEvent<HTMLElement>) => {
+    const items = [...(quotePickerRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])]
+    const index = items.indexOf(document.activeElement as HTMLButtonElement)
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      setQuoteMenuOpen(false)
+      textareaRef.current?.focus()
+    } else if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && items.length) {
+      event.preventDefault()
+      const isDown = event.key === 'ArrowDown'
+      const next = index < 0 ? (isDown ? 0 : items.length - 1) : (index + (isDown ? 1 : items.length - 1)) % items.length
+      items[next].focus()
+    }
+  }
+  const inText = props.quotes?.length ? embeddedQuoteIds(body) : null
+
   const formatButtons = [
     { id: 'bold', label: t('notes.format.bold'), face: <b>Ж</b>, run: () => wrapSelection('**', '**') },
     { id: 'italic', label: t('notes.format.italic'), face: <i>К</i>, run: () => wrapSelection('*', '*') },
@@ -303,7 +350,7 @@ export function NoteEditor(props: NoteEditorProps) {
         </div>
         <div id={`${id}-preview`} className={styles.previewPanel} hidden={!isPreview} aria-live="polite">
           {isPreview ? (body.trim()
-            ? <NoteContent body={body} links={props.knownLinks} />
+            ? <NoteContent body={body} links={props.knownLinks} quotes={props.quotes} />
             : <p className={styles.previewEmpty}>{t('notes.previewEmpty')}</p>) : null}
         </div>
       </div>
@@ -332,6 +379,49 @@ export function NoteEditor(props: NoteEditorProps) {
               {button.face}
             </button>
           ))}
+          {props.quotes?.length ? (
+            <span ref={quotePickerRef} className={styles.quotePicker} onKeyDown={moveInQuoteMenu}>
+              <button
+                type="button"
+                className={styles.formatButton}
+                aria-label={t('notes.format.quote')}
+                title={t('notes.format.quote')}
+                aria-haspopup="menu"
+                aria-expanded={isQuoteMenuOpen}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={(event) => {
+                  setQuoteMenuOpen(!isQuoteMenuOpen)
+                  // С клавиатуры (detail 0) фокус переходит в список, мышью — остаётся в тексте.
+                  if (!isQuoteMenuOpen && event.detail === 0) {
+                    window.requestAnimationFrame(() => quotePickerRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus())
+                  }
+                }}
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 9.5c0-2.6 1.3-4.3 3.4-5M3 9.5h2.6v3H3zM9 9.5c0-2.6 1.3-4.3 3.4-5M9 9.5h2.6v3H9z" /></svg>
+              </button>
+              {isQuoteMenuOpen ? (
+                <div className={styles.quoteMenu} role="menu" aria-label={t('notes.format.quotesTitle')}>
+                  <span className={styles.suggestionsTitle}>{t('notes.format.quotesTitle')}</span>
+                  {props.quotes.map((quote) => (
+                    <button
+                      key={quote.id}
+                      type="button"
+                      role="menuitem"
+                      className={styles.quoteItem}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => insertQuote(quote)}
+                    >
+                      <span className={styles.quoteItemText}>{quote.quote}</span>
+                      <span className={styles.quoteItemWhere}>
+                        {quoteWhere(quote.paragraph_index, t(quote.side === 'SOURCE' ? 'panel.original' : 'panel.translation'))}
+                        {inText?.has(quote.id) ? ` · ${t('notes.format.quoteInText')}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </span>
+          ) : null}
           <button
             type="button"
             className={styles.formatButton}

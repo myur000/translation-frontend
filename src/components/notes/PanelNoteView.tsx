@@ -8,6 +8,7 @@ import type { TranslationKey } from '../../i18n/translations.ts'
 import { noteErrorMessage, type NoteErrorMessage } from '../../notes/noteErrors.ts'
 import { useNote } from '../../notes/useNote.ts'
 import { useNotes } from '../../notes/useNotes.ts'
+import { embeddedQuoteIds } from '../../notes/quoteEmbeds.ts'
 import { NoteContent } from './NoteContent.tsx'
 import { NoteEditSession } from './NoteEditSession.tsx'
 import { NoteErrorText } from './NoteErrorText.tsx'
@@ -60,8 +61,19 @@ export function PanelNoteView({ noteId, jobId, onBack, onShowQuote, onChanged }:
   }
 
   const note = state.note
-  // Цитаты этой книги — первыми: ради них панель и открыта.
-  const quotes = [...note.quotes].sort((left, right) => Number(right.job_id === jobId) - Number(left.job_id === jobId))
+  // Цитаты, вставленные в текст, стоят там; списком — остальные, этой книги первыми.
+  const inText = embeddedQuoteIds(note.body)
+  const quotes = note.quotes.filter((quote) => !inText.has(quote.id))
+    .sort((left, right) => Number(right.job_id === jobId) - Number(left.job_id === jobId))
+  const showInBook = (quote: NoteQuoteResponse) => {
+    const result = onShowQuote(quote)
+    setMessage(result === 'shown' ? null : { quoteId: quote.id, key: SHOW_QUOTE_MESSAGES[result] })
+  }
+  const quoteAction = (quote: NoteQuoteResponse) => (quote.job_id !== null && quote.job_id === jobId
+    ? <button type="button" onClick={() => showInBook(quote)}>{t('notesPanel.showInBook')}</button>
+    : quote.document_available && quote.job_id
+      ? <Link to={`/documents/${encodeURIComponent(quote.job_id)}`}>{t('notesPanel.fromOtherBook', { name: quote.document_name ?? '' })}</Link>
+      : null)
 
   const removeQuote = async (quote: NoteQuoteResponse) => {
     const token = session?.accessToken
@@ -97,7 +109,8 @@ export function PanelNoteView({ noteId, jobId, onBack, onShowQuote, onChanged }:
               <Link className={styles.secondary} to={`/notes/${encodeURIComponent(note.id)}`}>{t('notesPanel.openInSection')}</Link>
             </div>
           </header>
-          {note.body.trim() ? <NoteContent body={note.body} links={note.links} /> : null}
+          {note.body.trim() ? <NoteContent body={note.body} links={note.links} quotes={note.quotes} quoteAction={quoteAction} /> : null}
+          {message && inText.has(message.quoteId) ? <p className={styles.muted} role="status">{t(message.key)}</p> : null}
         </>
       )}
 
@@ -122,10 +135,7 @@ export function PanelNoteView({ noteId, jobId, onBack, onShowQuote, onChanged }:
                   <div className={styles.quoteMeta}>
                     <span>{t(quote.side === 'SOURCE' ? 'panel.original' : 'panel.translation')}</span>
                     {isThisBook ? (
-                      <button type="button" onClick={() => {
-                        const result = onShowQuote(quote)
-                        setMessage(result === 'shown' ? null : { quoteId: quote.id, key: SHOW_QUOTE_MESSAGES[result] })
-                      }}>{t('notesPanel.showInBook')}</button>
+                      <button type="button" onClick={() => showInBook(quote)}>{t('notesPanel.showInBook')}</button>
                     ) : quote.document_available && quote.job_id ? (
                       <Link to={`/documents/${encodeURIComponent(quote.job_id)}`}>
                         {t('notesPanel.fromOtherBook', { name: quote.document_name ?? '' })}

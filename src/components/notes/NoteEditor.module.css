@@ -157,6 +157,74 @@
   font-size: 12px;
 }
 
+/* Выбор цитаты для вставки: раскрывается вверх, над панелью разметки. */
+.quotePicker {
+  position: relative;
+  display: inline-flex;
+}
+
+.formatButton svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+.quoteMenu {
+  position: absolute;
+  z-index: 20;
+  bottom: calc(100% + 6px);
+  left: 0;
+  width: 300px;
+  max-width: 80vw;
+  max-height: 280px;
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+}
+
+.quoteItem {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 7px 9px;
+  color: var(--color-text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-left: 2px solid var(--color-accent);
+  border-radius: 0 6px 6px 0;
+}
+
+.quoteItem:hover,
+.quoteItem:focus-visible {
+  background: var(--color-primary-soft);
+  outline: none;
+}
+
+.quoteItemText {
+  display: -webkit-box;
+  overflow: hidden;
+  font-family: var(--font-serif);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.quoteItemWhere {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
 .previewPanel {
   min-height: 9em;
 }
@@ -264,3 +332,12 @@
 .compact .previewPanel { min-height: 5em; font-size: 13.5px; line-height: 1.6; }
 .compact .formatButton { min-width: 26px; height: 26px; font-size: 13px; }
 .compact .writePanel { margin-left: -10px; padding-left: 8px; }
+/* Рядом с книгой поле растёт внутри прокручиваемой панели: «Готово» и разметка
+   прилипают к её низу и не уезжают вместе с длинным текстом. */
+.compact .actions {
+  position: sticky;
+  z-index: 1;
+  bottom: 0;
+  padding-bottom: 2px;
+  background: var(--color-surface);
+}

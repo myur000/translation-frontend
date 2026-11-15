@@ -199,6 +199,7 @@ export function NoteEditSession({ note, knownLinks, compact = false, afterTitle,
       error={error}
       notice={notice}
       afterTitle={afterTitle}
+      quotes={note.quotes}
       compact={compact}
       autoFocus="body"
       autosave={{ status: statusText, onDone: () => void finish() }}

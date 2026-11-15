@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
-import type { NoteQuoteRequest, NoteResponse, NoteSummary } from '../../api/contracts/notes.ts'
+import type { NoteQuoteRequest, NoteQuoteResponse, NoteResponse, NoteSummary } from '../../api/contracts/notes.ts'
 import { loadDocumentText } from '../../api/documentText.ts'
 import { addNoteQuote, createNote, getNote, updateNote } from '../../api/notes.ts'
 import { useAuth } from '../../auth/useAuth.ts'
@@ -8,6 +8,7 @@ import type { BookQuote } from '../../notes/bookQuotes.ts'
 import { isNoteConflict, noteErrorMessage, type NoteErrorMessage } from '../../notes/noteErrors.ts'
 import { appendToBody, NOTE_TITLE_MAX_LENGTH, noteTitleProblem, titleFromQuote } from '../../notes/noteSyntax.ts'
 import { NOTES_SEARCH_DELAY_MS } from '../../notes/notesQuery.ts'
+import { quoteEmbed, quoteWhere } from '../../notes/quoteEmbeds.ts'
 import { locateQuote, normalizeQuoteText, type QuoteLocation, type QuoteSelection } from '../../notes/quoteLocator.ts'
 import { useNotesList } from '../../notes/useNotesList.ts'
 import { NoteErrorText } from './NoteErrorText.tsx'
@@ -70,8 +71,9 @@ export function QuoteComposer({ jobId, selection, bookNotes, bookQuotes, summary
   const [query, setQuery] = useState('')
   const [isSaving, setSaving] = useState(false)
   const [error, setError] = useState<NoteErrorMessage | null>(null)
-  // Цитата уже ушла в эту заметку, а текст дописать не удалось: повтор не добавит её второй раз.
-  const quotedInto = useRef<string | null>(null)
+  // Цитата уже ушла в эту заметку, а текст дописать не удалось: повтор не добавит её второй раз
+  // (и не создаст второй конспект — допишет в созданный).
+  const quotedInto = useRef<{ noteId: string; quote: NoteQuoteResponse } | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
   const thoughtRef = useRef<HTMLTextAreaElement>(null)
 
@@ -141,25 +143,45 @@ export function QuoteComposer({ jobId, selection, bookNotes, bookQuotes, summary
       setTitleOpen(true)
       return
     }
+    if (summary && quotedInto.current) {
+      await addTo({ id: quotedInto.current.noteId })
+      return
+    }
     // Новый конспект сразу привязан к книге целиком и несёт первую выписку.
-    const caught = await run(async (token, payload) => (await createNote({
-      title: title.trim(),
-      body: text.trim(),
-      quote: payload,
-      ...(summary ? { job_ids: [jobId] } : {}),
-    }, { accessToken: token })).id)
+    const caught = await run(async (token, payload) => {
+      const created = await createNote({
+        title: title.trim(),
+        body: summary ? '' : text.trim(),
+        quote: payload,
+        ...(summary ? { job_ids: [jobId] } : {}),
+      }, { accessToken: token })
+      const added = created.quotes[0]
+      if (!summary || !added) return created.id
+      // В конспекте цитата встаёт в текст, мысль — сразу под ней.
+      quotedInto.current = { noteId: created.id, quote: added }
+      await updateNote(created.id, { title: created.title, body: excerpt(added), version: created.version }, { accessToken: token })
+      return created.id
+    })
     // Название занято (у заметок оно уникально) — показываем поле, чтобы поменять.
     if (caught && isNoteConflict(caught)) setTitleOpen(true)
   }
 
+  /** Выписка в конспект: цитата блоком в тексте, под ней мысль. */
+  const excerpt = (added: NoteQuoteResponse) => appendToBody(
+    quoteEmbed(added, quoteWhere(added.paragraph_index, t(added.side === 'SOURCE' ? 'panel.original' : 'panel.translation'))),
+    text,
+  )
+
   const addTo = (note: Pick<NoteSummary, 'id'>) => run(async (token, payload) => {
-    if (quotedInto.current !== note.id) {
-      await addNoteQuote(note.id, payload, { accessToken: token })
-      quotedInto.current = note.id
+    let added = quotedInto.current?.noteId === note.id ? quotedInto.current.quote : null
+    if (!added) {
+      added = await addNoteQuote(note.id, payload, { accessToken: token })
+      quotedInto.current = { noteId: note.id, quote: added }
     }
-    if (text.trim()) {
+    const addition = summary ? excerpt(added) : text
+    if (addition.trim()) {
       const current = await getNote(note.id, { accessToken: token })
-      await updateNote(note.id, { title: current.title, body: appendToBody(current.body, text), version: current.version },
+      await updateNote(note.id, { title: current.title, body: appendToBody(current.body, addition), version: current.version },
         { accessToken: token })
     }
     return note.id

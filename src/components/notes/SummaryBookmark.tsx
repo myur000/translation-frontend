@@ -1,6 +1,6 @@
 import { useId, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
-import type { NoteResponse } from '../../api/contracts/notes.ts'
+import type { NoteQuoteResponse, NoteResponse } from '../../api/contracts/notes.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import { summaryLabels } from '../../notes/bookSummaries.ts'
 import { plainExcerpt } from '../../notes/noteSyntax.ts'
@@ -36,6 +36,8 @@ interface SummaryBookmarkProps {
   onCreated: (noteId: string) => void
   onCancelCreate: () => void
   onNoteSaved?: (note: NoteResponse) => void
+  /** «Показать в книге» у цитаты в тексте конспекта. */
+  quoteAction?: (quote: NoteQuoteResponse) => ReactNode
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
 }
 
@@ -154,7 +156,7 @@ export function SummaryBookmark(props: SummaryBookmarkProps) {
               </button>
             )}
           </div>
-          <div id={`${ids}-panel`} role={count && !isCreating ? 'tabpanel' : undefined} aria-labelledby={current && !isCreating ? `${ids}-tab-${current.id}` : undefined}>
+          <div id={`${ids}-panel`} className={`${styles.panel} ${cardStyles.bookmarkPanel}`} role={count && !isCreating ? 'tabpanel' : undefined} aria-labelledby={current && !isCreating ? `${ids}-tab-${current.id}` : undefined}>
             {props.composer ? props.composer : isCreating || !current ? (
               <PanelNewNote key="summary" summary={props.newSummary} onCreated={props.onCreated} onCancel={props.onCancelCreate} />
             ) : (
@@ -165,6 +167,7 @@ export function SummaryBookmark(props: SummaryBookmarkProps) {
                 onEdit={() => setEditingId(current.id)}
                 onDone={() => setEditingId(null)}
                 onSaved={props.onNoteSaved}
+                quoteAction={props.quoteAction}
               />
             )}
           </div>

@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import type { NoteQuoteResponse, NoteResponse } from '../../api/contracts/notes.ts'
-import { deleteNoteQuote } from '../../api/notes.ts'
+import { deleteNoteQuote, updateNote } from '../../api/notes.ts'
 import { useAuth } from '../../auth/useAuth.ts'
 import { bookTitle, coverTone } from '../../documents/bookTitle.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import { bookNoteHref, noteBooks } from '../../notes/noteBooks.ts'
 import { noteErrorMessage, type NoteErrorMessage } from '../../notes/noteErrors.ts'
 import { useNotes } from '../../notes/useNotes.ts'
+import { appendToBody } from '../../notes/noteSyntax.ts'
+import { embeddedQuoteIds, quoteEmbed, quoteWhere } from '../../notes/quoteEmbeds.ts'
 import { NoteErrorText } from './NoteErrorText.tsx'
 import styles from './NoteBookContext.module.css'
 
@@ -44,21 +46,34 @@ export function NoteBookBar({ note }: { note: NoteResponse }) {
 }
 
 /**
- * Цитаты заметки карточками в основной колонке: текст в три строки с линией
- * слева, по кнопкам — целиком и второй язык, «В книге →» к своему месту.
- * Цитату можно убрать из заметки: текст в книге не меняется.
+ * Цитаты заметки, которых нет в её тексте, — карточками в основной колонке: текст
+ * в три строки с линией слева, по кнопкам — целиком и второй язык, «В книге →» к
+ * своему месту. Цитаты, вставленные в текст, стоят там же, где о них написано.
+ * Цитату можно убрать из заметки (текст в книге не меняется) или вставить в текст
+ * (`canInsert`; во время правки вставляет кнопка редактора).
  */
-export function NoteQuoteCards({ note, onChanged }: { note: NoteResponse; onChanged: (note: NoteResponse) => void }) {
+export function NoteQuoteCards({ note, onChanged, canInsert = false }: {
+  note: NoteResponse
+  onChanged: (note: NoteResponse) => void
+  canInsert?: boolean
+}) {
   const { t } = useTranslation()
-  if (!note.quotes.length) return null
+  const inText = embeddedQuoteIds(note.body)
+  const quotes = note.quotes.filter((quote) => !inText.has(quote.id))
+  if (!quotes.length) return null
   return (
     <section className={styles.quotes} aria-label={t('notes.quotes')}>
-      {note.quotes.map((quote) => <QuoteCard key={quote.id} note={note} quote={quote} onChanged={onChanged} />)}
+      {quotes.map((quote) => <QuoteCard key={quote.id} note={note} quote={quote} canInsert={canInsert} onChanged={onChanged} />)}
     </section>
   )
 }
 
-function QuoteCard({ note, quote, onChanged }: { note: NoteResponse; quote: NoteQuoteResponse; onChanged: (note: NoteResponse) => void }) {
+function QuoteCard({ note, quote, canInsert, onChanged }: {
+  note: NoteResponse
+  quote: NoteQuoteResponse
+  canInsert: boolean
+  onChanged: (note: NoteResponse) => void
+}) {
   const { t } = useTranslation()
   const { session } = useAuth()
   const { notesChanged } = useNotes()
@@ -68,6 +83,22 @@ function QuoteCard({ note, quote, onChanged }: { note: NoteResponse; quote: Note
   const [error, setError] = useState<NoteErrorMessage | null>(null)
   const name = quote.document_name ? bookTitle(quote.document_name) : t('notes.documentDeleted')
   const side = t(quote.side === 'SOURCE' ? 'panel.original' : 'panel.translation')
+
+  const insert = async () => {
+    const token = session?.accessToken
+    if (!token) return
+    setRemoving(true)
+    setError(null)
+    try {
+      const body = appendToBody(note.body, quoteEmbed(quote, quoteWhere(quote.paragraph_index, side)))
+      onChanged(await updateNote(note.id, { title: note.title, body, version: note.version }, { accessToken: token }))
+      notesChanged()
+    } catch (caught) {
+      setError(noteErrorMessage(caught))
+    } finally {
+      setRemoving(false)
+    }
+  }
 
   const remove = async () => {
     const token = session?.accessToken
@@ -99,6 +130,11 @@ function QuoteCard({ note, quote, onChanged }: { note: NoteResponse; quote: Note
         {quote.paired_text ? (
           <button type="button" className={styles.textButton} aria-pressed={isPairedShown} onClick={() => setPairedShown(!isPairedShown)}>
             {t(quote.side === 'SOURCE' ? 'notes.showTranslation' : 'notes.showOriginal')}
+          </button>
+        ) : null}
+        {canInsert ? (
+          <button type="button" className={styles.textButton} disabled={isRemoving} onClick={() => void insert()}>
+            {t('notes.insertQuote')}
           </button>
         ) : null}
         <button type="button" className={styles.textButton} disabled={isRemoving} onClick={() => void remove()}>

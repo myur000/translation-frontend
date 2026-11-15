@@ -8,6 +8,24 @@
   overflow-wrap: anywhere;
 }
 
+/* Текст с цитатами из книг: куски Markdown и карточки цитат по порядку. */
+.flow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  color: var(--color-text);
+  font-family: var(--font-serif);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+/* Размер задаёт обёртка: на полях текст заметки мельче, чем на её странице. */
+.flow > .markdown {
+  font-size: inherit;
+  line-height: inherit;
+}
+
 .markdown > :first-child { margin-top: 0; }
 .markdown > :last-child { margin-bottom: 0; }
 
@@ -80,4 +98,82 @@
   font-weight: 600;
   line-height: 1.6;
   text-decoration: none;
+}
+
+/* Цитата из книги внутри текста: та же линия акцента, что у цитат заметки, без рамки —
+   она часть текста, а не вложение. Размер шрифта — как у текста вокруг. */
+.quote {
+  min-width: 0;
+  margin: 0;
+}
+
+.quoteText {
+  margin: 0;
+  padding-left: 12px;
+  color: var(--color-text);
+  border-left: 2px solid var(--color-accent);
+  font-family: var(--font-serif);
+  font-size: inherit;
+  line-height: 1.6;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.paired {
+  margin: 6px 0 0;
+  padding-left: 14px;
+  color: var(--color-text-muted);
+  font-family: var(--font-serif);
+  font-size: 0.93em;
+  line-height: 1.55;
+}
+
+.quoteMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 6px;
+  padding-left: 14px;
+  font-size: 12px;
+}
+
+.quoteSource {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+}
+
+.spine {
+  width: 9px;
+  height: 13px;
+  flex: none;
+  border-radius: 1px 3px 3px 1px;
+  box-shadow: inset 2px 0 0 rgb(0 0 0 / 24%);
+}
+
+.quoteMeta button {
+  padding: 0;
+  color: var(--color-text-muted);
+  background: none;
+  border: 0;
+  font: inherit;
+}
+
+.quoteMeta button:hover,
+.quoteMeta button[aria-pressed='true'] {
+  color: var(--color-text);
+}
+
+.quoteMeta a {
+  margin-left: auto;
+  color: var(--color-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.quoteMeta a:hover {
+  text-decoration: underline;
 }

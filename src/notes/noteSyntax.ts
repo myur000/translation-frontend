@@ -70,6 +70,8 @@ export function readTag(text: string, position: number): { raw: string; tag: str
  */
 export function plainExcerpt(markdown: string) {
   return markdown
+    // Строка-источник цитаты в тексте («— [¶5 · перевод](quote:…)») — служебная.
+    .replace(/^\s{0,3}>\s*—\s*\[[^\]\n]*\]\(quote:[^)\n]*\)\s*$/gm, '')
     .replace(/\[\[([^[\]\n]+?)\]\]/g, (_match, inner: string) => parseWikiLink(inner).label)
     .replace(/!?\[([^\]\n]*)\]\([^)\n]*\)/g, '$1')
     .replace(/^\s{0,3}(?:#{1,6}\s+|>\s?|[-*+]\s+|\d+[.)]\s+)/gm, '')

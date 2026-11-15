@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
-import type { NoteQuoteSide, NoteResponse, NoteSummary } from '../../api/contracts/notes.ts'
+import type { NoteQuoteResponse, NoteQuoteSide, NoteResponse, NoteSummary } from '../../api/contracts/notes.ts'
 import { getNote } from '../../api/notes.ts'
 import { useAuth } from '../../auth/useAuth.ts'
 import { bookTitle as titleOfBook, coverTone } from '../../documents/bookTitle.ts'
@@ -10,12 +10,15 @@ import { nextSummaryTitle, pickCurrentSummary, readCurrentSummary, writeCurrentS
 import type { BookQuote } from '../../notes/bookQuotes.ts'
 import {
   CARD_EDGE_GAP,
+  CARD_MAX_WIDTH,
   fitMarginNotes,
+  SUMMARY_MAX_WIDTH,
   placeCards,
   VIEWPORT_SIDE_PADDING,
   type MarginFit,
 } from '../../notes/marginNotesLayout.ts'
 import { plainExcerpt } from '../../notes/noteSyntax.ts'
+import { findQuoteElement, revealQuoteElement } from '../../notes/quoteHighlight.ts'
 import type { QuoteSelection } from '../../notes/quoteLocator.ts'
 import { placeMarkers, quoteRanges } from '../../notes/quoteMarkerLayout.ts'
 import { setActiveQuoteHighlight } from '../../notes/quoteRanges.ts'
@@ -85,6 +88,11 @@ interface Measured {
   /** Низ страницы: до него закладка держится вверху полей, дальше уходит с концом книги. */
   pageBottom: number
   /**
+   * Где кончается место под раскрытую закладку: высота колонки без нижней панели и
+   * верх прилипшей закладки. Дальше текст конспекта прокручивается внутри неё.
+   */
+  room: { bottom: number; stuckTop: number }
+  /**
    * «Липкий» отступ закладки. Chrome отсчитывает его от края содержимого колонки, то есть
    * под её внутренним отступом сверху (шапка и подпись колонки), поэтому отступ — разница
    * между желаемым местом (под шапкой) и этим краем.
@@ -104,6 +112,10 @@ const ABOUT_KEY = 'about'
 const ABOUT_OFFSET = 12
 /** Высота свёрнутой закладки, пока она не измерена: место под неё у начала книги. */
 const BOOKMARK_HEIGHT = 56
+/** Зазор между раскрытой закладкой и нижней панелью: над ней ещё масштаб колонки (12 + 36px). */
+const BOOKMARK_BOTTOM_GAP = 60
+/** Ниже этого раскрытая закладка не сжимается: на маленьком экране пусть лучше уйдёт под панель. */
+const BOOKMARK_MIN_OPEN_HEIGHT = 240
 /** Ширина всплывающей карточки, когда на полях места нет. */
 const POPOVER_MAX_WIDTH = 360
 /** Метка по центру первой строки: карточка встаёт чуть выше, вровень со строкой. */
@@ -126,6 +138,7 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
   // Черновик, который уже открыт, при повторном включении заметок снова раскрыт.
   const [active, setActive] = useState<{ key: string; noteId: string | null } | null>(() => (draft ? { key: DRAFT_KEY, noteId: null } : null))
   const [handledRequest, setHandledRequest] = useState<number | null>(null)
+  const isSummaryOpen = active?.key === ABOUT_KEY
   const [handledDraft, setHandledDraft] = useState<number | null>(draft?.nonce ?? null)
   const [scrollTop, setScrollTop] = useState(0)
   const cardRefs = useRef(new Map<string, HTMLElement>())
@@ -155,7 +168,8 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
       frame = window.requestAnimationFrame(() => {
         const page = host.querySelector<HTMLElement>('article, [data-document-page]')
         if (!page) return
-        const fit = fitMarginNotes(host.clientWidth, page.getBoundingClientRect().width, stageRef.current)
+        const fit = fitMarginNotes(host.clientWidth, page.getBoundingClientRect().width, stageRef.current,
+          isSummaryOpen ? SUMMARY_MAX_WIDTH : CARD_MAX_WIDTH)
         stageRef.current = fit.stage
         // Правый отступ колонки растёт на ширину карточек: страница центрируется в
         // оставшемся месте, то есть сдвигается влево. Стиль задаётся до замера меток.
@@ -174,7 +188,9 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
         const hostStyle = getComputedStyle(host)
         const chromeTop = parseFloat(hostStyle.getPropertyValue('--chrome-top')) || 0
         const stickyTop = chromeTop + ABOUT_OFFSET - (parseFloat(hostStyle.paddingTop) || 0)
-        setMeasured({ host, fit, groups, pageRight, pageTop, pageBottom, stickyTop })
+        const chromeBottom = parseFloat(hostStyle.getPropertyValue('--chrome-bottom')) || 0
+        const room = { bottom: host.clientHeight - chromeBottom - BOOKMARK_BOTTOM_GAP, stuckTop: chromeTop + ABOUT_OFFSET }
+        setMeasured({ host, fit, groups, pageRight, pageTop, pageBottom, stickyTop, room })
       })
     }
     recompute()
@@ -192,7 +208,7 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
       mutations.disconnect()
       resizes?.disconnect()
     }
-  }, [column, host, quotes])
+  }, [column, host, quotes, isSummaryOpen])
   // Отступ снимаем, только когда поля уходят из колонки. При пересчёте (новая цитата,
   // перечитанные заметки) он остаётся до следующего кадра, иначе страница отъезжает и возвращается.
   useEffect(() => {
@@ -269,14 +285,16 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
   }
 
   // Всплывающей карточке нужна прокрутка: у нижнего края экрана она встаёт над абзацем.
+  // Раскрытому конспекту тоже: в начале книги он стоит ниже, чем прилипший.
   const isPopover = fit?.stage === 'popover'
+  const needsScroll = Boolean(active) && (isPopover || isSummaryOpen)
   useEffect(() => {
-    if (!host || !isPopover || !active) return
+    if (!host || !needsScroll) return
     const handleScroll = () => setScrollTop(host.scrollTop)
     handleScroll()
     host.addEventListener('scroll', handleScroll, { passive: true })
     return () => host.removeEventListener('scroll', handleScroll)
-  }, [active, host, isPopover])
+  }, [host, needsScroll])
 
   // Клик мимо раскрытой карточки её сворачивает, как в Google Docs (кроме меток: они
   // откроют свою). Черновик и форма выписки в конспект так не закрываются: в них
@@ -376,7 +394,10 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
     host.focus({ preventScroll: true })
   }
 
-  const cardWidth = isPopover ? Math.min(POPOVER_MAX_WIDTH, host.clientWidth - 2 * VIEWPORT_SIDE_PADDING) : fit.cardWidth
+  const popoverWidth = Math.min(POPOVER_MAX_WIDTH, host.clientWidth - 2 * VIEWPORT_SIDE_PADDING)
+  // Поля шире только под раскрытый конспект; карточки абзацев остаются обычными.
+  const cardWidth = isPopover ? popoverWidth : Math.min(CARD_MAX_WIDTH, fit.cardWidth)
+  const bookmarkWidth = isPopover ? popoverWidth : fit.cardWidth
   // На полях — сразу за правым краем страницы, как комментарии в Google Docs. Место там
   // есть по построению: правый отступ колонки вырос на ширину карточек с зазорами.
   const marginLeft = pageRight + CARD_EDGE_GAP
@@ -389,6 +410,9 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
   ]
   const tops = placeCards(slots, active && active.key !== ABOUT_KEY ? active.key : null)
   const isBookmarkOpen = active?.key === ABOUT_KEY
+  const room = measured?.host === host ? measured.room : null
+  // Закладка стоит у верха страницы, пока не прилипла под шапкой; ниже неё — до нижней панели.
+  const bookmarkMaxHeight = room ? Math.max(BOOKMARK_MIN_OPEN_HEIGHT, room.bottom - Math.max(aboutAnchor - scrollTop, room.stuckTop)) : undefined
   const bookTitle = titleOfBook(bookName)
   const newSummary = {
     jobId,
@@ -434,6 +458,17 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
     />
   ) : undefined
 
+  /** Цитата этой книги из текста заметки: прокрутить к ней колонку (чужая сторона — к парному абзацу). */
+  const showInBook = (quote: NoteQuoteResponse) => {
+    const element = quote.side === column
+      ? findQuoteElement(host, quote.paragraph_index, quote.quote)
+      : quote.paired_text ? findQuoteElement(host, quote.paragraph_index, quote.paired_text, quote.paired_text) : null
+    if (element) revealQuoteElement(element)
+  }
+  const quoteAction = (quote: NoteQuoteResponse) => (quote.job_id === jobId
+    ? <button type="button" onClick={() => showInBook(quote)}>{t('notesPanel.showInBook')}</button>
+    : null)
+
   const popoverStyle = (anchor: number, key: string): CSSProperties => {
     const height = heights.get(key) ?? 240
     const below = anchor + 28
@@ -458,14 +493,14 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
           style={{
             top: aboutAnchor,
             left: isPopover ? host.scrollLeft + VIEWPORT_SIDE_PADDING : marginLeft,
-            width: cardWidth,
+            width: bookmarkWidth,
             height: Math.max(0, pageBottom - aboutAnchor),
           }}
         >
           <SummaryBookmark
             cardRef={cardRef(ABOUT_KEY)}
             cardKey={ABOUT_KEY}
-            style={{ position: 'sticky', top: stickyTop }}
+            style={{ position: 'sticky', top: stickyTop, maxHeight: isBookmarkOpen ? bookmarkMaxHeight : undefined }}
             isPopover={isPopover}
             isOpen={isBookmarkOpen}
             isLinked={aboutBook.some((note) => linkedNoteIds.includes(note.id))}
@@ -495,6 +530,7 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
               if (!currentSummary) setActive(null)
             }}
             onNoteSaved={onNoteSaved}
+            quoteAction={quoteAction}
             onKeyDown={handleKeyDown}
           />
         </div>
@@ -519,6 +555,7 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
             onHover={(isHovered) => setHoveredKey((current) => (isHovered ? group.key : current === group.key ? null : current))}
             onKeyDown={handleKeyDown}
             onNoteSaved={onNoteSaved}
+            quoteAction={quoteAction}
           />
         )
       })}
@@ -572,6 +609,7 @@ interface MarginCardProps {
   activeNoteId: string | null
   onActivate: (noteId: string | null) => void
   onNoteSaved?: (note: NoteResponse) => void
+  quoteAction?: (quote: NoteQuoteResponse) => ReactNode
   onHover: (isHovered: boolean) => void
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
 }
@@ -583,7 +621,7 @@ interface MarginCardProps {
  * заметка целиком, остальные строками; клик по строке раскрывает её.
  * Сворачивается кликом мимо или Esc.
  */
-function MarginCard({ cardRef, cardKey, style, isPopover, notes, paragraph, isActive, isLinked, activeNoteId, onActivate, onHover, onKeyDown, onNoteSaved }: MarginCardProps) {
+function MarginCard({ cardRef, cardKey, style, isPopover, notes, paragraph, isActive, isLinked, activeNoteId, onActivate, onHover, onKeyDown, onNoteSaved, quoteAction }: MarginCardProps) {
   const { t } = useTranslation()
   const { drafts } = useNotes()
   const open = notes.find((note) => note.id === activeNoteId) ?? notes[0] ?? null
@@ -646,7 +684,7 @@ function MarginCard({ cardRef, cardKey, style, isPopover, notes, paragraph, isAc
               {notes.map((note) => (
                 <li key={note.id}>
                   {note.id === open.id ? (
-                    <OpenNote note={note} isEditing={editingId === note.id} onEdit={() => setEditingId(note.id)} onDone={() => setEditingId(null)} onSaved={onNoteSaved} />
+                    <OpenNote note={note} isEditing={editingId === note.id} onEdit={() => setEditingId(note.id)} onDone={() => setEditingId(null)} onSaved={onNoteSaved} quoteAction={quoteAction} />
                   ) : (
                     <button type="button" className={styles.threadItem} onClick={() => { setEditingId(null); onActivate(note.id) }}>
                       <strong className={styles.cardTitle}>{note.title}</strong>
@@ -657,7 +695,7 @@ function MarginCard({ cardRef, cardKey, style, isPopover, notes, paragraph, isAc
               ))}
             </ul>
           ) : (
-            <OpenNote note={open} isEditing={editingId === open.id} onEdit={() => setEditingId(open.id)} onDone={() => setEditingId(null)} onSaved={onNoteSaved} />
+            <OpenNote note={open} isEditing={editingId === open.id} onEdit={() => setEditingId(open.id)} onDone={() => setEditingId(null)} onSaved={onNoteSaved} quoteAction={quoteAction} />
           )}
         </>
       )}
