@@ -1,14 +1,25 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { GraphCanvas } from '../components/graph/GraphCanvas.tsx'
 import { GraphNodeCard } from '../components/graph/GraphNodeCard.tsx'
-import { buildGraphModel, filterGraph, matchesGraphQuery, type GraphModel, type GraphNode } from '../graph/graphModel.ts'
+import { buildGraphModel, filterGraph, matchesGraphQuery, splitLonely, type GraphModel, type GraphNode } from '../graph/graphModel.ts'
 import { graphSearch, readGraphQuery } from '../graph/graphQuery.ts'
 import { useTranslation } from '../i18n/useTranslation.ts'
 import { useNotesGraph } from '../notes/useNotesGraph.ts'
 import styles from './GraphPage.module.css'
 
 const EMPTY: GraphModel = { nodes: [], links: [], truncated: false }
+/** Меньше стольких связей — подсказываем, откуда они берутся. */
+const SPARSE_LINKS = 10
+const SPARSE_HINT_KEY = 'parallel.graph-sparse-hint.v1'
+
+function isSparseHintClosed() {
+  try {
+    return window.localStorage.getItem(SPARSE_HINT_KEY) === 'closed'
+  } catch {
+    return false
+  }
+}
 
 /**
  * Раздел «Граф» в рельсе: все заметки, книги, конспекты, теги и несозданные заметки
@@ -26,6 +37,9 @@ export function GraphPage() {
   const hiddenKey = [...query.hidden].sort().join(',')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const visible = useMemo(() => filterGraph(model, query.hidden), [model, hiddenKey])
+  const { connected, lonely } = useMemo(() => splitLonely(visible), [visible])
+  const [isSparseClosed, setSparseClosed] = useState(isSparseHintClosed)
+  const sparseTitleId = useId()
   const [focusNonce, setFocusNonce] = useState(0)
   const selected = visible.nodes.find((node) => node.id === query.node) ?? null
   // Узел выбран кликом по самой карте — камера остаётся, где была. Выбран откуда угодно
@@ -46,6 +60,15 @@ export function GraphPage() {
     else if (node.kind === 'book' && node.ref && !node.deleted) void navigate(`/documents/${encodeURIComponent(node.ref)}`)
     else if (node.kind === 'missing') void navigate(`/notes/new?${new URLSearchParams({ title: node.label })}`)
     else if (node.kind === 'tag') void navigate(`/notes?${new URLSearchParams({ tag: node.label.replace(/^#/, '') })}`)
+  }
+
+  const closeSparseHint = () => {
+    setSparseClosed(true)
+    try {
+      window.localStorage.setItem(SPARSE_HINT_KEY, 'closed')
+    } catch {
+      // Без хранилища подсказка вернётся при следующем заходе.
+    }
   }
 
   const matches = query.q ? visible.nodes.filter((node) => matchesGraphQuery(node.label, query.q)).length : 0
@@ -73,29 +96,47 @@ export function GraphPage() {
     )
   } else {
     content = (
-      <div className={styles.body}>
-        <div className={styles.canvasArea}>
-          <GraphCanvas
-            model={visible}
-            selectedId={selected?.id ?? null}
-            query={query.q}
-            focusNonce={focusNonce}
-            label={t('graph.canvasLabel', { notes: counts.notes, books: counts.books })}
-            onSelect={(id) => select(id, true)}
-            onOpen={open}
-          />
-          <p className={styles.hint}>{t('graph.hint')}</p>
-          {/* Холст не читается скринридером и не ходит по Tab — рядом те же узлы списком. */}
-          <ul className={styles.visuallyHidden} aria-label={t('graph.nodeList')}>
-            {visible.nodes.map((node) => (
-              <li key={node.id}>
-                <button type="button" aria-pressed={node.id === selected?.id} onClick={() => select(node.id)}>
-                  {t(`graph.short.${node.kind}`)}: {node.label}
-                </button>
-              </li>
+      <>
+        <GraphCanvas
+          model={connected}
+          selectedId={selected?.id ?? null}
+          query={query.q}
+          focusNonce={focusNonce}
+          label={t('graph.canvasLabel', { notes: counts.notes, books: counts.books })}
+          onSelect={(id, follow) => select(id, !follow)}
+          onOpen={open}
+        />
+        {!isSparseClosed && connected.links.length < SPARSE_LINKS ? (
+          <section className={styles.sparse} aria-labelledby={sparseTitleId}>
+            <h2 id={sparseTitleId}>{t('graph.sparse.title')}</h2>
+            <ul>
+              <li><svg viewBox="0 0 30 12" aria-hidden="true"><line x1="1" y1="6" x2="29" y2="6" className={styles.sampleQuote} /></svg>{t('graph.sparse.quote')}</li>
+              <li><svg viewBox="0 0 30 12" aria-hidden="true"><line x1="1" y1="6" x2="29" y2="6" className={styles.sampleLink} /></svg>{t('graph.sparse.link')}</li>
+              <li><svg viewBox="0 0 30 12" aria-hidden="true"><circle cx="15" cy="6" r="4.5" className={styles.sampleMissing} /></svg>{t('graph.sparse.missing')}</li>
+            </ul>
+            <button type="button" onClick={closeSparseHint}>{t('graph.sparse.dismiss')}</button>
+          </section>
+        ) : null}
+        {lonely.length ? (
+          <div className={styles.lonely} role="group" aria-label={t('graph.lonely', { count: lonely.length })}>
+            <span aria-hidden="true">{t('graph.lonely', { count: lonely.length })}</span>
+            {lonely.map((node) => (
+              <button key={node.id} type="button" aria-pressed={node.id === selected?.id} onClick={() => select(node.id, true)}>
+                {node.label}
+              </button>
             ))}
-          </ul>
-        </div>
+          </div>
+        ) : null}
+        {/* Холст не читается скринридером и не ходит по Tab — рядом те же узлы списком. */}
+        <ul className={styles.visuallyHidden} aria-label={t('graph.nodeList')}>
+          {visible.nodes.map((node) => (
+            <li key={node.id}>
+              <button type="button" aria-pressed={node.id === selected?.id} onClick={() => select(node.id)}>
+                {t(`graph.short.${node.kind}`)}: {node.label}
+              </button>
+            </li>
+          ))}
+        </ul>
         {selected ? (
           <GraphNodeCard
             key={selected.id}
@@ -106,7 +147,7 @@ export function GraphPage() {
             onClose={() => select(null, true)}
           />
         ) : null}
-      </div>
+      </>
     )
   }
 
@@ -120,9 +161,9 @@ export function GraphPage() {
             {query.q ? ` · ${t('graph.matches', { count: matches })}` : ''}
           </p>
         ) : null}
+        {graph.status === 'ready' && graph.response.truncated ? <p className={styles.notice} role="status">{t('notesPanel.truncated')}</p> : null}
       </header>
-      {graph.status === 'ready' && graph.response.truncated ? <p className={styles.notice} role="status">{t('notesPanel.truncated')}</p> : null}
-      {content}
+      <div className={styles.stage}>{content}</div>
     </section>
   )
 }

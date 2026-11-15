@@ -141,6 +141,12 @@
   --cover-4: #7a3f3f;
   --cover-5: #3d4f7a;
 
+  /* Холст графа: фон, точки сетки, связи и заметки. */
+  --graph-bg: #f7f9fc;
+  --graph-dot: rgb(74 111 140 / 16%);
+  --graph-edge: #9fb6c9;
+  --graph-note: var(--palette-steel);
+
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
@@ -205,6 +211,11 @@
   --sidebar-hover: #0f1d2f;
   --sidebar-active: #1a3048;
   --sidebar-border: rgb(143 177 201 / 12%);
+
+  --graph-bg: #0c1727;
+  --graph-dot: rgb(143 177 201 / 12%);
+  --graph-edge: #3c5a76;
+  --graph-note: var(--palette-mist);
 
   --shadow-page: 0 8px 24px rgb(0 0 0 / 35%);
   --shadow-popover: 0 16px 40px rgb(0 0 0 / 50%), 0 2px 8px rgb(0 0 0 / 30%);

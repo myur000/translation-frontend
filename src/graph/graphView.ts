@@ -98,3 +98,35 @@ export function nodeAt<T extends { x: number; y: number; radius: number }>(nodes
   }
   return best
 }
+
+/**
+ * Узел для стрелки с клавиатуры: ближайший в направлении `(dx, dy)` — сначала среди
+ * соседей, потом среди всех. Узлы в стороне (больше ~70° от направления) не берём.
+ */
+export function stepTowards<T extends { id: string; x: number; y: number }>(
+  from: T,
+  dx: number,
+  dy: number,
+  neighbourIds: ReadonlySet<string>,
+  nodes: readonly T[],
+): T | null {
+  const pick = (pool: readonly T[]) => {
+    let best: T | null = null
+    let bestScore = Infinity
+    for (const node of pool) {
+      if (node.id === from.id) continue
+      const vx = node.x - from.x
+      const vy = node.y - from.y
+      const distance = Math.hypot(vx, vy) || 1
+      const cos = (vx * dx + vy * dy) / distance
+      if (cos < 0.35) continue
+      const score = distance * (2 - cos)
+      if (score < bestScore) {
+        best = node
+        bestScore = score
+      }
+    }
+    return best
+  }
+  return pick(nodes.filter((node) => neighbourIds.has(node.id))) ?? pick(nodes)
+}

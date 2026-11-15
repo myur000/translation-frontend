@@ -1,8 +1,9 @@
-import { useEffect, useRef, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, type KeyboardEvent } from 'react'
 import { coverInitial } from '../../documents/bookTitle.ts'
 import { ForceLayout } from '../../graph/forceLayout.ts'
 import { matchesGraphQuery, neighbours, type GraphModel, type GraphNode } from '../../graph/graphModel.ts'
-import { fitCamera, linkDistance, nodeAt, nodeRadius, toScreen, toWorld, zoomAt, type Camera } from '../../graph/graphView.ts'
+import { fitCamera, linkDistance, nodeAt, nodeRadius, stepTowards, toScreen, toWorld, zoomAt, type Camera } from '../../graph/graphView.ts'
+import { useTranslation } from '../../i18n/useTranslation.ts'
 import styles from './GraphCanvas.module.css'
 
 interface GraphCanvasProps {
@@ -14,18 +15,25 @@ interface GraphCanvasProps {
   /** Растёт, когда камере нужно подлететь к выбранному узлу (выбор в панели, в списке связей). */
   focusNonce: number
   label: string
-  onSelect: (id: string | null) => void
+  /** `follow` — камера подлетает к узлу (выбор стрелками с клавиатуры). */
+  onSelect: (id: string | null, follow?: boolean) => void
   onOpen: (node: GraphNode) => void
 }
 
 interface Palette {
   accent: string
+  /** Связи выбранного узла — светлее акцента, чтобы линия читалась. */
+  hot: string
   text: string
   muted: string
   soft: string
   border: string
   surface: string
   canvas: string
+  dot: string
+  edge: string
+  note: string
+  font: string
   covers: string[]
 }
 
@@ -33,19 +41,29 @@ interface Palette {
 const CLICK_SLOP = 4
 /** С какого масштаба подписываются все заметки (книги и конспекты — всегда). */
 const LABEL_SCALE = 0.8
+/** Граф до стольких узлов подписан целиком при любом масштабе. */
+const SMALL_GRAPH = 30
+/** Шаг точечной сетки в координатах мира. */
+const GRID_STEP = 26
 const KEY_PAN = 60
+const ZOOM_STEP = 1.3
 
 function readPalette(element: HTMLElement): Palette {
   const style = getComputedStyle(element)
   const value = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback
   return {
     accent: value('--color-accent', '#e8833a'),
+    hot: value('--color-accent-highlight-line', '#f28c3a'),
     text: value('--color-text', '#e6edf5'),
     muted: value('--color-text-muted', '#9fb1c6'),
     soft: value('--color-text-soft', '#7c90a8'),
     border: value('--color-border', '#2a3b55'),
     surface: value('--color-surface', '#16233a'),
-    canvas: value('--color-surface-subtle', '#111d30'),
+    canvas: value('--graph-bg', '#111d30'),
+    dot: value('--graph-dot', 'rgba(143,177,201,0.12)'),
+    edge: value('--graph-edge', '#3c5a76'),
+    note: value('--graph-note', '#8fb1c9'),
+    font: value('--font-sans', 'system-ui, sans-serif'),
     covers: Array.from({ length: 6 }, (_, index) => value(`--cover-${index}`, '#7a5a2e')),
   }
 }
@@ -57,6 +75,8 @@ function readPalette(element: HTMLElement): Palette {
  * DOM; для клавиатуры и скринридера рядом есть обычный список узлов (`GraphPage`).
  */
 export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSelect, onOpen }: GraphCanvasProps) {
+  const { t } = useTranslation()
+  const hintId = useId()
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const layoutRef = useRef<ForceLayout | null>(null)
@@ -159,12 +179,26 @@ export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSel
       const { width, height } = sizeRef.current
       const ratio = window.devicePixelRatio || 1
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
-      ctx.clearRect(0, 0, width, height)
       const { model: current, selectedId: selected, query: search } = state.current
       const camera = cameraRef.current
       const focus = hoverRef.current ?? selected
       const near = focus ? neighbours(current.links, focus) : null
       const nodesById = new Map(current.nodes.map((node) => [node.id, node]))
+      const lineScale = Math.min(1.6, Math.max(0.6, camera.scale))
+
+      ctx.fillStyle = colors.canvas
+      ctx.fillRect(0, 0, width, height)
+      // Сетка едет вместе с картой: видно, что её можно тянуть.
+      const step = GRID_STEP * camera.scale
+      if (step > 11) {
+        const origin = toScreen(camera, sizeRef.current, { x: 0, y: 0 })
+        ctx.fillStyle = colors.dot
+        for (let x = ((origin.x % step) + step) % step; x < width; x += step) {
+          for (let y = ((origin.y % step) + step) % step; y < height; y += step) {
+            ctx.fillRect(x - 0.75, y - 0.75, 1.5, 1.5)
+          }
+        }
+      }
 
       // Связи.
       for (const link of current.links) {
@@ -175,21 +209,42 @@ export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSel
         const b = toScreen(camera, sizeRef.current, target)
         const isHot = Boolean(focus && (link.source === focus || link.target === focus))
         const summary = link.kind === 'about' ? nodesById.get(link.source) : null
+        const color = isHot
+          ? (summary?.tone !== null && summary?.tone !== undefined ? colors.covers[summary.tone] : colors.hot)
+          : colors.edge
+        const base = link.kind === 'quotes' ? 1.2 + Math.min(3, (link.weight - 1) * 0.8)
+          : link.kind === 'about' ? 1.4
+            : link.kind === 'tagged' ? 0.9 : 1
         ctx.beginPath()
         ctx.moveTo(a.x, a.y)
         ctx.lineTo(b.x, b.y)
-        ctx.setLineDash(link.kind === 'about' ? [4, 3] : [])
-        ctx.globalAlpha = near && !isHot ? 0.1 : isHot ? 0.95 : link.kind === 'tagged' ? 0.3 : 0.5
-        ctx.strokeStyle = isHot
-          ? (summary?.tone !== null && summary?.tone !== undefined ? colors.covers[summary.tone] : colors.accent)
-          : colors.muted
-        ctx.lineWidth = (link.kind === 'quotes' ? 0.8 + Math.min(link.weight, 6) * 0.6 : link.kind === 'about' ? 1.8 : 1) * Math.min(1.4, camera.scale)
+        ctx.setLineDash(link.kind === 'about' ? [5, 4] : link.kind === 'tagged' ? [1.5, 3.5] : [])
+        ctx.globalAlpha = near ? (isHot ? 1 : 0.1) : 0.9
+        ctx.strokeStyle = color
+        ctx.lineWidth = (isHot ? base + 0.6 : base) * lineScale
         ctx.stroke()
+        // Стрелка у цели [[ссылки]]: видно, кто на кого ссылается.
+        if (link.kind === 'links' && (isHot || camera.scale > 1.3)) {
+          const angle = Math.atan2(b.y - a.y, b.x - a.x)
+          const back = target.radius * camera.scale + 3
+          const tipX = b.x - Math.cos(angle) * back
+          const tipY = b.y - Math.sin(angle) * back
+          const size = 7 * lineScale
+          ctx.setLineDash([])
+          ctx.fillStyle = color
+          ctx.beginPath()
+          ctx.moveTo(tipX, tipY)
+          ctx.lineTo(tipX - Math.cos(angle - 0.45) * size, tipY - Math.sin(angle - 0.45) * size)
+          ctx.lineTo(tipX - Math.cos(angle + 0.45) * size, tipY - Math.sin(angle + 0.45) * size)
+          ctx.closePath()
+          ctx.fill()
+        }
       }
       ctx.setLineDash([])
 
       // Узлы.
-      const showAllLabels = camera.scale >= LABEL_SCALE
+      const showAllLabels = camera.scale >= LABEL_SCALE || current.nodes.length <= SMALL_GRAPH
+      const labels: { text: string; x: number; y: number; weight: number; color: string; alpha: number }[] = []
       for (const node of current.nodes) {
         const place = layout.node(node.id)
         if (!place) continue
@@ -199,7 +254,8 @@ export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSel
         const isFocus = node.id === focus
         const isSelected = node.id === selected
         const isMatch = matchesGraphQuery(node.label, search)
-        ctx.globalAlpha = near && !near.has(node.id) ? 0.22 : 1
+        const isDim = Boolean(near && !near.has(node.id)) || Boolean(!near && search && !isMatch)
+        ctx.globalAlpha = isDim ? 0.2 : 1
         const tone = node.tone !== null ? colors.covers[node.tone] : colors.muted
         const ring = isSelected || isMatch || isFocus ? colors.accent : null
         if (node.kind === 'book') {
@@ -210,7 +266,7 @@ export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSel
           ctx.fill()
           ctx.fillStyle = 'rgba(0,0,0,0.25)'
           ctx.fillRect(p.x - w / 2, p.y - h / 2, Math.max(2, w * 0.13), h)
-          if (ring) strokeRound(ctx, p.x - w / 2 - 2, p.y - h / 2 - 2, w + 4, h + 4, 4, ring)
+          if (ring) strokeRound(ctx, p.x - w / 2 - 4, p.y - h / 2 - 4, w + 8, h + 8, 6, ring)
           ctx.fillStyle = '#ffffff'
           ctx.font = `${Math.max(10, r * 0.75)}px Literata, Georgia, serif`
           ctx.textAlign = 'center'
@@ -233,26 +289,25 @@ export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSel
             ctx.lineTo(p.x + w * 0.3, p.y + h * offset)
             ctx.stroke()
           }
-          ctx.globalAlpha = near && !near.has(node.id) ? 0.22 : 1
-          if (ring) strokeRound(ctx, p.x - w / 2 - 2, p.y - h / 2 - 2, w + 4, h + 4, 3, ring)
+          ctx.globalAlpha = isDim ? 0.2 : 1
+          if (ring) strokeRound(ctx, p.x - w / 2 - 3, p.y - h / 2 - 3, w + 6, h + 6, 4, ring)
         } else if (node.kind === 'note') {
           ctx.beginPath()
           ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
-          ctx.fillStyle = isSelected || isFocus || isMatch ? colors.accent : colors.muted
+          ctx.fillStyle = isSelected || isFocus ? colors.accent : colors.note
           ctx.fill()
-          ctx.lineWidth = 1.5
-          ctx.strokeStyle = colors.canvas
-          ctx.stroke()
+          if (isSelected || isMatch) strokeCircle(ctx, p.x, p.y, r + 4, colors.accent)
         } else if (node.kind === 'missing') {
           ctx.beginPath()
           ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
           ctx.fillStyle = colors.canvas
           ctx.fill()
-          ctx.setLineDash([2, 2])
-          ctx.lineWidth = 1.2
-          ctx.strokeStyle = ring ?? colors.muted
+          ctx.setLineDash([2.5, 2.5])
+          ctx.lineWidth = 1.4
+          ctx.strokeStyle = colors.soft
           ctx.stroke()
           ctx.setLineDash([])
+          if (ring) strokeCircle(ctx, p.x, p.y, r + 4, ring)
         } else {
           const w = Math.max(r * 2.8, measure(ctx, node.label, camera.scale) + 12 * camera.scale)
           const h = r * 1.15
@@ -263,21 +318,38 @@ export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSel
           ctx.strokeStyle = ring ?? colors.border
           ctx.stroke()
           ctx.fillStyle = colors.muted
-          ctx.font = `${Math.max(9, 11 * camera.scale)}px system-ui, sans-serif`
+          ctx.font = `${Math.max(9, 11 * camera.scale)}px ${colors.font}`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
           ctx.fillText(node.label, p.x, p.y)
         }
-        // Подписи: книги и конспекты всегда, заметки — при крупном масштабе или в фокусе.
+        // Подписи: книги и конспекты всегда, заметки — при крупном масштабе, в маленьком графе или в фокусе.
         const isLabelled = node.kind === 'book' || node.kind === 'summary' || showAllLabels || isFocus || isSelected || isMatch || Boolean(near?.has(node.id))
         if (node.kind !== 'tag' && isLabelled) {
-          const below = node.kind === 'book' ? r * 1.05 + 6 : r + 5
-          ctx.font = `${isSelected ? '600 ' : ''}${Math.max(10, Math.min(13, 11 * camera.scale))}px system-ui, sans-serif`
-          ctx.textAlign = 'center'
-          ctx.textBaseline = 'top'
-          ctx.fillStyle = isSelected || isFocus ? colors.text : colors.soft
-          ctx.fillText(shorten(node.label), p.x, p.y + below)
+          const isBook = node.kind === 'book'
+          labels.push({
+            text: shorten(node.label),
+            x: p.x,
+            y: p.y + (isBook ? r * 1.05 + 7 : r + 5),
+            weight: isBook || isSelected ? 600 : 400,
+            color: node.kind === 'missing' ? colors.muted : colors.text,
+            alpha: isDim ? 0.25 : 1,
+          })
         }
+      }
+
+      // Подписи поверх линий, с подложкой цвета фона.
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'top'
+      ctx.lineJoin = 'round'
+      ctx.lineWidth = 3.5
+      ctx.strokeStyle = colors.canvas
+      for (const label of labels) {
+        ctx.globalAlpha = label.alpha
+        ctx.font = `${label.weight} 12px ${colors.font}`
+        ctx.strokeText(label.text, label.x, label.y)
+        ctx.fillStyle = label.color
+        ctx.fillText(label.text, label.x, label.y)
       }
       ctx.globalAlpha = 1
     }
@@ -401,21 +473,41 @@ export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSel
     }
   }, [])
 
-  /** Клавиатура на холсте: стрелки сдвигают, +/− масштабируют, 0 вписывает граф, Esc снимает выбор. */
+  const zoomBy = (factor: number) => {
+    const { width, height } = sizeRef.current
+    cameraTarget.current = zoomAt(cameraTarget.current ?? cameraRef.current, sizeRef.current, width / 2, height / 2, factor)
+    requestDraw.current()
+  }
+  const fit = () => {
+    if (!layoutRef.current) return
+    cameraTarget.current = fitCamera(layoutRef.current.nodes, sizeRef.current)
+    requestDraw.current()
+  }
+
+  /**
+   * Клавиатура на холсте: стрелки — к соседнему узлу в эту сторону, Shift со стрелками —
+   * сдвиг карты, Enter открывает, +/− масштабируют, 0 вписывает граф, Esc снимает выбор.
+   */
   const handleKeyDown = (event: KeyboardEvent<HTMLCanvasElement>) => {
     const camera = cameraRef.current
-    const step = KEY_PAN / camera.scale
-    const moves: Record<string, Camera> = {
-      ArrowLeft: { ...camera, x: camera.x - step },
-      ArrowRight: { ...camera, x: camera.x + step },
-      ArrowUp: { ...camera, y: camera.y - step },
-      ArrowDown: { ...camera, y: camera.y + step },
-    }
-    const { width, height } = sizeRef.current
-    if (moves[event.key]) cameraRef.current = moves[event.key]
-    else if (event.key === '+' || event.key === '=') cameraRef.current = zoomAt(camera, sizeRef.current, width / 2, height / 2, 1.25)
-    else if (event.key === '-') cameraRef.current = zoomAt(camera, sizeRef.current, width / 2, height / 2, 0.8)
-    else if (event.key === '0' && layoutRef.current) cameraRef.current = fitCamera(layoutRef.current.nodes, sizeRef.current)
+    const directions: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
+    const direction = directions[event.key]
+    const layout = layoutRef.current
+    if (direction && event.shiftKey) {
+      const step = KEY_PAN / camera.scale
+      cameraRef.current = { ...camera, x: camera.x + direction[0] * step, y: camera.y + direction[1] * step }
+    } else if (direction && layout) {
+      const current = selectedId ? layout.node(selectedId) : null
+      const next = current
+        ? stepTowards(current, direction[0], direction[1], neighbours(model.links, current.id), layout.nodes)
+        : [...model.nodes].sort((a, b) => b.degree - a.degree)[0]
+      if (next) onSelect(next.id, true)
+    } else if (event.key === 'Enter' && selectedId) {
+      const node = model.nodes.find((item) => item.id === selectedId)
+      if (node) onOpen(node)
+    } else if (event.key === '+' || event.key === '=') zoomBy(ZOOM_STEP)
+    else if (event.key === '-') zoomBy(1 / ZOOM_STEP)
+    else if (event.key === '0') fit()
     else if (event.key === 'Escape' && selectedId) onSelect(null)
     else return
     event.preventDefault()
@@ -424,7 +516,20 @@ export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSel
 
   return (
     <div ref={containerRef} className={styles.container}>
-      <canvas ref={canvasRef} className={styles.canvas} role="img" aria-label={label} tabIndex={0} onKeyDown={handleKeyDown} />
+      <canvas ref={canvasRef} className={styles.canvas} role="img" aria-label={label} aria-describedby={hintId}
+        tabIndex={0} onKeyDown={handleKeyDown} />
+      <p id={hintId} className={styles.visuallyHidden}>{t('graph.hint')}</p>
+      <div className={styles.zoom} role="group" aria-label={t('graph.zoomControls')}>
+        <button type="button" aria-label={t('graph.zoomIn')} title={t('graph.zoomIn')} onClick={() => zoomBy(ZOOM_STEP)}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" /></svg>
+        </button>
+        <button type="button" aria-label={t('graph.zoomOut')} title={t('graph.zoomOut')} onClick={() => zoomBy(1 / ZOOM_STEP)}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9" /></svg>
+        </button>
+        <button type="button" aria-label={t('graph.fit')} title={t('graph.fit')} onClick={fit}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" /></svg>
+        </button>
+      </div>
     </div>
   )
 }
@@ -436,6 +541,14 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: n
 
 function strokeRound(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, color: string) {
   roundRect(ctx, x, y, width, height, radius)
+  ctx.lineWidth = 2
+  ctx.strokeStyle = color
+  ctx.stroke()
+}
+
+function strokeCircle(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, color: string) {
+  ctx.beginPath()
+  ctx.arc(x, y, radius, 0, Math.PI * 2)
   ctx.lineWidth = 2
   ctx.strokeStyle = color
   ctx.stroke()

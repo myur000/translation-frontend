@@ -109,3 +109,52 @@ export function matchesGraphQuery(label: string, query: string) {
   const needle = normalize(query)
   return Boolean(needle) && normalize(label).includes(needle)
 }
+
+/**
+ * Узлы без видимых связей не участвуют в раскладке: они уходят строкой «Без связей»
+ * под картой, а не разлетаются по краям холста.
+ */
+export function splitLonely(model: GraphModel): { connected: GraphModel; lonely: GraphNode[] } {
+  const linked = new Set(model.links.flatMap((link) => [link.source, link.target]))
+  return {
+    connected: { ...model, nodes: model.nodes.filter((node) => linked.has(node.id)) },
+    lonely: model.nodes.filter((node) => !linked.has(node.id)),
+  }
+}
+
+/** Связи узла по смыслу — группы карточки узла. */
+export interface NodeRelations {
+  /** Книги, из которых заметка цитирует, и сколько цитат. */
+  quotes: { id: string; weight: number }[]
+  /** Книги, конспектом которых заметка является. */
+  about: string[]
+  /** Куда ведут `[[ссылки]]` узла. */
+  linksOut: string[]
+  /** Кто ссылается на узел. */
+  linksIn: string[]
+  tags: string[]
+  /** У книги — её конспекты. */
+  summaries: string[]
+  /** У книги — заметки с цитатами из неё. */
+  quotedBy: { id: string; weight: number }[]
+  /** У тега — заметки с ним. */
+  tagged: string[]
+}
+
+export function nodeRelations(links: readonly GraphLink[], id: string): NodeRelations {
+  const result: NodeRelations = { quotes: [], about: [], linksOut: [], linksIn: [], tags: [], summaries: [], quotedBy: [], tagged: [] }
+  for (const link of links) {
+    if (link.source === id) {
+      if (link.kind === 'quotes') result.quotes.push({ id: link.target, weight: link.weight })
+      else if (link.kind === 'about') result.about.push(link.target)
+      else if (link.kind === 'links') result.linksOut.push(link.target)
+      else result.tags.push(link.target)
+    } else if (link.target === id) {
+      if (link.kind === 'quotes') result.quotedBy.push({ id: link.source, weight: link.weight })
+      else if (link.kind === 'about') result.summaries.push(link.source)
+      else if (link.kind === 'links') result.linksIn.push(link.source)
+      else result.tagged.push(link.source)
+    }
+  }
+  return result
+}

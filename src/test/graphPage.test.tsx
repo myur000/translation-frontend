@@ -62,6 +62,7 @@ function renderGraph(path = '/graph', withPanel = false) {
 const address = () => screen.getByRole('status', { name: 'Адрес' }).textContent
 
 beforeEach(() => {
+  window.localStorage.clear()
   for (const mock of Object.values(api)) mock.mockReset()
   api.getNoteGraph.mockResolvedValue(graph)
   api.getNote.mockResolvedValue(storm)
@@ -87,11 +88,14 @@ describe('graph section', () => {
 
     const card = screen.getByRole('complementary', { name: 'Узел «Шторм»' })
     expect(await within(card).findByText('Ветер с северо-востока, 9 баллов.')).toBeTruthy()
-    expect(within(card).getByRole('link', { name: 'Открыть' }).getAttribute('href')).toBe('/notes/n1')
-    expect(within(card).getByRole('link', { name: 'Открыть в книге →' }).getAttribute('href')).toBe('/documents/j1?note=n1&quote=q1')
-    // Связи узла — список, по нему можно ходить по графу.
+    expect(card.textContent).toContain('2 цитаты из книги')
+    expect(within(card).getByRole('link', { name: 'Открыть заметку' }).getAttribute('href')).toBe('/notes/n1')
+    expect(within(card).getByRole('link', { name: 'В книге →' }).getAttribute('href')).toBe('/documents/j1?note=n1&quote=q1')
+    // Связи по смыслу; по ним можно ходить по графу.
     const related = within(card).getByRole('region', { name: 'Связи · 3' })
-    await user.click(within(related).getByRole('button', { name: 'Lighthouse keepers ledger' }))
+    expect(within(related).getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Цитирует', 'Ссылается на', 'Теги'])
+    expect(within(related).getByRole('button', { name: 'Огонь за рифом' })).toBeTruthy()
+    await user.click(within(related).getByRole('button', { name: 'Lighthouse keepers ledger 2 цитаты' }))
     expect(address()).toBe('/graph?node=document:j1')
   })
 
@@ -119,6 +123,40 @@ describe('graph section', () => {
     api.getNoteGraph.mockResolvedValue({ nodes: [], edges: [], truncated: false })
     renderGraph()
     expect(await screen.findByRole('heading', { name: 'Граф пока пустой' })).toBeTruthy()
+  })
+
+  it('keeps notes without links in a row under the map and explains a small graph once', async () => {
+    const user = userEvent.setup()
+    api.getNoteGraph.mockResolvedValue({
+      ...graph,
+      nodes: [...graph.nodes, { id: 'note:n2', type: 'note', label: 'Идеи для эссе', ref: 'n2', deleted: false }],
+    })
+    renderGraph()
+    const lonely = await screen.findByRole('group', { name: 'Без связей · 1' })
+    await user.click(within(lonely).getByRole('button', { name: 'Идеи для эссе' }))
+    expect(address()).toBe('/graph?node=note:n2')
+    expect(within(lonely).getByRole('button', { name: 'Идеи для эссе' }).getAttribute('aria-pressed')).toBe('true')
+
+    const hint = screen.getByRole('region', { name: 'Граф пока небольшой' })
+    await user.click(within(hint).getByRole('button', { name: 'Понятно' }))
+    expect(screen.queryByRole('region', { name: 'Граф пока небольшой' })).toBeNull()
+    cleanup()
+    renderGraph()
+    await screen.findByRole('group', { name: 'Без связей · 1' })
+    expect(screen.queryByRole('region', { name: 'Граф пока небольшой' })).toBeNull()
+  })
+
+  it('walks the map with arrows and opens the chosen node with Enter', async () => {
+    const user = userEvent.setup()
+    renderGraph()
+    const map = await screen.findByRole('img', { name: /Граф заметок/ })
+    expect(screen.getByRole('group', { name: 'Масштаб' })).toBeTruthy()
+    map.focus()
+    // Без выбора стрелка начинает с самого связанного узла.
+    await user.keyboard('{ArrowRight}')
+    expect(address()).toBe('/graph?node=note:n1')
+    await user.keyboard('{Enter}')
+    expect(address()).toBe('/notes/n1')
   })
 
   it('offers a retry when the graph cannot be loaded', async () => {

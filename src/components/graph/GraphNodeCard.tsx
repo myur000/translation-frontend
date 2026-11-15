@@ -3,8 +3,10 @@ import { Link } from 'react-router'
 import type { NoteResponse } from '../../api/contracts/notes.ts'
 import { getNote } from '../../api/notes.ts'
 import { useAuth } from '../../auth/useAuth.ts'
+import { coverInitial } from '../../documents/bookTitle.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
-import type { GraphLink, GraphNode } from '../../graph/graphModel.ts'
+import type { CountKey, TranslationKey } from '../../i18n/translations.ts'
+import { nodeRelations, type GraphLink, type GraphNode } from '../../graph/graphModel.ts'
 import { bookNoteHref, bookSummaryHref, noteBooks } from '../../notes/noteBooks.ts'
 import { notesSearch } from '../../notes/notesQuery.ts'
 import { plainExcerpt } from '../../notes/noteSyntax.ts'
@@ -12,19 +14,22 @@ import styles from './GraphNodeCard.module.css'
 
 interface GraphNodeCardProps {
   node: GraphNode
-  /** Все узлы и связи графа (не только видимые): у книги считаются все её заметки. */
+  /** Узлы графа: по ним подписываются связи. */
   nodes: readonly GraphNode[]
+  /** Видимые связи: карточка показывает то же, что карта. */
   links: readonly GraphLink[]
   onSelect: (id: string) => void
   onClose: () => void
 }
 
 type Loaded = { id: string; note: NoteResponse | null }
+type RelatedItem = { id: string; weight?: number }
+
+const toneStyle = (tone: number | null) => (tone !== null ? ({ '--node-tone': `var(--cover-${tone})` } as CSSProperties) : undefined)
 
 /**
- * Карточка выбранного узла справа от графа: что это, начало текста (у заметки и
- * конспекта) и куда перейти — открыть, открыть в книге, создать несозданную,
- * заметки с тегом. Ниже — связи узла списком: по ним можно ходить и с клавиатуры.
+ * Карточка выбранного узла поверх карты: что это, начало текста, связи по смыслу
+ * (цитирует, ссылается, ссылаются сюда…) — по ним можно ходить — и куда перейти.
  */
 export function GraphNodeCard({ node, nodes, links, onSelect, onClose }: GraphNodeCardProps) {
   const { t, tc } = useTranslation()
@@ -33,7 +38,7 @@ export function GraphNodeCard({ node, nodes, links, onSelect, onClose }: GraphNo
   const isNote = node.kind === 'note' || node.kind === 'summary'
   const noteId = isNote ? node.ref : null
 
-  // Текст заметки граф не отдаёт — дочитываем саму заметку, когда её выбрали.
+  // Текста заметки в графе нет — дочитываем саму заметку.
   useEffect(() => {
     const token = session?.accessToken
     if (!noteId || !token) return
@@ -46,90 +51,118 @@ export function GraphNodeCard({ node, nodes, links, onSelect, onClose }: GraphNo
   }, [noteId, session?.accessToken])
 
   const byId = new Map(nodes.map((item) => [item.id, item]))
-  const related = [...new Set(links.flatMap((link) => (link.source === node.id ? [link.target] : link.target === node.id ? [link.source] : [])))]
-    .map((id) => byId.get(id))
-    .filter((item): item is GraphNode => Boolean(item))
+  const relations = nodeRelations(links, node.id)
+  const ids = (list: string[]): RelatedItem[] => list.map((id) => ({ id }))
+  const groups: [TranslationKey, RelatedItem[]][] = [
+    ['graph.rel.quotes', relations.quotes],
+    ['graph.rel.about', ids(relations.about)],
+    ['graph.rel.summaries', ids(relations.summaries)],
+    ['graph.rel.quotedBy', relations.quotedBy],
+    ['graph.rel.linksOut', ids(relations.linksOut)],
+    ['graph.rel.linksIn', ids(relations.linksIn)],
+    ['graph.rel.tags', ids(relations.tags)],
+    ['graph.rel.tagged', ids(relations.tagged)],
+  ]
+  const relatedCount = new Set(groups.flatMap(([, items]) => items.map((item) => item.id))).size
+
   const note = loaded?.id === noteId ? loaded.note : null
-  const book = node.kind === 'summary' ? related.find((item) => item.kind === 'book') : null
   const bookOfNote = note ? noteBooks(note).find((item) => item.isAvailable) : null
-  const tone = node.tone !== null ? `var(--cover-${node.tone})` : undefined
-  const kindLabel = node.kind === 'summary'
-    ? t('graph.kind.summaryOf', { book: book?.label ?? '' })
-    : t(`graph.kind.${node.kind}`)
+  const summaryBook = node.kind === 'summary' ? byId.get(relations.about[0] ?? '') : undefined
+  const kindLabel = summaryBook ? t('graph.kind.summaryOf', { book: summaryBook.label }) : t(`graph.kind.${node.kind}`)
+  const quoteTotal = relations.quotes.reduce((sum, item) => sum + item.weight, 0)
+  const count = (key: CountKey, value: number) => tc(key, value)
+
+  let meta: string[] = []
+  if (node.kind === 'note') {
+    meta = [quoteTotal ? count('graph.quotesFromBook', quoteTotal) : t('graph.noBook')]
+    if (relations.linksIn.length) meta.push(count('graph.backlinks', relations.linksIn.length))
+  } else if (node.kind === 'summary' && note) {
+    meta = [count('graph.excerpts', note.quotes.length)]
+  } else if (node.kind === 'book') {
+    meta = [count('notes.home.noteCount', new Set(relations.quotedBy.map((item) => item.id)).size)]
+    if (relations.summaries.length) meta.push(count('notes.home.summaryCount', relations.summaries.length))
+  } else if (node.kind === 'tag') {
+    meta = [count('notes.home.noteCount', relations.tagged.length)]
+  }
 
   return (
-    <aside className={styles.card} aria-label={t('graph.cardLabel', { title: node.label })}
-      style={tone ? ({ '--node-tone': tone } as CSSProperties) : undefined}>
+    <aside className={styles.card} aria-label={t('graph.cardLabel', { title: node.label })} style={toneStyle(node.tone)}>
       <div className={styles.header}>
-        <span className={styles.kind}>
-          <span className={`${styles.mark} ${styles[`mark_${node.kind}`]}`} aria-hidden="true" />
-          {kindLabel}
-        </span>
-        <button type="button" className={styles.close} aria-label={t('graph.closeCard')} title={t('graph.closeCard')} onClick={onClose}>×</button>
+        <span className={styles.kind}>{kindLabel}</span>
+        <button type="button" className={styles.close} aria-label={t('graph.closeCard')} title={t('graph.closeCard')} onClick={onClose}>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+        </button>
       </div>
-      <h2 className={styles.title}>{node.label}</h2>
-
-      {isNote ? (
-        <>
-          {note && note.body.trim() ? <p className={`${styles.excerpt} ${node.kind === 'summary' ? styles.summaryExcerpt : ''}`}>{plainExcerpt(note.body)}</p> : null}
-          {node.kind === 'summary' && note ? <p className={styles.meta}>{tc('graph.excerpts', note.quotes.length)}</p> : null}
-          <div className={styles.actions}>
-            <Link className={styles.action} to={`/notes/${encodeURIComponent(node.ref ?? '')}`}>{t('graph.open')}</Link>
-            {bookOfNote && note ? (
-              <Link className={`${styles.action} ${styles.primary}`} to={bookNoteHref(bookOfNote.jobId, note.id, bookOfNote.quote?.id)}>
-                {t('notes.openInBook')}
-              </Link>
-            ) : null}
-          </div>
-        </>
-      ) : null}
 
       {node.kind === 'book' ? (
-        <>
-          <p className={styles.meta}>
-            {tc('notes.home.noteCount', related.filter((item) => item.kind === 'note').length)}
-            {related.some((item) => item.kind === 'summary') ? ` · ${tc('notes.home.summaryCount', related.filter((item) => item.kind === 'summary').length)}` : ''}
-          </p>
-          {node.ref && !node.deleted ? (
-            <div className={styles.actions}>
-              <Link className={`${styles.action} ${styles.primary}`} to={`/documents/${encodeURIComponent(node.ref)}`}>{t('notes.home.openBook')}</Link>
-              <Link className={styles.action} to={bookSummaryHref(node.ref)}>{t('documentActions.summary')}</Link>
-            </div>
-          ) : <p className={styles.meta}>{t('notes.home.bookDeleted')}</p>}
-        </>
-      ) : null}
-
-      {node.kind === 'missing' ? (
-        <>
-          <p className={styles.meta}>{t('graph.missingHint')}</p>
-          <div className={styles.actions}>
-            <Link className={`${styles.action} ${styles.primary}`} to={`/notes/new?${new URLSearchParams({ title: node.label })}`}>{t('graph.create')}</Link>
+        <div className={styles.bookHead}>
+          <span className={styles.cover} aria-hidden="true">{coverInitial(node.label)}</span>
+          <div className={styles.bookText}>
+            <h2 className={styles.title}>{node.label}</h2>
+            <p className={styles.meta}>{meta.join(' · ')}</p>
           </div>
-        </>
-      ) : null}
-
-      {node.kind === 'tag' ? (
-        <div className={styles.actions}>
-          <Link className={styles.action} to={{ pathname: '/notes', search: notesSearch({ tag: node.label.replace(/^#/, '') }) }}>{t('graph.tagNotes')}</Link>
         </div>
-      ) : null}
+      ) : (
+        <h2 className={styles.title}>{node.label}</h2>
+      )}
 
-      {related.length ? (
-        <section className={styles.related} aria-label={t('graph.related', { count: related.length })}>
-          <h3>{t('graph.related', { count: related.length })}</h3>
-          <ul>
-            {related.map((item) => (
-              <li key={item.id}>
-                <button type="button" onClick={() => onSelect(item.id)}
-                  style={item.tone !== null ? ({ '--node-tone': `var(--cover-${item.tone})` } as CSSProperties) : undefined}>
-                  <span className={`${styles.mark} ${styles[`mark_${item.kind}`]}`} aria-hidden="true" />
-                  <span className={styles.relatedLabel}>{item.label}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+      {isNote && note?.body.trim() ? (
+        <p className={`${styles.excerpt} ${node.kind === 'summary' ? styles.summaryExcerpt : ''}`}>{plainExcerpt(note.body)}</p>
+      ) : null}
+      {node.kind !== 'book' && meta.length ? <p className={styles.meta}>{meta.join(' · ')}</p> : null}
+      {node.kind === 'missing' ? <p className={styles.meta}>{t('graph.missingHint')}</p> : null}
+      {node.kind === 'book' && (!node.ref || node.deleted) ? <p className={styles.meta}>{t('notes.home.bookDeleted')}</p> : null}
+
+      {relatedCount ? (
+        <section className={styles.related} aria-label={t('graph.related', { count: relatedCount })}>
+          {groups.map(([key, items]) => (items.length ? (
+            <div key={key} className={styles.group}>
+              <h3>{t(key)}</h3>
+              <ul>
+                {items.map((item) => {
+                  const target = byId.get(item.id)
+                  if (!target) return null
+                  return (
+                    <li key={item.id}>
+                      <button type="button" className={`${styles.chip} ${target.kind === 'missing' ? styles.chipMissing : ''}`}
+                        style={toneStyle(target.tone)} onClick={() => onSelect(target.id)}>
+                        {target.kind === 'book' || target.kind === 'summary' ? <span className={styles.chipTone} aria-hidden="true" /> : null}
+                        <span className={styles.chipLabel}>{target.label}</span>
+                        {item.weight ? <>{' '}<small>{count('graph.quoteCount', item.weight)}</small></> : null}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          ) : null))}
         </section>
       ) : null}
+
+      <div className={styles.actions}>
+        {isNote && node.ref ? (
+          <>
+            <Link className={`${styles.action} ${styles.primary}`} to={`/notes/${encodeURIComponent(node.ref)}`}>{t('graph.openNote')}</Link>
+            {bookOfNote && note ? (
+              <Link className={styles.action} to={bookNoteHref(bookOfNote.jobId, note.id, bookOfNote.quote?.id)}>{t('graph.inBook')}</Link>
+            ) : null}
+          </>
+        ) : null}
+        {node.kind === 'book' && node.ref && !node.deleted ? (
+          <>
+            <Link className={`${styles.action} ${styles.primary}`} to={`/documents/${encodeURIComponent(node.ref)}`}>{t('notes.home.openBook')}</Link>
+            <Link className={styles.action} to={bookSummaryHref(node.ref)}>{t('documentActions.summary')}</Link>
+          </>
+        ) : null}
+        {node.kind === 'missing' ? (
+          <Link className={`${styles.action} ${styles.primary}`} to={`/notes/new?${new URLSearchParams({ title: node.label })}`}>{t('graph.create')}</Link>
+        ) : null}
+        {node.kind === 'tag' ? (
+          <Link className={`${styles.action} ${styles.primary}`} to={{ pathname: '/notes', search: notesSearch({ tag: node.label.replace(/^#/, '') }) }}>
+            {t('graph.tagNotes')}
+          </Link>
+        ) : null}
+      </div>
     </aside>
   )
 }

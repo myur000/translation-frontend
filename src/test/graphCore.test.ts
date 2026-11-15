@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { NoteGraphResponse } from '../api/contracts/notes.ts'
 import { ForceLayout } from '../graph/forceLayout.ts'
-import { buildGraphModel, filterGraph, matchesGraphQuery, neighbours } from '../graph/graphModel.ts'
+import { buildGraphModel, filterGraph, matchesGraphQuery, neighbours, nodeRelations, splitLonely } from '../graph/graphModel.ts'
 import { graphSearch, readGraphQuery } from '../graph/graphQuery.ts'
-import { fitCamera, linkDistance, nodeAt, nodeRadius, toScreen, toWorld, zoomAt } from '../graph/graphView.ts'
+import { fitCamera, linkDistance, nodeAt, nodeRadius, stepTowards, toScreen, toWorld, zoomAt } from '../graph/graphView.ts'
 
 const response: NoteGraphResponse = {
   nodes: [
@@ -138,5 +138,53 @@ describe('graph address', () => {
     expect(readGraphQuery(graphSearch(query))).toEqual({ hidden: new Set(['tag', 'missing']), node: 'note:n1', q: 'шторм' })
     expect(readGraphQuery('?hide=tag,bogus')).toEqual({ hidden: new Set(['tag']), node: null, q: '' })
     expect(graphSearch({ hidden: new Set(), node: null, q: '' })).toBe('')
+  })
+})
+
+describe('graph map helpers', () => {
+  it('moves notes without visible links out of the layout', () => {
+    const model = buildGraphModel(response)
+    const { connected, lonely } = splitLonely(model)
+    expect(lonely.map((node) => node.id)).toEqual(['note:n3'])
+    expect(connected.nodes.map((node) => node.id)).not.toContain('note:n3')
+    expect(connected.links).toEqual(model.links)
+    // Связь только с тегом: тег спрятан — заметка уходит в «без связей».
+    const withoutTags = splitLonely(filterGraph(buildGraphModel({
+      ...response,
+      edges: [{ source: 'note:n3', target: 'tag:сюжет', type: 'tagged', weight: 1 }],
+    }), new Set(['tag'])))
+    expect(withoutTags.lonely.map((node) => node.id)).toContain('note:n3')
+  })
+
+  it('groups a node’s links by meaning for its card', () => {
+    const model = buildGraphModel(response)
+    expect(nodeRelations(model.links, 'note:n1')).toEqual({
+      quotes: [{ id: 'document:j1', weight: 3 }],
+      about: [],
+      linksOut: ['note:n2', 'missing:огонь'],
+      linksIn: [],
+      tags: ['tag:сюжет'],
+      summaries: [],
+      quotedBy: [],
+      tagged: [],
+    })
+    const book = nodeRelations(model.links, 'document:j1')
+    expect(book.summaries).toEqual(['note:s1'])
+    expect(book.quotedBy).toEqual([{ id: 'note:n1', weight: 3 }])
+    expect(nodeRelations(model.links, 'note:n2').linksIn).toEqual(['note:n1'])
+    expect(nodeRelations(model.links, 'tag:сюжет').tagged).toEqual(['note:n1'])
+  })
+
+  it('steps to the nearest node in the arrow’s direction, neighbours first', () => {
+    const nodes = [
+      { id: 'a', x: 0, y: 0 },
+      { id: 'near', x: 40, y: 5 },
+      { id: 'linked', x: 120, y: -20 },
+      { id: 'above', x: 0, y: -50 },
+    ]
+    expect(stepTowards(nodes[0], 1, 0, new Set(['linked']), nodes)?.id).toBe('linked')
+    expect(stepTowards(nodes[0], 1, 0, new Set(), nodes)?.id).toBe('near')
+    expect(stepTowards(nodes[0], 0, -1, new Set(), nodes)?.id).toBe('above')
+    expect(stepTowards(nodes[0], -1, 0, new Set(), nodes)).toBeNull()
   })
 })
