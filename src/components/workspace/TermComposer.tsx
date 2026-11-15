@@ -3,6 +3,7 @@ import type { TermListItem, TermResponse } from '../../api/contracts/terms.ts'
 import { createTerm, linkTermDocument, updateTerm } from '../../api/terms.ts'
 import { useAuth } from '../../auth/useAuth.ts'
 import { cleanTermText } from '../../glossary/termMatch.ts'
+import { setDraftTermHighlight } from '../../glossary/termRanges.ts'
 import {
   autoRange,
   clickWord,
@@ -85,15 +86,54 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, l
   const cardRef = useRef<HTMLFormElement>(null)
   const otherRef = useRef<HTMLInputElement>(null)
   const saveRef = useRef<HTMLButtonElement>(null)
-  const [top, setTop] = useState(selection.rect.top + selection.rect.height + GAP)
+  // Слово, за которым едет карточка; новое выделение в той же колонке его меняет.
+  const [anchor, setAnchor] = useState<Range | null>(selection.range ?? null)
+  const [rect, setRect] = useState(selection.rect)
+  const [height, setHeight] = useState(0)
+  // Под словом или над ним — решается один раз, иначе при прокрутке карточка прыгала бы.
+  const [isAbove, setAbove] = useState<boolean | null>(null)
 
-  // Под выделением, а если снизу не помещается — над ним.
+  // Высота меняется вместе с содержимым (ошибка, «уже в глоссарии»).
   useLayoutEffect(() => {
-    const height = cardRef.current?.offsetHeight ?? 0
-    const { rect } = selection
-    const below = rect.top + rect.height + GAP
-    setTop(below + height <= window.innerHeight - GAP ? below : Math.max(GAP, rect.top - height - GAP))
-  }, [selection])
+    const card = cardRef.current
+    if (!card) return
+    const opened = selection.rect
+    const measure = () => {
+      const measured = card.offsetHeight
+      setHeight(measured)
+      // Сторона — по месту слова при открытии: снизу не помещается — над ним.
+      if (measured) setAbove((current) => current ?? opened.top + opened.height + GAP + measured > window.innerHeight - GAP)
+    }
+    measure()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    observer?.observe(card)
+    return () => observer?.disconnect()
+  }, [selection.rect])
+
+  // Прокрутка книги двигает слово — карточка едет за ним.
+  useEffect(() => {
+    if (!anchor) return
+    setDraftTermHighlight(anchor)
+    let frame = 0
+    const follow = () => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(() => {
+        const next = anchor.getBoundingClientRect()
+        // Узлы слова пропали из книги (перерисовка страницы) — остаёмся, где были.
+        if (!next.width && !next.height) return
+        setRect({ top: next.top, left: next.left, width: next.width, height: next.height })
+      })
+    }
+    follow()
+    window.addEventListener('scroll', follow, true)
+    window.addEventListener('resize', follow)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', follow, true)
+      window.removeEventListener('resize', follow)
+      setDraftTermHighlight(null)
+    }
+  }, [anchor])
 
   useEffect(() => { otherRef.current?.focus({ preventScroll: true }) }, [])
 
@@ -123,6 +163,7 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, l
         setError(null)
         if (next.side === side) {
           setPicked(pick(next.text, language))
+          if (next.range) setAnchor(next.range)
           focusNext.current = otherRef.current?.value.trim() ? saveRef : otherRef
         } else {
           setOther(text.slice(0, side === 'SOURCE' ? TRANSLATION_MAX : TERM_MAX))
@@ -187,7 +228,10 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, l
     : trimmed
   const pickedLabel = t(side === 'SOURCE' ? 'glossary.term' : 'glossary.translation')
   const otherLabel = t(side === 'SOURCE' ? 'glossary.translation' : 'glossary.term')
-  const left = Math.max(GAP, Math.min(selection.rect.left + selection.rect.width / 2 - WIDTH / 2, window.innerWidth - WIDTH - GAP))
+  // Слово ушло за край экрана — карточка прижимается к краю и не теряется.
+  const wanted = isAbove ? rect.top - height - GAP : rect.top + rect.height + GAP
+  const top = Math.max(GAP, Math.min(wanted, window.innerHeight - height - GAP))
+  const left = Math.max(GAP, Math.min(rect.left + rect.width / 2 - WIDTH / 2, window.innerWidth - WIDTH - GAP))
 
   return (
     <form

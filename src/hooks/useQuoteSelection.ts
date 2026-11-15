@@ -4,6 +4,8 @@ import type { QuoteSelection } from '../notes/quoteLocator.ts'
 export interface ActiveQuoteSelection extends QuoteSelection {
   /** Где выделение на экране: над ним показывается кнопка «В заметку». */
   rect: { top: number; left: number; width: number; height: number }
+  /** Сам диапазон: по нему карточка у выделения едет за текстом при прокрутке. */
+  range?: Range
 }
 
 /** Блоки, текст которых уточняет абзац (DOCX после mammoth и текстовый вид оригинала). */
@@ -29,6 +31,7 @@ function readSelection(original: HTMLElement | null, translation: HTMLElement | 
     blockText: start.closest(BLOCK_SELECTOR)?.textContent ?? null,
     paragraphIndex: indexed ? Number(indexed.dataset.paragraphIndex) : null,
     rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+    range: range.cloneRange(),
   }
 }
 

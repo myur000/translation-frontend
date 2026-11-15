@@ -71,6 +71,14 @@ a {
   text-decoration-skip-ink: none;
 }
 
+/* Слово, из которого сейчас делают термин: держится, пока открыта карточка «В глоссарий». */
+::highlight(glossary-draft) {
+  background-color: color-mix(in srgb, var(--glossary-term-line) 24%, transparent);
+  text-decoration: underline 2px var(--glossary-term-line);
+  text-underline-offset: 4px;
+  text-decoration-skip-ink: none;
+}
+
 ::highlight(glossary-term-active) {
   background-color: var(--glossary-term-soft);
   text-decoration: underline 2px var(--glossary-term-line);

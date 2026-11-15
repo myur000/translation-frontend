@@ -6,6 +6,8 @@ import { findTerms, termMatcher, type GlossaryTerm } from './termMatch.ts'
 export const GLOSSARY_TERM_HIGHLIGHT = 'glossary-term'
 /** Термин под курсором — ярче остальных. */
 export const GLOSSARY_TERM_ACTIVE_HIGHLIGHT = 'glossary-term-active'
+/** Слово, из которого сейчас делают термин: выделение браузера пропадает, когда курсор в поле. */
+export const GLOSSARY_DRAFT_HIGHLIGHT = 'glossary-draft'
 
 const BLOCKS = 'p, li, h1, h2, h3, h4, h5, h6, td, th, blockquote'
 /** PDF: текстовый слой — строки-span внутри страницы. */
@@ -76,4 +78,16 @@ export function setActiveTermHighlight(range: Range | null) {
   const highlight = new Highlight(range)
   highlight.priority = 1
   CSS.highlights.set(GLOSSARY_TERM_ACTIVE_HIGHLIGHT, highlight)
+}
+
+/** Подсветка слова, из которого делают термин; `null` убирает её. */
+export function setDraftTermHighlight(range: Range | null) {
+  if (!supportsQuoteHighlight()) return
+  if (!range) {
+    CSS.highlights.delete(GLOSSARY_DRAFT_HIGHLIGHT)
+    return
+  }
+  const highlight = new Highlight(range)
+  highlight.priority = 2
+  CSS.highlights.set(GLOSSARY_DRAFT_HIGHLIGHT, highlight)
 }

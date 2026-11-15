@@ -230,6 +230,23 @@ describe('«To glossary» card over a selection', () => {
     expect(card.textContent).toContain("термин: keeper's ledger")
   })
 
+  it('follows the selected word while the book scrolls and stays on screen', async () => {
+    let box = { top: 300, left: 200, width: 40, height: 20 }
+    const range = { getBoundingClientRect: () => ({ ...box, bottom: box.top + box.height, right: box.left + box.width }) } as unknown as Range
+    renderCard({ selection: { ...selection('SOURCE', 'reef'), range } })
+    const card = screen.getByRole('form', { name: 'В глоссарий' })
+    const top = () => card.style.getPropertyValue('--composer-top')
+    expect(top()).toBe('330px')
+
+    box = { ...box, top: 120 }
+    fireEvent.scroll(window)
+    await waitFor(() => expect(top()).toBe('150px'))
+    // Слово ушло выше экрана — карточка прижата к краю, а не уехала вместе с ним.
+    box = { ...box, top: -400 }
+    fireEvent.scroll(document.body)
+    await waitFor(() => expect(top()).toBe('10px'))
+  })
+
   it('replaces the words when the same column is selected again', async () => {
     const { rerenderWith } = renderCard()
     rerenderWith({ liveSelection: selection('SOURCE', 'glass float') })
