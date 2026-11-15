@@ -25,6 +25,11 @@
   border-color: var(--color-border-strong);
 }
 
+.linked,
+.linked:hover {
+  border-color: var(--summary-tone);
+}
+
 .open,
 .open:hover {
   border-color: var(--summary-tone);

@@ -20,7 +20,13 @@ const quote = (overrides: Partial<BookQuote>): BookQuote => ({
 })
 
 /** Колонка книги в DOCX-виде: страница-article и абзацы без номеров, как после mammoth. */
-function Column({ column, quotes, onOpen }: { column: 'SOURCE' | 'TRANSLATION'; quotes: BookQuote[]; onOpen: (ids: string[]) => void }) {
+function Column({ column, quotes, summaryQuotes, onOpen, onOpenSummary }: {
+  column: 'SOURCE' | 'TRANSLATION'
+  quotes: BookQuote[]
+  summaryQuotes?: BookQuote[]
+  onOpen: (ids: string[]) => void
+  onOpenSummary?: (id: string) => void
+}) {
   const ref = useRef<HTMLDivElement>(null)
   return (
     <PreferencesProvider>
@@ -33,7 +39,8 @@ function Column({ column, quotes, onOpen }: { column: 'SOURCE' | 'TRANSLATION'; 
           )}
         </article>
       </div>
-      <QuoteMarkers viewportRef={ref} column={column} quotes={quotes} layoutKey="compare" onOpen={onOpen} />
+      <QuoteMarkers viewportRef={ref} column={column} quotes={quotes} summaryQuotes={summaryQuotes} summaryTone={2}
+        layoutKey="compare" onOpen={onOpen} onOpenSummary={onOpenSummary} />
     </PreferencesProvider>
   )
 }
@@ -65,6 +72,24 @@ describe('margin markers', () => {
     const marker = await screen.findByRole('button', { name: 'Заметки к этому абзацу (1): Шторм' })
     // Число на метке есть и у единственной заметки: метка читается одинаково.
     expect(marker.textContent).toBe('1')
+  })
+
+  it('marks an excerpt in a summary with a notebook under the notes marker of the same paragraph', async () => {
+    const user = userEvent.setup()
+    const onOpen = vi.fn()
+    const onOpenSummary = vi.fn()
+    render(<Column column="TRANSLATION" onOpen={onOpen} onOpenSummary={onOpenSummary} quotes={[quote({})]}
+      summaryQuotes={[quote({ id: 'q-9', noteId: 's-1', noteTitle: 'Конспект', quote: 'для октября' })]} />)
+
+    const notes = await screen.findByRole('button', { name: 'Заметки к этому абзацу (1): Шторм' })
+    const summary = screen.getByRole('button', { name: 'Выписка в конспект «Конспект»' })
+    // Тетрадь не закрывает кружок заметок: она под ним, на той же вертикали.
+    expect(Number.parseFloat(summary.style.top)).toBeGreaterThan(Number.parseFloat(notes.style.top))
+    expect(summary.style.left).toBe(notes.style.left)
+    // Каждая метка открывает своё: кружок — заметки, тетрадь — конспект.
+    await user.click(summary)
+    expect(onOpenSummary).toHaveBeenCalledWith('s-1')
+    expect(onOpen).not.toHaveBeenCalled()
   })
 
   it('draws nothing without quotes', async () => {

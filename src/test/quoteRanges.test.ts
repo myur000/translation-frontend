@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { findQuoteRange, NOTE_QUOTE_ACTIVE_HIGHLIGHT, NOTE_QUOTE_HIGHLIGHT, setActiveQuoteHighlight, setQuoteHighlightRanges } from '../notes/quoteRanges.ts'
+import { findQuoteRange, NOTE_QUOTE_ACTIVE_HIGHLIGHT, NOTE_QUOTE_HIGHLIGHT, setActiveQuoteHighlight, setQuoteHighlightRanges, wholeWordIndex } from '../notes/quoteRanges.ts'
 
 function paragraph(html: string) {
   const element = document.createElement('p')
@@ -25,6 +25,18 @@ describe('quote range in a paragraph', () => {
     expect(findQuoteRange(element, 'он увидел свет. Дальше…')?.toString()).toBe('он увидел свет. Дальше')
     expect(findQuoteRange(element, 'он увидел свет. Дальше текст абзаца. Следующий абзац')?.toString())
       .toBe('он увидел свет. Дальше текст абзаца.')
+  })
+
+  it('prefers a whole word to the same letters inside another word', () => {
+    const element = paragraph('Незадолго до полуночи Элиас долго разглядывал свет.')
+    const range = findQuoteRange(element, 'долго')
+    // Не «…долго» внутри «Незадолго», а само слово дальше по тексту.
+    expect(range?.toString()).toBe('долго')
+    expect(range?.startOffset).toBe('Незадолго до полуночи Элиас '.length)
+    // Если целого слова нет, годится и часть слова — лучше, чем ничего.
+    expect(findQuoteRange(paragraph('Незадолго до полуночи.'), 'долго')?.toString()).toBe('долго')
+    // Цитата с пунктуацией по краям сверяется только по буквенным краям.
+    expect(wholeWordIndex('он, она, оно', ', она,')).toBe(2)
   })
 
   it('skips service layers and returns null when the quote is not in the paragraph', () => {

@@ -5,6 +5,11 @@ export const NOTE_QUOTE_HIGHLIGHT = 'note-quote'
 /** Цитаты открытой или наведённой заметки на полях — ярче остальных (`::highlight(note-quote-active)`). */
 export const NOTE_QUOTE_ACTIVE_HIGHLIGHT = 'note-quote-active'
 /**
+ * Выписки в конспект — подчёркивание цветом обложки книги (`::highlight(summary-quote)`),
+ * а не фон: у заметок фон, и на слове, которое есть и там и там, видны оба знака.
+ */
+export const SUMMARY_QUOTE_HIGHLIGHT = 'summary-quote'
+/**
  * По стольким первым символам ищется начало цитаты, если целиком она в абзаце не
  * нашлась. Короткие пробы — для цитаты, которая начинается в самом конце абзаца.
  */
@@ -44,6 +49,28 @@ function indexText(element: HTMLElement) {
   return { text, points }
 }
 
+const WORD_CHAR = /[\p{L}\p{N}]/u
+
+/**
+ * Где цитата в тексте абзаца. Целое слово важнее совпадения внутри другого слова:
+ * короткая выписка «долго» в абзаце «Незадолго до полуночи… долго разглядывал» —
+ * это второе «долго», а не кусок «Незадолго». Сервер хранит только текст цитаты,
+ * поэтому выбираем первое вхождение, у которого по краям не буквы; нет такого —
+ * первое вообще.
+ */
+export function wholeWordIndex(text: string, needle: string) {
+  const first = text.indexOf(needle)
+  if (first < 0) return first
+  const startsWithWord = WORD_CHAR.test(needle[0])
+  const endsWithWord = WORD_CHAR.test(needle[needle.length - 1])
+  for (let at = first; at >= 0; at = text.indexOf(needle, at + 1)) {
+    const before = at > 0 ? text[at - 1] : ''
+    const after = text[at + needle.length] ?? ''
+    if ((!startsWithWord || !WORD_CHAR.test(before)) && (!endsWithWord || !WORD_CHAR.test(after))) return at
+  }
+  return first
+}
+
 /**
  * Диапазон цитаты внутри абзаца. Цитата могла быть обрезана («…») или начаться в
  * этом абзаце и уйти в следующий — тогда подсвечивается совпавшее начало.
@@ -52,7 +79,7 @@ export function findQuoteRange(element: HTMLElement, quote: string): Range | nul
   const needle = normalizeQuoteText(quote).replace(/…$/, '').trimEnd()
   if (!needle) return null
   const { text, points } = indexText(element)
-  let start = text.indexOf(needle)
+  let start = wholeWordIndex(text, needle)
   let length = needle.length
   if (start < 0) {
     start = -1
@@ -79,17 +106,28 @@ export function supportsQuoteHighlight() {
   return typeof CSS !== 'undefined' && 'highlights' in CSS && typeof Highlight !== 'undefined'
 }
 
-/** Диапазоны каждой колонки: обе колонки пишут в одну подсветку и не стирают чужие. */
-const rangesByOwner = new Map<object, Range[]>()
+/** Диапазоны каждой колонки по слоям: обе колонки пишут в одну подсветку и не стирают чужие. */
+const rangesByLayer = new Map<string, Map<object, Range[]>>()
 
-/** Заменяет диапазоны одной колонки; пустой список убирает их. */
-export function setQuoteHighlightRanges(owner: object, ranges: Range[]) {
+function setLayerRanges(name: string, owner: object, ranges: Range[]) {
   if (!supportsQuoteHighlight()) return
-  if (ranges.length) rangesByOwner.set(owner, ranges)
-  else rangesByOwner.delete(owner)
-  const all = [...rangesByOwner.values()].flat()
-  if (all.length) CSS.highlights.set(NOTE_QUOTE_HIGHLIGHT, new Highlight(...all))
-  else CSS.highlights.delete(NOTE_QUOTE_HIGHLIGHT)
+  const byOwner = rangesByLayer.get(name) ?? new Map<object, Range[]>()
+  rangesByLayer.set(name, byOwner)
+  if (ranges.length) byOwner.set(owner, ranges)
+  else byOwner.delete(owner)
+  const all = [...byOwner.values()].flat()
+  if (all.length) CSS.highlights.set(name, new Highlight(...all))
+  else CSS.highlights.delete(name)
+}
+
+/** Заменяет диапазоны цитат заметок одной колонки; пустой список убирает их. */
+export function setQuoteHighlightRanges(owner: object, ranges: Range[]) {
+  setLayerRanges(NOTE_QUOTE_HIGHLIGHT, owner, ranges)
+}
+
+/** То же для выписок в конспект — отдельный слой с подчёркиванием. */
+export function setSummaryHighlightRanges(owner: object, ranges: Range[]) {
+  setLayerRanges(SUMMARY_QUOTE_HIGHLIGHT, owner, ranges)
 }
 
 /** Цитаты открытой заметки: отдельный слой поверх обычного; пустой список убирает его. */

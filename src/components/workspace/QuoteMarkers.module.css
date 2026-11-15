@@ -56,3 +56,39 @@
     transition: none;
   }
 }
+
+/* Тетрадь у абзаца с выпиской в конспект: корешок цвета обложки книги. От оранжевого
+   кружка заметок отличается и формой, и цветом — их не спутать, даже если стоят рядом. */
+.summaryMarker {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #ffffff;
+  background: var(--summary-tone);
+  border: none;
+  border-radius: 3px 6px 6px 3px;
+  box-shadow: inset 3px 0 0 rgb(0 0 0 / 24%);
+  transition: filter 120ms ease;
+}
+
+.summaryMarker:hover {
+  filter: brightness(1.15);
+}
+
+.summaryMarker:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.summaryMarker svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}

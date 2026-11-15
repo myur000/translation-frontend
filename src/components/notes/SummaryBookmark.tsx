@@ -15,6 +15,8 @@ interface SummaryBookmarkProps {
   style: CSSProperties
   isPopover: boolean
   isOpen: boolean
+  /** Курсор над выпиской этого конспекта в тексте книги: закладка откликается. */
+  isLinked?: boolean
   summaries: readonly NoteResponse[]
   /** Текущий конспект (вкладка); `null` — конспектов нет. */
   current: NoteResponse | null
@@ -57,6 +59,7 @@ export function SummaryBookmark(props: SummaryBookmarkProps) {
     cardStyles.card,
     styles.bookmark,
     isOpen ? styles.open : '',
+    props.isLinked && !isOpen ? styles.linked : '',
     props.isPopover && isOpen ? cardStyles.popover : '',
   ].join(' ')
   const style = { ...props.style, '--summary-tone': `var(--cover-${props.tone})` } as CSSProperties

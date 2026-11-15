@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { NoteResponse } from '../api/contracts/notes.ts'
-import { nextSummaryTitle, pickCurrentSummary, readCurrentSummary, writeCurrentSummary } from '../notes/bookSummaries.ts'
+import { nextSummaryTitle, pickCurrentSummary, readCurrentSummary, textClickTarget, writeCurrentSummary } from '../notes/bookSummaries.ts'
 
 const titles = {
   first: (book: string) => `Конспект — ${book}`,
@@ -35,5 +35,13 @@ describe('summaries of a book', () => {
     expect(readCurrentSummary('broken@example.com', 'job-1')).toBeNull()
     localStorage.setItem('parallel.current-summary.v1.array@example.com', '["a"]')
     expect(readCurrentSummary('array@example.com', '0')).toBeNull()
+  })
+
+  it('decides what a click on a quoted word opens: notes, the summary or a choice', () => {
+    const summaries = new Set(['s-1'])
+    expect(textClickTarget(['n-1', 'n-2'], summaries)).toEqual({ kind: 'notes', noteIds: ['n-1', 'n-2'] })
+    expect(textClickTarget(['s-1'], summaries)).toEqual({ kind: 'summary', noteId: 's-1' })
+    // Слово и в заметке, и в конспекте — выбирает человек.
+    expect(textClickTarget(['n-1', 's-1'], summaries)).toEqual({ kind: 'choice', noteIds: ['n-1'], summaryIds: ['s-1'] })
   })
 })

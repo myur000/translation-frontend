@@ -59,3 +59,12 @@ a {
   text-decoration: underline 2px var(--color-accent-highlight-line);
   text-underline-offset: 3px;
 }
+
+/* Выписки в конспект — подчёркивание цветом обложки книги, без фона: фон — знак
+   заметки, и слово, которое есть и в заметке, и в конспекте, несёт оба знака.
+   Цвет ставит слой меток (--summary-quote-color на корне документа). */
+::highlight(summary-quote) {
+  text-decoration: underline 2px var(--summary-quote-color, #7a5a2e);
+  text-underline-offset: 4px;
+  text-decoration-skip-ink: none;
+}

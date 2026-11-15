@@ -1,0 +1,58 @@
+/* Меню выбора у слова, которое есть и в заметке, и в конспекте. */
+.menu {
+  position: fixed;
+  z-index: 40;
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+  font-family: var(--font-sans);
+}
+
+.item {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.item:hover,
+.item:focus-visible {
+  background: var(--color-surface-subtle);
+  outline: none;
+}
+
+.text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Знаки те же, что у меток на полях: оранжевый кружок — заметка, тетрадь — конспект. */
+.noteMark {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  background: var(--color-accent);
+  border-radius: 50%;
+}
+
+.summaryMark {
+  width: 9px;
+  height: 12px;
+  flex: none;
+  background: var(--summary-tone);
+  border-radius: 1px 3px 3px 1px;
+  box-shadow: inset 2px 0 0 rgb(0 0 0 / 24%);
+}

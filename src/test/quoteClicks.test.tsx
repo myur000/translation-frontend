@@ -12,7 +12,7 @@ const quote: BookQuote = { id: 'q-1', noteId: 'n-1', noteTitle: 'Шторм', si
 /** Прямоугольник цитаты на экране: строка 100…300 по горизонтали, 40…60 по вертикали. */
 const quoteRect = { left: 100, right: 300, top: 40, bottom: 60, width: 200, height: 20, x: 100, y: 40, toJSON: () => ({}) } as DOMRect
 
-function Column({ onOpen, onHover }: { onOpen: (ids: string[]) => void; onHover: (ids: string[]) => void }) {
+function Column({ onOpen, onHover }: { onOpen: (ids: string[], point: { x: number; y: number }) => void; onHover: (ids: string[]) => void }) {
   const ref = useRef<HTMLDivElement>(null)
   useQuoteClicks({ viewportRef: ref, column: 'TRANSLATION', quotes: [quote], layoutKey: 'translation', onOpen, onHover })
   return (
@@ -50,7 +50,8 @@ describe('clicks on quotes in the book', () => {
     const onOpen = vi.fn()
     render(<Column onOpen={onOpen} onHover={vi.fn()} />)
     fireEvent.click(screen.getByText(/Тогда ветер/), { clientX: 150, clientY: 50 })
-    expect(onOpen).toHaveBeenCalledWith(['n-1'])
+    // Точка клика нужна меню выбора, если слово есть и в заметке, и в конспекте.
+    expect(onOpen).toHaveBeenCalledWith(['n-1'], { x: 150, y: 50 })
   })
 
   it('leaves selections, links and clicks beside the quote alone', () => {

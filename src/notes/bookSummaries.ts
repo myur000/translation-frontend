@@ -58,3 +58,21 @@ export function writeCurrentSummary(owner: string, jobId: string, noteId: string
 export function pickCurrentSummary(summaries: readonly NoteResponse[], rememberedId: string | null) {
   return summaries.find((note) => note.id === rememberedId) ?? summaries[0] ?? null
 }
+
+/**
+ * Что открыть по клику на цитату в тексте: под точкой могут лежать и заметки, и
+ * выписки в конспект. Только заметки — их карточки; только конспект — закладку на
+ * нём; и то и другое — меню выбора у слова, а не молчаливая догадка.
+ */
+export type TextClickTarget =
+  | { kind: 'notes'; noteIds: string[] }
+  | { kind: 'summary'; noteId: string }
+  | { kind: 'choice'; noteIds: string[]; summaryIds: string[] }
+
+export function textClickTarget(noteIds: readonly string[], summaryIds: ReadonlySet<string>): TextClickTarget {
+  const summaries = noteIds.filter((id) => summaryIds.has(id))
+  const notes = noteIds.filter((id) => !summaryIds.has(id))
+  if (summaries.length && notes.length) return { kind: 'choice', noteIds: notes, summaryIds: summaries }
+  if (summaries.length) return { kind: 'summary', noteId: summaries[0] }
+  return { kind: 'notes', noteIds: notes }
+}

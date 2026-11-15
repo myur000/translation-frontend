@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useEffectEvent, useId, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useId, useMemo, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useOutletContext } from 'react-router'
 import { ApiClientError } from '../api/client.ts'
 import type { NoteQuoteResponse } from '../api/contracts/notes.ts'
@@ -7,12 +7,13 @@ import type { NotesPanelRequest } from '../components/notes/WorkspaceNotesPanel.
 import type { MarginDraft } from '../components/notes/MarginNotes.tsx'
 import { draftAnchor } from '../notes/marginNotesLayout.ts'
 import { NOTE_PARAM, QUOTE_PARAM } from '../notes/noteBooks.ts'
-import { bookTitle } from '../documents/bookTitle.ts'
-import { nextSummaryTitle } from '../notes/bookSummaries.ts'
+import { bookTitle, coverTone } from '../documents/bookTitle.ts'
+import { nextSummaryTitle, textClickTarget } from '../notes/bookSummaries.ts'
 import { QuoteMarkers } from '../components/workspace/QuoteMarkers.tsx'
 import { useBookNotes } from '../notes/useBookQuotes.ts'
 import type { BookQuote } from '../notes/bookQuotes.ts'
 import { useNotes } from '../notes/useNotes.ts'
+import { QuoteChoiceMenu, type QuoteChoice } from '../components/notes/QuoteChoiceMenu.tsx'
 import { QuoteSelectionButton } from '../components/notes/QuoteSelectionButton.tsx'
 import { useQuoteSelection } from '../hooks/useQuoteSelection.ts'
 import { findQuoteElement, revealQuoteElement } from '../notes/quoteHighlight.ts'
@@ -217,11 +218,43 @@ function DocumentWorkspace({
   // Конспект можно начать, пока книга переводится: заметки о книге грузятся у любой отправленной.
   const bookNotes = useBookNotes(document.jobId ?? null, notesRevision)
   const bookQuotes = canQuote ? bookNotes.quotes : NO_BOOK_QUOTES
+  // Выписки в конспект — отдельно от цитат заметок: у них своя метка-тетрадь и
+  // подчёркивание цветом обложки, а открываются они в закладке конспекта.
+  const summaryIds = useMemo(() => new Set(bookNotes.aboutBook.map((note) => note.id)), [bookNotes.aboutBook])
+  const noteQuotes = useMemo(() => bookQuotes.filter((quote) => !summaryIds.has(quote.noteId)), [bookQuotes, summaryIds])
+  const summaryQuotes = useMemo(() => bookQuotes.filter((quote) => summaryIds.has(quote.noteId)), [bookQuotes, summaryIds])
+  const bookTone = coverTone(document.name)
   const [notesRequest, setNotesRequest] = useState<NotesPanelRequest | null>(null)
   const revealNotes = () => notesPanel.reveal()
   const openNotesFromMarker = (noteIds: string[]) => {
     setNotesRequest((current) => ({ nonce: (current?.nonce ?? 0) + 1, noteIds }))
     revealNotes()
+  }
+  /** Выписка в конспект: на полях — закладка на этом конспекте, иначе он в колонке. */
+  const openSummaryNote = (noteId: string) => {
+    setNotesRequest((current) => ({ nonce: (current?.nonce ?? 0) + 1, noteIds: [noteId], about: true }))
+    revealNotes()
+  }
+  // Слово есть и в заметке, и в конспекте: меню выбора у слова, а не молчаливая догадка.
+  const [quoteChoice, setQuoteChoice] = useState<{ x: number; y: number; choices: QuoteChoice[] } | null>(null)
+  // Ссылка постоянная: меню подписывается на клики мимо один раз, а не на каждую перерисовку.
+  const closeQuoteChoice = useCallback(() => setQuoteChoice(null), [])
+  const openFromText = (noteIds: string[], point: { x: number; y: number }) => {
+    const target = textClickTarget(noteIds, summaryIds)
+    if (target.kind === 'notes') {
+      openNotesFromMarker(target.noteIds)
+    } else if (target.kind === 'summary') {
+      openSummaryNote(target.noteId)
+    } else {
+      const titles = new Map(bookQuotes.map((quote) => [quote.noteId, quote.noteTitle]))
+      setQuoteChoice({
+        ...point,
+        choices: [
+          ...target.noteIds.map((noteId) => ({ noteId, title: titles.get(noteId) ?? '', kind: 'note' as const })),
+          ...target.summaryIds.map((noteId) => ({ noteId, title: titles.get(noteId) ?? '', kind: 'summary' as const })),
+        ],
+      })
+    }
   }
   const markersLayoutKey = `${layoutPreset(visibleLayout)}:${isImmersiveMode}`
   // Одна колонка книги и готовый перевод — заметки на полях, напротив абзацев.
@@ -238,11 +271,11 @@ function DocumentWorkspace({
   const [textHoverNoteIds, setTextHoverNoteIds] = useState<string[]>([])
   useQuoteClicks({
     viewportRef: synchronizedScroll.originalRef, column: 'SOURCE', quotes: bookQuotes, layoutKey: markersLayoutKey,
-    onOpen: openNotesFromMarker, onHover: setTextHoverNoteIds,
+    onOpen: openFromText, onHover: setTextHoverNoteIds,
   })
   useQuoteClicks({
     viewportRef: synchronizedScroll.translationRef, column: 'TRANSLATION', quotes: bookQuotes, layoutKey: markersLayoutKey,
-    onOpen: openNotesFromMarker, onHover: setTextHoverNoteIds,
+    onOpen: openFromText, onHover: setTextHoverNoteIds,
   })
   /**
    * Конспект книги — заметка о ней целиком (T-67); их может быть несколько. На полях
@@ -683,12 +716,14 @@ function DocumentWorkspace({
           ) : null}
           {/* Метки рисуются внутри колонок (портал), здесь только их состояние. */}
           {showsPane(visibleLayout, 'original') ? (
-            <QuoteMarkers viewportRef={synchronizedScroll.originalRef} column="SOURCE" quotes={bookQuotes}
-              layoutKey={markersLayoutKey} onOpen={openNotesFromMarker} />
+            <QuoteMarkers viewportRef={synchronizedScroll.originalRef} column="SOURCE" quotes={noteQuotes}
+              summaryQuotes={summaryQuotes} summaryTone={bookTone}
+              layoutKey={markersLayoutKey} onOpen={openNotesFromMarker} onOpenSummary={openSummaryNote} />
           ) : null}
           {showsPane(visibleLayout, 'translation') ? (
-            <QuoteMarkers viewportRef={synchronizedScroll.translationRef} column="TRANSLATION" quotes={bookQuotes}
-              layoutKey={markersLayoutKey} onOpen={openNotesFromMarker} />
+            <QuoteMarkers viewportRef={synchronizedScroll.translationRef} column="TRANSLATION" quotes={noteQuotes}
+              summaryQuotes={summaryQuotes} summaryTone={bookTone}
+              layoutKey={markersLayoutKey} onOpen={openNotesFromMarker} onOpenSummary={openSummaryNote} />
           ) : null}
           {isMarginMode && document.jobId ? (
             <Suspense fallback={null}>
@@ -697,7 +732,7 @@ function DocumentWorkspace({
                 column={visibleLayout.primary === 'translation' ? 'TRANSLATION' : 'SOURCE'}
                 jobId={document.jobId}
                 bookName={document.name}
-                quotes={bookQuotes}
+                quotes={noteQuotes}
                 aboutBook={bookNotes.aboutBook}
                 layoutKey={markersLayoutKey}
                 request={notesRequest}
@@ -770,6 +805,20 @@ function DocumentWorkspace({
             documentName={document.name}
             mode={feedbackPrompt}
             onClose={() => setFeedbackPrompt(null)}
+          />
+        ) : null}
+        {quoteChoice ? (
+          <QuoteChoiceMenu
+            x={quoteChoice.x}
+            y={quoteChoice.y}
+            choices={quoteChoice.choices}
+            summaryTone={bookTone}
+            onPick={(choice) => {
+              setQuoteChoice(null)
+              if (choice.kind === 'summary') openSummaryNote(choice.noteId)
+              else openNotesFromMarker([choice.noteId])
+            }}
+            onClose={closeQuoteChoice}
           />
         ) : null}
         {/* Пока цитата оформляется в панели, кнопка над старым выделением только мешает. */}

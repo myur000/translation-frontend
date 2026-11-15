@@ -414,6 +414,7 @@ export function MarginNotes({ viewportRef, column, jobId, bookName, quotes, abou
             style={{ position: 'sticky', top: stickyTop }}
             isPopover={isPopover}
             isOpen={isBookmarkOpen}
+            isLinked={aboutBook.some((note) => linkedNoteIds.includes(note.id))}
             summaries={aboutBook}
             current={currentSummary}
             isCreating={isCreatingSummary || !currentSummary}

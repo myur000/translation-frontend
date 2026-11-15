@@ -9,8 +9,8 @@ interface QuoteClicksOptions {
   quotes: BookQuote[]
   /** Меняется, когда колонка могла смонтироваться заново (раскладка, полный экран). */
   layoutKey: string
-  /** Клик по цитате: открыть её заметки. */
-  onOpen: (noteIds: string[]) => void
+  /** Клик по цитате: открыть её заметки; `point` — где кликнули (там встаёт меню выбора). */
+  onOpen: (noteIds: string[], point: { x: number; y: number }) => void
   /** Курсор над цитатами этих заметок (пустой список — ни над одной). */
   onHover: (noteIds: string[]) => void
 }
@@ -51,7 +51,7 @@ export function useQuoteClicks({ viewportRef, column, quotes, layoutKey, onOpen,
       if (event.button !== 0 || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
       if (!window.getSelection()?.isCollapsed) return
       const noteIds = hitsAt(event)
-      if (noteIds.length) handlers.current.onOpen(noteIds)
+      if (noteIds.length) handlers.current.onOpen(noteIds, { x: event.clientX, y: event.clientY })
     }
     const handlePointerMove = (event: PointerEvent) => {
       if (event.pointerType === 'touch') return
