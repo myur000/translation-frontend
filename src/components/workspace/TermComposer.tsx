@@ -25,32 +25,27 @@ const TERM_MAX = 200
 const TRANSLATION_MAX = 500
 const WIDTH = 360
 const GAP = 10
-/** Выделение во второй колонке читается после того, как его закончили: хук выделения обновляется в кадре анимации. */
+/** Хук выделения обновляется в rAF — читаем его чуть позже. */
 const PICK_DELAY_MS = 80
 
 interface TermComposerProps {
   jobId: string
-  /** Выделение, с которого начали: его слова — чипы, вторая сторона — поле. */
   selection: ActiveQuoteSelection
-  /** Текущее выделение в книге: пока карточка открыта, им заменяют слова или заполняют поле. */
+  /** Новое выделение заменяет чипы (та же колонка) или заполняет поле (другая). */
   liveSelection: ActiveQuoteSelection | null
-  /** Видна вторая колонка — значит, поле можно заполнить выделением. */
   canPickPaired: boolean
-  /** Языки книги (коды NLLB): по языку выделения отрезается артикль. */
+  /** По языку выделения отрезается артикль. */
   languages: { source: string; target: string }
-  /** Термины пары: совпадение с существующим показывается и обновляет его. */
   terms: readonly TermListItem[]
-  /** «EN → RU». */
   pair: string
   onSaved: (term: TermResponse) => void
   onClose: () => void
 }
 
-/** Слова выделения: до `MAX_TERM_WORDS` — чипы, длиннее — обычное поле с текстом. */
 interface Picked {
   words: string[]
   range: WordRange
-  /** Диапазон после автообрезки: пока его не меняли, внизу сказано, что отрезано. */
+  /** После автообрезки: пока не меняли, внизу видно, что отрезано. */
   auto: WordRange
   article: string | null
   free: string | null
@@ -68,12 +63,6 @@ function pick(text: string, language: string): Picked {
   return { words, range, auto: range, article, free: null }
 }
 
-/**
- * Быстрая карточка «В глоссарий» у выделения. Слова выделения — чипы: щелчок по
- * крайнему убирает его, по слову в середине — обрезает термин перед ним. Вторую
- * сторону пары вписывают или выделяют в соседней колонке. Сохраняется с привязкой
- * к книге; существующий термин пары обновляется.
- */
 export function TermComposer({ jobId, selection, liveSelection, canPickPaired, languages, terms, pair, onSaved, onClose }: TermComposerProps) {
   const { t } = useTranslation()
   const { session } = useAuth()
@@ -86,14 +75,12 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, l
   const cardRef = useRef<HTMLFormElement>(null)
   const otherRef = useRef<HTMLInputElement>(null)
   const saveRef = useRef<HTMLButtonElement>(null)
-  // Слово, за которым едет карточка; новое выделение в той же колонке его меняет.
   const [anchor, setAnchor] = useState<Range | null>(selection.range ?? null)
   const [rect, setRect] = useState(selection.rect)
   const [height, setHeight] = useState(0)
-  // Под словом или над ним — решается один раз, иначе при прокрутке карточка прыгала бы.
+  // Сторона выбирается один раз, иначе при прокрутке карточка прыгает.
   const [isAbove, setAbove] = useState<boolean | null>(null)
 
-  // Высота меняется вместе с содержимым (ошибка, «уже в глоссарии»).
   useLayoutEffect(() => {
     const card = cardRef.current
     if (!card) return
@@ -101,7 +88,6 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, l
     const measure = () => {
       const measured = card.offsetHeight
       setHeight(measured)
-      // Сторона — по месту слова при открытии: снизу не помещается — над ним.
       if (measured) setAbove((current) => current ?? opened.top + opened.height + GAP + measured > window.innerHeight - GAP)
     }
     measure()
@@ -110,7 +96,6 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, l
     return () => observer?.disconnect()
   }, [selection.rect])
 
-  // Прокрутка книги двигает слово — карточка едет за ним.
   useEffect(() => {
     if (!anchor) return
     setDraftTermHighlight(anchor)
@@ -119,7 +104,7 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, l
       window.cancelAnimationFrame(frame)
       frame = window.requestAnimationFrame(() => {
         const next = anchor.getBoundingClientRect()
-        // Узлы слова пропали из книги (перерисовка страницы) — остаёмся, где были.
+        // Узлы слова пропали при перерисовке страницы.
         if (!next.width && !next.height) return
         setRect({ top: next.top, left: next.left, width: next.width, height: next.height })
       })
@@ -137,15 +122,14 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, l
 
   useEffect(() => { otherRef.current?.focus({ preventScroll: true }) }, [])
 
-  // Фокус после подстановки: кнопка «Сохранить» активна только после перерисовки.
+  // «Сохранить» становится активной только после перерисовки.
   const focusNext = useRef<RefObject<HTMLElement | null> | null>(null)
   useEffect(() => {
     focusNext.current?.current?.focus({ preventScroll: true })
     focusNext.current = null
   })
 
-  // Новое выделение, когда его закончили (отпустили кнопку мыши или Shift): на той же
-  // стороне оно заменяет слова, на другой — заполняет поле.
+  // Ждём конца выделения, чтобы не забирать фокус посреди него.
   const latest = useRef(liveSelection)
   useEffect(() => { latest.current = liveSelection })
   const consumed = useRef(selectionKey(selection))
@@ -228,7 +212,6 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, l
     : trimmed
   const pickedLabel = t(side === 'SOURCE' ? 'glossary.term' : 'glossary.translation')
   const otherLabel = t(side === 'SOURCE' ? 'glossary.translation' : 'glossary.term')
-  // Слово ушло за край экрана — карточка прижимается к краю и не теряется.
   const wanted = isAbove ? rect.top - height - GAP : rect.top + rect.height + GAP
   const top = Math.max(GAP, Math.min(wanted, window.innerHeight - height - GAP))
   const left = Math.max(GAP, Math.min(rect.left + rect.width / 2 - WIDTH / 2, window.innerWidth - WIDTH - GAP))
@@ -258,7 +241,7 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, l
               const isIncluded = action !== 'restore'
               return (
                 <button
-                  // Слова могут повторяться — ключ по месту в выделении.
+                  // Слова могут повторяться.
                   key={index}
                   type="button"
                   className={`${styles.chip} ${isIncluded ? '' : styles.chipOut}`}

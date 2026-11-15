@@ -1,11 +1,11 @@
 import { cleanTermText } from './termMatch.ts'
 
-/** Термин — слово или словосочетание: длиннее уже не термин, а фраза. */
+/** Длиннее — уже фраза, а не термин. */
 export const MAX_TERM_WORDS = 8
-/** Выделение длиннее — предложение или абзац: круг «В глоссарий» над ним не показываем. */
+/** Длиннее — предложение: круг глоссария не показываем. */
 export const MAX_SELECTION_WORDS = 20
 
-/** Слова, включённые в термин: непрерывный отрезок `[from, to]` слов выделения. */
+/** Включённые слова — непрерывный отрезок. */
 export interface WordRange {
   from: number
   to: number
@@ -33,7 +33,6 @@ export function countWords(text: string) {
   return splitWords(cleanTermText(text)).length
 }
 
-/** Выделение может стать термином (с обрезкой лишнего). */
 export function canBeTerm(text: string) {
   const count = countWords(text)
   return count > 0 && count <= MAX_SELECTION_WORDS
@@ -41,10 +40,7 @@ export function canBeTerm(text: string) {
 
 const bare = (word: string) => word.replace(EDGE_PUNCTUATION, '').toLocaleLowerCase()
 
-/**
- * Что сразу отрезать: слова без букв и цифр по краям («—», «,»), а в начале — артикль
- * языка выделения. Хотя бы одно слово остаётся.
- */
+/** Слова-знаки по краям и артикль в начале; одно слово остаётся всегда. */
 export function autoRange(words: readonly string[], language: string): { range: WordRange; article: string | null } {
   const articles = ARTICLES[language.slice(0, 3)] ?? []
   let from = 0
@@ -59,12 +55,10 @@ export function autoRange(words: readonly string[], language: string): { range: 
   return { range: { from, to }, article }
 }
 
-/** Текст термина из включённых слов: знаки по краям отрезаны. */
 export function rangeText(words: readonly string[], range: WordRange) {
   return cleanTermText(words.slice(range.from, range.to + 1).join(' '))
 }
 
-/** Отрезаны ли знаки препинания: у крайних слов или целые слова-знаки по краям. */
 export function hasTrimmedPunctuation(words: readonly string[], range: WordRange) {
   const joined = words.slice(range.from, range.to + 1).join(' ')
   const edgeWords = words.slice(0, range.from).concat(words.slice(range.to + 1))
@@ -72,10 +66,8 @@ export function hasTrimmedPunctuation(words: readonly string[], range: WordRange
 }
 
 /**
- * Щелчок по слову-чипу:
- * - крайнее слово термина убирается (последнее оставшееся — нет);
- * - слово в середине — термин обрезается перед ним («keeper | of the light» → «keeper»);
- * - убранное слово возвращается вместе со всеми между ним и термином.
+ * Крайнее слово убирается, слово в середине обрезает термин перед собой,
+ * убранное возвращается вместе со словами до термина.
  */
 export function clickWord(range: WordRange, index: number): WordRange {
   if (index < range.from) return { ...range, from: index }
@@ -86,7 +78,6 @@ export function clickWord(range: WordRange, index: number): WordRange {
   return { ...range, to: index - 1 }
 }
 
-/** Что сделает щелчок по слову — для подписи кнопки. */
 export function wordAction(range: WordRange, index: number): 'restore' | 'remove' | 'cut' | 'keep' {
   if (index < range.from || index > range.to) return 'restore'
   if (range.from === range.to) return 'keep'

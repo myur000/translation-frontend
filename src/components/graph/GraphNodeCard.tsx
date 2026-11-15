@@ -14,9 +14,8 @@ import styles from './GraphNodeCard.module.css'
 
 interface GraphNodeCardProps {
   node: GraphNode
-  /** Узлы графа: по ним подписываются связи. */
   nodes: readonly GraphNode[]
-  /** Видимые связи: карточка показывает то же, что карта. */
+  /** Только видимые: карточка показывает то же, что карта. */
   links: readonly GraphLink[]
   onSelect: (id: string) => void
   onClose: () => void
@@ -27,10 +26,6 @@ type RelatedItem = { id: string; weight?: number }
 
 const toneStyle = (tone: number | null) => (tone !== null ? ({ '--node-tone': `var(--cover-${tone})` } as CSSProperties) : undefined)
 
-/**
- * Карточка выбранного узла поверх карты: что это, начало текста, связи по смыслу
- * (цитирует, ссылается, ссылаются сюда…) — по ним можно ходить — и куда перейти.
- */
 export function GraphNodeCard({ node, nodes, links, onSelect, onClose }: GraphNodeCardProps) {
   const { t, tc } = useTranslation()
   const { session } = useAuth()
@@ -38,7 +33,7 @@ export function GraphNodeCard({ node, nodes, links, onSelect, onClose }: GraphNo
   const isNote = node.kind === 'note' || node.kind === 'summary'
   const noteId = isNote ? node.ref : null
 
-  // Текста заметки в графе нет — дочитываем саму заметку.
+  // В графе нет текста заметки.
   useEffect(() => {
     const token = session?.accessToken
     if (!noteId || !token) return

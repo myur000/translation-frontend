@@ -2,11 +2,10 @@ import type { NoteQuoteSide } from '../api/contracts/notes.ts'
 import { indexText, setLayerRanges, supportsQuoteHighlight } from '../notes/quoteRanges.ts'
 import { findTerms, termMatcher, type GlossaryTerm } from './termMatch.ts'
 
-/** Термины в тексте книги: `::highlight(glossary-term)` в global.css. */
+/** Слои `::highlight(...)` в global.css. */
 export const GLOSSARY_TERM_HIGHLIGHT = 'glossary-term'
-/** Термин под курсором — ярче остальных. */
 export const GLOSSARY_TERM_ACTIVE_HIGHLIGHT = 'glossary-term-active'
-/** Слово, из которого сейчас делают термин: выделение браузера пропадает, когда курсор в поле. */
+/** Пока фокус в поле карточки, выделения браузера нет — слово подсвечиваем сами. */
 export const GLOSSARY_DRAFT_HIGHLIGHT = 'glossary-draft'
 
 const BLOCKS = 'p, li, h1, h2, h3, h4, h5, h6, td, th, blockquote'
@@ -18,7 +17,7 @@ export interface TermHit {
   term: GlossaryTerm
 }
 
-/** Блоки текста колонки: самые внутренние (абзац в пункте списка — сам абзац), без служебных слоёв. */
+/** Самые внутренние блоки, без служебных слоёв. */
 export function termBlocks(host: HTMLElement): HTMLElement[] {
   const blocks = [...host.querySelectorAll<HTMLElement>(BLOCKS)]
     .filter((element) => !element.closest('[data-quote-ignore]') && !element.querySelector(BLOCKS))
@@ -26,11 +25,7 @@ export function termBlocks(host: HTMLElement): HTMLElement[] {
   return [...blocks, ...lines]
 }
 
-/**
- * Вхождения терминов в колонке, по блокам: по блоку под курсором находится
- * подсказка без обхода всей книги. Блок, где выражение ничего не находит в
- * сыром тексте, не индексируется посимвольно — это основная экономия на длинной книге.
- */
+/** По блокам — для подсказки под курсором. Блоки без совпадений посимвольно не индексируем. */
 export function termHits(host: HTMLElement, column: NoteQuoteSide, terms: readonly GlossaryTerm[]): Map<HTMLElement, TermHit[]> {
   const result = new Map<HTMLElement, TermHit[]>()
   const matcher = termMatcher(terms, column)
@@ -54,7 +49,6 @@ export function termHits(host: HTMLElement, column: NoteQuoteSide, terms: readon
   return result
 }
 
-/** Термин под точкой экрана — по прямоугольникам строк самого вхождения. */
 export function termAtPoint(hits: readonly TermHit[], x: number, y: number): TermHit | null {
   for (const hit of hits) {
     if (typeof hit.range.getClientRects !== 'function') continue
@@ -80,7 +74,6 @@ export function setActiveTermHighlight(range: Range | null) {
   CSS.highlights.set(GLOSSARY_TERM_ACTIVE_HIGHLIGHT, highlight)
 }
 
-/** Подсветка слова, из которого делают термин; `null` убирает её. */
 export function setDraftTermHighlight(range: Range | null) {
   if (!supportsQuoteHighlight()) return
   if (!range) {

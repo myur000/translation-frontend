@@ -7,7 +7,7 @@ import { useTranslation } from '../../i18n/useTranslation.ts'
 import { usePreferences } from '../../preferences/usePreferences.ts'
 import styles from './TermHighlights.module.css'
 
-/** Подсказка не мелькает, когда курсор просто проходит по строке. */
+/** Чтобы подсказка не мелькала, пока курсор идёт по строке. */
 const HOVER_DELAY_MS = 250
 const TIP_GAP = 6
 
@@ -15,7 +15,6 @@ interface TermHighlightsProps {
   viewportRef: RefObject<HTMLElement | null>
   column: NoteQuoteSide
   terms: readonly GlossaryTerm[]
-  /** Меняется вместе с раскладкой: колонка могла смениться. */
   layoutKey: string
 }
 
@@ -24,11 +23,7 @@ interface Hover {
   rect: { top: number; left: number; bottom: number; width: number }
 }
 
-/**
- * Термины глоссария в колонке книги: пунктирное подчёркивание через CSS Custom
- * Highlight API (DOM книги не трогаем) и подсказка «термин → перевод» при наведении.
- * Оригинал ищется по термину, перевод — по переводу термина.
- */
+/** Подсветка через CSS Highlight API — DOM книги не трогаем. */
 export function TermHighlights({ viewportRef, column, terms, layoutKey }: TermHighlightsProps) {
   const { t } = useTranslation()
   const { isTermHighlightEnabled } = usePreferences()
@@ -54,7 +49,7 @@ export function TermHighlights({ viewportRef, column, terms, layoutKey }: TermHi
       })
     }
     recompute()
-    // Текст DOCX и страницы PDF появляются позже колонки; метки и карточки на полях не в счёт.
+    // Текст DOCX и страницы PDF появляются позже колонки.
     const mutations = new MutationObserver((records) => {
       if (records.some((record) => !(record.target instanceof Element && record.target.closest('[data-quote-ignore]')))) recompute()
     })
@@ -78,7 +73,6 @@ export function TermHighlights({ viewportRef, column, terms, layoutKey }: TermHi
       setHover(null)
     }
     const handleMove = (event: PointerEvent) => {
-      // Пока тянут выделение или касаются пальцем, подсказка не нужна.
       if (event.pointerType !== 'mouse' || event.buttons) {
         hide()
         return

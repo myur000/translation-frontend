@@ -1,6 +1,5 @@
 import type { NoteQuoteSide } from '../api/contracts/notes.ts'
 
-/** Термин глоссария, как его ищут в тексте книги. */
 export interface GlossaryTerm {
   id: string
   term: string
@@ -15,7 +14,7 @@ export interface TermMatch {
 
 export interface TermMatcher {
   regex: RegExp
-  /** Термин каждой группы выражения: группа i + 1 — `terms[i]`. */
+  /** Группа i + 1 выражения — `terms[i]`. */
   terms: GlossaryTerm[]
 }
 
@@ -25,27 +24,18 @@ const NOT_WORD_AFTER = '(?![\\p{L}\\p{N}])'
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const words = (value: string) => value.trim().split(/\s+/).filter(Boolean)
 
-/** Термин в оригинале: слова целиком, между ними любые пробелы. */
 export function sourcePattern(term: string) {
   return words(term).map(escape).join('\\s+')
 }
 
-/**
- * Перевод ищется по основам слов: у длинных слов отбрасываются два последних
- * символа, дальше любые буквы — так находятся падежи («стеклянного поплавка»
- * для «стеклянный поплавок»). Это приближение, не морфология.
- */
+/** По основам слов, чтобы находились падежи. Приближение, не морфология. */
 export function translationPattern(translation: string) {
   return words(translation)
     .map((word) => escape(word.length <= 4 ? word : word.slice(0, Math.max(3, word.length - 2))) + '\\p{L}*')
     .join('\\s+')
 }
 
-/**
- * Одно выражение на колонку. Длинные термины раньше коротких: в «glass float»
- * находится весь термин, а не только «float». В оригинале допускаются
- * множественное число и притяжательная форма (`reefs`, `keeper's`).
- */
+/** Длинные термины первыми, иначе в «glass float» найдётся только «float». */
 export function termMatcher(terms: readonly GlossaryTerm[], side: NoteQuoteSide): TermMatcher | null {
   const patterns = terms
     .map((term) => ({ term, pattern: side === 'SOURCE' ? sourcePattern(term.term) : translationPattern(term.translation) }))
@@ -57,7 +47,6 @@ export function termMatcher(terms: readonly GlossaryTerm[], side: NoteQuoteSide)
   return { regex: new RegExp(`${NOT_WORD_BEFORE}(?:${body})${tail}`, 'giu'), terms: patterns.map((item) => item.term) }
 }
 
-/** Все вхождения терминов в тексте, слева направо, без пересечений. */
 export function findTerms(text: string, matcher: TermMatcher): TermMatch[] {
   const { regex, terms } = matcher
   const found: TermMatch[] = []
@@ -73,7 +62,6 @@ export function findTerms(text: string, matcher: TermMatcher): TermMatch[] {
   return found
 }
 
-/** Выделенный текст как термин: одна строка, без кавычек и знаков препинания по краям. */
 export function cleanTermText(text: string) {
   return text.replace(/\s+/g, ' ').trim().replace(/^[\s«"“„'‘([]+|[\s»"”'’)\].,;:!?…]+$/gu, '').trim()
 }

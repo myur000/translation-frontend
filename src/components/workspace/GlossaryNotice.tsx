@@ -9,10 +9,6 @@ interface GlossaryNoticeProps {
   onClose: () => void
 }
 
-/**
- * После нового термина: перевод книги сделан без него, глоссарий действует на
- * следующие переводы. Предлагаем перевести заново — с отмеченным глоссарием.
- */
 export function GlossaryNotice({ term, translation, onRetranslate, onClose }: GlossaryNoticeProps) {
   const { t } = useTranslation()
   return (

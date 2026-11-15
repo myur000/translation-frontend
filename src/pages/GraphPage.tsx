@@ -38,7 +38,7 @@ export function GraphPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const visible = useMemo(() => filterGraph(model, query.hidden), [model, hiddenKey])
   const { connected, lonely } = useMemo(() => splitLonely(visible), [visible])
-  // Цвета — по всему графу: спрятанные фильтром теги не сбивают раскраску.
+  // По всему графу: спрятанные фильтром теги не сбивают цвета.
   const colors = useMemo(() => colorGraph(model, query.color), [model, query.color])
   const [isSparseClosed, setSparseClosed] = useState(isSparseHintClosed)
   const sparseTitleId = useId()
@@ -69,7 +69,7 @@ export function GraphPage() {
     try {
       window.localStorage.setItem(SPARSE_HINT_KEY, 'closed')
     } catch {
-      // Без хранилища подсказка вернётся при следующем заходе.
+      // Нет хранилища — подсказка просто вернётся.
     }
   }
 

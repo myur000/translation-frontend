@@ -3,9 +3,9 @@ import type { TermListItem, TermResponse } from '../api/contracts/terms.ts'
 import { getTerms } from '../api/terms.ts'
 import { useAuth } from '../auth/useAuth.ts'
 
-/** Сервер отдаёт не больше 100 терминов за раз. */
+/** Лимит сервера. */
 const PAGE_SIZE = 100
-/** Предел подсветки: дальше выражение на колонку становится слишком тяжёлым. */
+/** Больше выражение на колонку становится слишком тяжёлым. */
 const MAX_PAGES = 20
 
 interface Loaded {
@@ -16,7 +16,6 @@ interface Loaded {
 export interface GlossaryTerms {
   terms: TermListItem[]
   isLoaded: boolean
-  /** Сохранённый термин сразу виден в тексте, без перезагрузки списка. */
   upsert: (term: TermResponse) => void
 }
 
@@ -30,11 +29,7 @@ const toListItem = (term: TermResponse): TermListItem => ({
   updated_at: term.updated_at,
 })
 
-/**
- * Термины пары языков книги — для подсветки в тексте и проверки «уже в глоссарии».
- * Глоссарий общий для пары, поэтому в книге видны и термины, добавленные в других
- * книгах. Ошибка загрузки не мешает читать: подсветки просто нет.
- */
+/** Глоссарий общий для пары, поэтому в книге видны и термины из других книг. */
 export function useGlossaryTerms(sourceLanguage: string | null, targetLanguage: string | null): GlossaryTerms {
   const { session } = useAuth()
   const accessToken = session?.accessToken ?? null

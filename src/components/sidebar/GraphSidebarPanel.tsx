@@ -15,7 +15,6 @@ import { useNotesGraph } from '../../notes/useNotesGraph.ts'
 import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 import styles from './GraphSidebarPanel.module.css'
 
-/** Образцы линий — как связи нарисованы на карте. */
 const LEGEND: [GraphLinkKind, ReactNode][] = [
   ['quotes', <line key="quotes" x1="1" y1="5" x2="27" y2="5" strokeWidth="2.6" />],
   ['links', <g key="links"><line x1="1" y1="5" x2="22" y2="5" strokeWidth="1" /><path d="M27 5l-5.5-3v6z" stroke="none" /></g>],
