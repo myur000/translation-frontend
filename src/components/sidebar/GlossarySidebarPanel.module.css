@@ -1,0 +1,134 @@
+/* Панель глоссария — те же отступы, заголовки и «таблетки», что у панели графа. */
+.panel {
+  display: grid;
+  gap: 16px;
+  padding: 0 12px 16px;
+}
+
+.search {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  color: var(--color-text-muted);
+  background: var(--sidebar-tile, rgb(143 177 201 / 10%));
+  border: 1px solid var(--sidebar-tile-border, rgb(143 177 201 / 22%));
+  border-radius: var(--radius-sm);
+}
+
+.search input {
+  min-width: 0;
+  flex: 1;
+  color: var(--color-text);
+  background: none;
+  border: 0;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+}
+
+.section {
+  display: grid;
+  gap: 8px;
+}
+
+.section h3 {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 10px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.pill:hover {
+  color: var(--color-text);
+}
+
+.pill[aria-pressed='true'] {
+  color: var(--color-text);
+  background: var(--sidebar-active);
+  border-color: var(--sidebar-active);
+}
+
+.count {
+  color: var(--color-text-soft);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.books {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.book {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  color: var(--color-text);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.book:hover,
+.book[aria-pressed='true'] {
+  background: var(--sidebar-tile, rgb(143 177 201 / 10%));
+}
+
+.cover {
+  width: 12px;
+  height: 17px;
+  flex: none;
+  background: var(--node-tone);
+  border-radius: 1px 3px 3px 1px;
+  box-shadow: inset 2px 0 0 rgb(0 0 0 / 24%);
+}
+
+.coverAll {
+  background: none;
+  border: 1px solid var(--color-border-strong);
+  box-shadow: none;
+}
+
+.bookTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}

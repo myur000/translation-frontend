@@ -70,6 +70,9 @@ Frontend обновляет JWT за минуту до истечения и п�
 | POST | `/api/terms` | JWT | `TermCreateRequest` (`term`, `translation`, `job_id` — пара из книги) | `201 TermResponse`; `409 NOTE_CONFLICT` — такой термин в паре есть или предел 5000 |
 | PUT | `/api/terms/{termId}` | JWT | `TermUpdateRequest` (`term`, `translation`) | `200 TermResponse`; `409` — написание занято другим термином |
 | POST | `/api/terms/{termId}/documents` | JWT | `{ job_id }` | `200 TermResponse`; повторная привязка ничего не меняет |
+| GET | `/api/terms/{termId}` | JWT | — | `200 TermResponse` (книги термина — для карточки в разделе «Глоссарий») |
+| DELETE | `/api/terms/{termId}` | JWT | — | `204` |
+| DELETE | `/api/terms/{termId}/documents/{jobId}` | JWT | — | `204`; удалённую книгу тоже можно отвязать |
 | GET | `/api/documents/{jobId}/status` | JWT | — | `200 DocumentStatusResponse` |
 | GET | `/api/documents/{jobId}/download` | JWT | — | file stream |
 | GET | `/api/documents/{jobId}/text?page=0&size=500` | JWT | query, `size` до 500 | `200 DocumentTextResponse` |

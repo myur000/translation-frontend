@@ -9,6 +9,8 @@ import {
 import { Link, NavLink, useMatch, useNavigate } from 'react-router'
 import { GRAPH_PATH } from '../../graph/graphQuery.ts'
 import { GraphSidebarPanel } from './GraphSidebarPanel.tsx'
+import { GlossarySidebarPanel } from './GlossarySidebarPanel.tsx'
+import { GLOSSARY_PATH } from '../../glossary/glossaryQuery.ts'
 import { bookSummaryHref } from '../../notes/noteBooks.ts'
 import { DocumentActionsMenu } from '../toolbar/DocumentActionsMenu.tsx'
 import { DeleteDocumentDialog } from '../workspace/DeleteDocumentDialog.tsx'
@@ -53,7 +55,7 @@ interface SidebarProps {
   onResetWidth: () => void
 }
 
-type SidebarSection = 'books' | 'notes' | 'graph'
+type SidebarSection = 'books' | 'notes' | 'graph' | 'glossary'
 
 export function Sidebar({
   documents,
@@ -84,9 +86,10 @@ export function Sidebar({
   const panelId = useId()
   const isNotesRoute = useMatch('/notes/*') !== null
   const isGraphRoute = useMatch(GRAPH_PATH) !== null
+  const isGlossaryRoute = useMatch(GLOSSARY_PATH) !== null
   const navigate = useNavigate()
   // Раздел панели; на странице заметок она открывается сразу с заметками.
-  const [section, setSection] = useState<SidebarSection>(() => (isNotesRoute ? 'notes' : isGraphRoute ? 'graph' : 'books'))
+  const [section, setSection] = useState<SidebarSection>(() => (isNotesRoute ? 'notes' : isGraphRoute ? 'graph' : isGlossaryRoute ? 'glossary' : 'books'))
   const shown = documents.filter((document) => matchesBookQuery(document.name, query))
   // Закреплённые идут отдельным разделом в порядке закрепления; остальные — как пришли.
   const pinned = pinnedJobIds.flatMap((jobId) => shown.filter((document) => document.jobId === jobId))
@@ -230,6 +233,25 @@ export function Sidebar({
           <GlyphIcon name="graph" />
           <span className={styles.visuallyHidden}>{t('sidebar.graph')}</span>
         </button>
+        <button
+          type="button"
+          className={`${styles.railItem} ${isSectionOpen('glossary') ? styles.railItemOpen : ''} ${isGlossaryRoute ? styles.railItemActive : ''}`}
+          onClick={() => {
+            if (!isGlossaryRoute) {
+              setSection('glossary')
+              if (isCollapsed) onToggleCollapsed()
+              void navigate(GLOSSARY_PATH)
+              return
+            }
+            openSection('glossary')
+          }}
+          aria-expanded={isSectionOpen('glossary')}
+          aria-controls={panelId}
+          title={t('sidebar.glossary')}
+        >
+          <GlyphIcon name="glossary" />
+          <span className={styles.visuallyHidden}>{t('sidebar.glossary')}</span>
+        </button>
         <NavLink
           to="/history"
           className={({ isActive }) => `${styles.railItem} ${isActive ? styles.railItemActive : ''}`}
@@ -250,6 +272,10 @@ export function Sidebar({
           {visibleSection === 'graph' ? (
             <Link to={GRAPH_PATH} className={`${styles.panelTitle} ${styles.panelTitleLink}`} title={t('graph.openSection')}>
               {t('sidebar.graph')}
+            </Link>
+          ) : visibleSection === 'glossary' ? (
+            <Link to={GLOSSARY_PATH} className={`${styles.panelTitle} ${styles.panelTitleLink}`} title={t('glossary.openSection')}>
+              {t('sidebar.glossary')}
             </Link>
           ) : visibleSection === 'notes' ? (
             <>
@@ -304,6 +330,10 @@ export function Sidebar({
 
         <div className={styles.sectionBody} hidden={visibleSection !== 'graph'}>
           <GraphSidebarPanel isActive={isSectionOpen('graph')} />
+        </div>
+
+        <div className={styles.sectionBody} hidden={visibleSection !== 'glossary'}>
+          <GlossarySidebarPanel isActive={isSectionOpen('glossary')} documents={documents} />
         </div>
 
         <div className={styles.sectionBody} hidden={visibleSection !== 'books'}>

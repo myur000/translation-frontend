@@ -1,0 +1,265 @@
+/* Карточка термина — колонка справа от списка, как карточка на странице заметки. */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.eyebrow,
+.section h3 {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.close {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  margin: -6px -8px -6px 0;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+}
+
+.close:hover {
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+}
+
+.close svg,
+.chip button svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.pair {
+  display: grid;
+  gap: 4px;
+  margin-top: -8px;
+}
+
+.pair h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.pair p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-glossary);
+  font-size: 16px;
+}
+
+.section {
+  display: grid;
+  gap: 8px;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 10px;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.chip > span:not(.tone) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tone {
+  width: 7px;
+  height: 10px;
+  flex: none;
+  background: var(--node-tone);
+  border-radius: 1px;
+}
+
+.deleted {
+  color: var(--color-text-soft);
+  text-decoration: line-through;
+}
+
+.chip button {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--color-text-soft);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+}
+
+.chip button:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.occurrences {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.occurrences li {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.source,
+.translation,
+.missing {
+  margin: 0;
+}
+
+.source {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.translation {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.occurrences mark {
+  color: inherit;
+  background: color-mix(in srgb, var(--glossary-term-line) 16%, transparent);
+  border-bottom: 2px solid var(--glossary-term-line);
+  border-radius: 2px;
+}
+
+.missing {
+  justify-self: start;
+  padding: 3px 8px;
+  color: var(--color-warning-text);
+  background: var(--color-warning-surface);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--color-text-soft);
+  font-size: 12px;
+}
+
+.foot a {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.foot a:hover {
+  text-decoration: underline;
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: 13px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.secondary,
+.danger {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.secondary {
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.secondary:hover {
+  background: var(--color-surface-subtle);
+}
+
+.danger {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger-border);
+}
+
+.quiet {
+  padding: 6px 8px;
+  color: var(--color-text-muted);
+  background: none;
+  border: 0;
+  font-size: 13px;
+}
+
+.quiet:hover {
+  color: var(--color-text);
+}

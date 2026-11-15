@@ -23,6 +23,7 @@ import { PreferencesProvider } from './preferences/PreferencesProvider.tsx'
 const NotesPage = lazy(() => import('./pages/NotesPage.tsx').then((module) => ({ default: module.NotesPage })))
 // Граф с холстом и раскладкой нужен только в своём разделе — отдельный кусок кода.
 const GraphPage = lazy(() => import('./pages/GraphPage.tsx').then((module) => ({ default: module.GraphPage })))
+const GlossaryPage = lazy(() => import('./pages/GlossaryPage.tsx').then((module) => ({ default: module.GlossaryPage })))
 
 function App() {
   return (
@@ -47,6 +48,7 @@ function App() {
               <Route path="/notes/new" element={<Suspense><NotesPage isNew /></Suspense>} />
               <Route path="/notes/:noteId" element={<Suspense><NotesPage /></Suspense>} />
               <Route path="/graph" element={<Suspense><GraphPage /></Suspense>} />
+              <Route path="/glossary" element={<Suspense><GlossaryPage /></Suspense>} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/plans" element={<PlansPage />} />
               <Route path="/profile" element={<ProfilePage />} />

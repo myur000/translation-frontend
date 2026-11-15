@@ -47,3 +47,32 @@ export function linkTermDocument(termId: string, jobId: string, options: Authent
     notifyAccessErrors: false,
   })
 }
+
+export function getTerm(termId: string, options: AuthenticatedApiCallOptions) {
+  return apiClient.request<TermResponse>(API_ENDPOINTS.terms.term(termId), {
+    method: 'GET',
+    accessToken: options.accessToken,
+    signal: options.signal,
+  })
+}
+
+export function deleteTerm(termId: string, options: AuthenticatedApiCallOptions) {
+  return apiClient.request<void>(API_ENDPOINTS.terms.term(termId), {
+    method: 'DELETE',
+    accessToken: options.accessToken,
+    responseType: 'void',
+    signal: options.signal,
+    notifyAccessErrors: false,
+  })
+}
+
+/** Удалённую книгу тоже можно отвязать. */
+export function unlinkTermDocument(termId: string, jobId: string, options: AuthenticatedApiCallOptions) {
+  return apiClient.request<void>(`${API_ENDPOINTS.terms.documents(termId)}/${encodeURIComponent(jobId)}`, {
+    method: 'DELETE',
+    accessToken: options.accessToken,
+    responseType: 'void',
+    signal: options.signal,
+    notifyAccessErrors: false,
+  })
+}

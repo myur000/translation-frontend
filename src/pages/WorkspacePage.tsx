@@ -15,6 +15,8 @@ import { TermComposer } from '../components/workspace/TermComposer.tsx'
 import { TermHighlights } from '../components/workspace/TermHighlights.tsx'
 import { canBeTerm } from '../glossary/termWords.ts'
 import { useGlossaryTerms } from '../glossary/useGlossaryTerms.ts'
+import { upsertGlossaryTerm } from '../glossary/glossaryStore.ts'
+import { PARAGRAPH_PARAM, TERM_PARAM } from '../glossary/glossaryLinks.ts'
 import type { ActiveQuoteSelection } from '../hooks/useQuoteSelection.ts'
 import { useBookNotes } from '../notes/useBookQuotes.ts'
 import type { BookQuote } from '../notes/bookQuotes.ts'
@@ -386,6 +388,36 @@ function DocumentWorkspace({
     // Срабатывает один раз на переход: параметры сразу убираются из адреса.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedNoteId, linkedQuoteId, bookNotes.isLoaded])
+
+  // «Открыть в книге» из глоссария: `?term=&paragraph=`. Текст книги появляется не сразу,
+  // поэтому абзац ищем несколько раз; параметры убираются, когда нашли или сдались.
+  const linkedTermId = linkParams.get(TERM_PARAM)
+  const linkedParagraph = linkParams.get(PARAGRAPH_PARAM)
+  useEffect(() => {
+    if (!linkedTermId || linkedParagraph === null || !glossary.isLoaded) return
+    const term = glossary.terms.find((item) => item.id === linkedTermId)
+    const index = Number(linkedParagraph)
+    let attempts = 0
+    let timer = 0
+    const finish = () => void navigate({ pathname: location.pathname, search: '' }, { replace: true })
+    const reveal = () => {
+      const original = synchronizedScroll.originalRef.current
+      const translation = synchronizedScroll.translationRef.current
+      const element = !term || !Number.isInteger(index) ? null
+        : original ? findQuoteElement(original, index, term.term)
+          : translation ? findQuoteElement(translation, index, term.translation) : null
+      if (element) revealQuoteElement(element)
+      if (element || !term || attempts >= 20) {
+        finish()
+        return
+      }
+      attempts += 1
+      timer = window.setTimeout(reveal, 250)
+    }
+    reveal()
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedTermId, linkedParagraph, glossary.isLoaded])
 
   // «Конспект книги» из меню книги на полке: `?summary=open` — книга открывается сразу с
   // раскрытым конспектом (на полях — закладка, иначе — колонка). Тоже один раз на переход.
@@ -910,6 +942,7 @@ function DocumentWorkspace({
             pair={`${shortLanguageCode(toCatalogLanguageCode(document.sourceLanguage))} → ${shortLanguageCode(toCatalogLanguageCode(document.targetLanguage))}`}
             onSaved={(term) => {
               glossary.upsert(term)
+              upsertGlossaryTerm(term)
               setTermDraft(null)
               quoteSelection.clear()
               setSavedTerm({ term: term.term, translation: term.translation })
