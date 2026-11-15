@@ -146,6 +146,13 @@
   --graph-dot: rgb(74 111 140 / 16%);
   --graph-edge: #9fb6c9;
   --graph-note: var(--palette-steel);
+  /* Раскраска заметок: тона обложек, чтобы цвет заметки совпадал с её книгой. */
+  --graph-group-0: var(--cover-0);
+  --graph-group-1: var(--cover-1);
+  --graph-group-2: var(--cover-2);
+  --graph-group-3: var(--cover-3);
+  --graph-group-4: var(--cover-4);
+  --graph-group-5: var(--cover-5);
 
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -216,6 +223,12 @@
   --graph-dot: rgb(143 177 201 / 12%);
   --graph-edge: #3c5a76;
   --graph-note: var(--palette-mist);
+  --graph-group-0: #6f97ab;
+  --graph-group-1: #9384a6;
+  --graph-group-2: #b3925f;
+  --graph-group-3: #82a287;
+  --graph-group-4: #b77575;
+  --graph-group-5: #7d8fbb;
 
   --shadow-page: 0 8px 24px rgb(0 0 0 / 35%);
   --shadow-popover: 0 16px 40px rgb(0 0 0 / 50%), 0 2px 8px rgb(0 0 0 / 30%);

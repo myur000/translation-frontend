@@ -2,7 +2,7 @@ import { useId, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { GraphCanvas } from '../components/graph/GraphCanvas.tsx'
 import { GraphNodeCard } from '../components/graph/GraphNodeCard.tsx'
-import { buildGraphModel, filterGraph, matchesGraphQuery, splitLonely, type GraphModel, type GraphNode } from '../graph/graphModel.ts'
+import { buildGraphModel, colorGraph, filterGraph, matchesGraphQuery, splitLonely, type GraphModel, type GraphNode } from '../graph/graphModel.ts'
 import { graphSearch, readGraphQuery } from '../graph/graphQuery.ts'
 import { useTranslation } from '../i18n/useTranslation.ts'
 import { useNotesGraph } from '../notes/useNotesGraph.ts'
@@ -38,6 +38,8 @@ export function GraphPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const visible = useMemo(() => filterGraph(model, query.hidden), [model, hiddenKey])
   const { connected, lonely } = useMemo(() => splitLonely(visible), [visible])
+  // Цвета — по всему графу: спрятанные фильтром теги не сбивают раскраску.
+  const colors = useMemo(() => colorGraph(model, query.color), [model, query.color])
   const [isSparseClosed, setSparseClosed] = useState(isSparseHintClosed)
   const sparseTitleId = useId()
   const [focusNonce, setFocusNonce] = useState(0)
@@ -101,6 +103,7 @@ export function GraphPage() {
           model={connected}
           selectedId={selected?.id ?? null}
           query={query.q}
+          tones={colors.tones}
           focusNonce={focusNonce}
           label={t('graph.canvasLabel', { notes: counts.notes, books: counts.books })}
           onSelect={(id, follow) => select(id, !follow)}

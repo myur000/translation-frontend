@@ -158,3 +158,80 @@ export function nodeRelations(links: readonly GraphLink[], id: string): NodeRela
   }
   return result
 }
+
+/** Раскраска заметок на карте: по книге, из которой цитируют, или по тегу. */
+export type GraphColoring = 'none' | 'book' | 'tag'
+export const GRAPH_COLORINGS: readonly GraphColoring[] = ['none', 'book', 'tag']
+/** Цветов групп столько же, сколько тонов обложек (`--graph-group-N`). */
+export const GRAPH_GROUP_TONES = 6
+
+export interface GraphColorGroup {
+  /** Узел группы: книга или тег. */
+  id: string
+  label: string
+  tone: number
+  /** Сколько заметок окрашено цветом группы. */
+  count: number
+}
+
+export interface GraphColors {
+  /** Тон узла (`--graph-group-N`); у узлов вне групп — нет. */
+  tones: Map<string, number>
+  groups: GraphColorGroup[]
+  /** Тегов без своего цвета: их больше, чем цветов. */
+  others: number
+}
+
+/**
+ * Цвета узлов для раскраски. По книгам — тон обложки книги, из которой заметка
+ * цитирует больше всего (конспект — его книги). По тегам — самые частые теги
+ * получают свой цвет, заметка — цвет самого частого из своих тегов.
+ */
+export function colorGraph(model: GraphModel, mode: GraphColoring): GraphColors {
+  const tones = new Map<string, number>()
+  if (mode === 'none') return { tones, groups: [], others: 0 }
+  const byId = new Map(model.nodes.map((node) => [node.id, node]))
+
+  if (mode === 'book') {
+    const best = new Map<string, { book: string; weight: number }>()
+    for (const link of model.links) {
+      if (link.kind !== 'quotes' && link.kind !== 'about') continue
+      const weight = link.kind === 'about' ? Infinity : link.weight
+      const current = best.get(link.source)
+      if (!current || weight > current.weight) best.set(link.source, { book: link.target, weight })
+    }
+    const counts = new Map<string, number>()
+    for (const [noteId, { book }] of best) {
+      const tone = byId.get(book)?.tone
+      if (tone === null || tone === undefined) continue
+      tones.set(noteId, tone)
+      counts.set(book, (counts.get(book) ?? 0) + 1)
+    }
+    const groups = [...counts].map(([id, count]) => {
+      const book = byId.get(id)
+      return { id, label: book?.label ?? id, tone: book?.tone ?? 0, count }
+    }).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    return { tones, groups, others: 0 }
+  }
+
+  const tagCount = new Map<string, number>()
+  for (const link of model.links) if (link.kind === 'tagged') tagCount.set(link.target, (tagCount.get(link.target) ?? 0) + 1)
+  const ranked = [...tagCount].sort((a, b) => b[1] - a[1] || (byId.get(a[0])?.label ?? '').localeCompare(byId.get(b[0])?.label ?? ''))
+  const coloured = ranked.slice(0, GRAPH_GROUP_TONES)
+  const rank = new Map(coloured.map(([id], index) => [id, index]))
+  for (const [id, index] of rank) tones.set(id, index)
+  const noteTone = new Map<string, number>()
+  for (const link of model.links) {
+    const index = link.kind === 'tagged' ? rank.get(link.target) : undefined
+    if (index === undefined) continue
+    const current = noteTone.get(link.source)
+    if (current === undefined || index < current) noteTone.set(link.source, index)
+  }
+  const counts = new Map<number, number>()
+  for (const [noteId, index] of noteTone) {
+    tones.set(noteId, index)
+    counts.set(index, (counts.get(index) ?? 0) + 1)
+  }
+  const groups = coloured.map(([id], index) => ({ id, label: byId.get(id)?.label ?? id, tone: index, count: counts.get(index) ?? 0 }))
+  return { tones, groups, others: ranked.length - coloured.length }
+}

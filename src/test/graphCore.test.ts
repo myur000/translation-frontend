@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { NoteGraphResponse } from '../api/contracts/notes.ts'
 import { ForceLayout } from '../graph/forceLayout.ts'
-import { buildGraphModel, filterGraph, matchesGraphQuery, neighbours, nodeRelations, splitLonely } from '../graph/graphModel.ts'
+import { buildGraphModel, colorGraph, filterGraph, matchesGraphQuery, neighbours, nodeRelations, splitLonely } from '../graph/graphModel.ts'
 import { graphSearch, readGraphQuery } from '../graph/graphQuery.ts'
 import { fitCamera, linkDistance, nodeAt, nodeRadius, stepTowards, toScreen, toWorld, zoomAt } from '../graph/graphView.ts'
 
@@ -133,11 +133,11 @@ describe('graph camera', () => {
 
 describe('graph address', () => {
   it('keeps filters, the selected node and the search in the address in a stable order', () => {
-    const query = { hidden: new Set(['missing', 'tag'] as const), node: 'note:n1', q: ' шторм ' }
-    expect(graphSearch(query)).toBe('?hide=tag%2Cmissing&node=note%3An1&q=%D1%88%D1%82%D0%BE%D1%80%D0%BC')
-    expect(readGraphQuery(graphSearch(query))).toEqual({ hidden: new Set(['tag', 'missing']), node: 'note:n1', q: 'шторм' })
-    expect(readGraphQuery('?hide=tag,bogus')).toEqual({ hidden: new Set(['tag']), node: null, q: '' })
-    expect(graphSearch({ hidden: new Set(), node: null, q: '' })).toBe('')
+    const query = { hidden: new Set(['missing', 'tag'] as const), color: 'tag' as const, node: 'note:n1', q: ' шторм ' }
+    expect(graphSearch(query)).toBe('?hide=tag%2Cmissing&color=tag&node=note%3An1&q=%D1%88%D1%82%D0%BE%D1%80%D0%BC')
+    expect(readGraphQuery(graphSearch(query))).toEqual({ hidden: new Set(['tag', 'missing']), color: 'tag', node: 'note:n1', q: 'шторм' })
+    expect(readGraphQuery('?hide=tag,bogus&color=rainbow')).toEqual({ hidden: new Set(['tag']), color: 'none', node: null, q: '' })
+    expect(graphSearch({ hidden: new Set(), color: 'none', node: null, q: '' })).toBe('')
   })
 })
 
@@ -186,5 +186,46 @@ describe('graph map helpers', () => {
     expect(stepTowards(nodes[0], 1, 0, new Set(), nodes)?.id).toBe('near')
     expect(stepTowards(nodes[0], 0, -1, new Set(), nodes)?.id).toBe('above')
     expect(stepTowards(nodes[0], -1, 0, new Set(), nodes)).toBeNull()
+  })
+})
+
+describe('graph colouring', () => {
+  it('colours notes by the book they quote most, and a summary by its book', () => {
+    const model = buildGraphModel({
+      ...response,
+      edges: [...response.edges, { source: 'note:n1', target: 'document:j2', type: 'quotes', weight: 1 }],
+    })
+    const tone = (id: string) => model.nodes.find((node) => node.id === id)?.tone
+    const colors = colorGraph(model, 'book')
+    expect(colors.tones.get('note:n1')).toBe(tone('document:j1'))
+    expect(colors.tones.get('note:s1')).toBe(tone('document:j1'))
+    expect(colors.tones.get('note:n2')).toBe(tone('document:j2'))
+    expect(colors.tones.has('note:n3')).toBe(false)
+    expect(colors.groups.map((group) => [group.label, group.count])).toEqual([['Lighthouse keepers ledger', 2], ['Salt and iron', 1]])
+    expect(colorGraph(model, 'none')).toEqual({ tones: new Map(), groups: [], others: 0 })
+  })
+
+  it('gives the most used tags their own colour and the rest none', () => {
+    const tags = ['a', 'b', 'c', 'd', 'e', 'f', 'g']
+    const model = buildGraphModel({
+      nodes: [
+        ...tags.map((tag) => ({ id: `tag:${tag}`, type: 'tag' as const, label: `#${tag}`, ref: null, deleted: false })),
+        { id: 'note:x', type: 'note', label: 'X', ref: 'x', deleted: false },
+        { id: 'note:y', type: 'note', label: 'Y', ref: 'y', deleted: false },
+      ],
+      edges: [
+        ...tags.map((tag) => ({ source: 'note:x', target: `tag:${tag}`, type: 'tagged' as const, weight: 1 })),
+        { source: 'note:y', target: 'tag:g', type: 'tagged', weight: 1 },
+      ],
+      truncated: false,
+    })
+    const colors = colorGraph(model, 'tag')
+    // «g» встречается дважды — у неё первый цвет; у заметки — цвет самого частого тега.
+    expect(colors.groups.map((group) => [group.label, group.tone, group.count])[0]).toEqual(['#g', 0, 2])
+    expect(colors.groups).toHaveLength(6)
+    expect(colors.others).toBe(1)
+    expect(colors.tones.get('note:x')).toBe(0)
+    expect(colors.tones.get('tag:g')).toBe(0)
+    expect(colors.tones.has('tag:f')).toBe(false)
   })
 })

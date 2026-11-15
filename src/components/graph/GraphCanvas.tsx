@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, type KeyboardEvent } from 'react'
 import { coverInitial } from '../../documents/bookTitle.ts'
 import { ForceLayout } from '../../graph/forceLayout.ts'
-import { matchesGraphQuery, neighbours, type GraphModel, type GraphNode } from '../../graph/graphModel.ts'
+import { GRAPH_GROUP_TONES, matchesGraphQuery, neighbours, type GraphModel, type GraphNode } from '../../graph/graphModel.ts'
 import { fitCamera, linkDistance, nodeAt, nodeRadius, stepTowards, toScreen, toWorld, zoomAt, type Camera } from '../../graph/graphView.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import styles from './GraphCanvas.module.css'
@@ -12,6 +12,8 @@ interface GraphCanvasProps {
   selectedId: string | null
   /** Поиск: совпавшие узлы обведены акцентом. */
   query: string
+  /** Раскраска: тон узла (`--graph-group-N`), у кого он есть. */
+  tones?: ReadonlyMap<string, number>
   /** Растёт, когда камере нужно подлететь к выбранному узлу (выбор в панели, в списке связей). */
   focusNonce: number
   label: string
@@ -35,6 +37,7 @@ interface Palette {
   note: string
   font: string
   covers: string[]
+  groups: string[]
 }
 
 /** Сдвиг больше этого — перетаскивание, а не клик. */
@@ -46,6 +49,7 @@ const SMALL_GRAPH = 30
 /** Шаг точечной сетки в координатах мира. */
 const GRID_STEP = 26
 const KEY_PAN = 60
+const NO_TONES: ReadonlyMap<string, number> = new Map()
 const ZOOM_STEP = 1.3
 
 function readPalette(element: HTMLElement): Palette {
@@ -65,6 +69,7 @@ function readPalette(element: HTMLElement): Palette {
     note: value('--graph-note', '#8fb1c9'),
     font: value('--font-sans', 'system-ui, sans-serif'),
     covers: Array.from({ length: 6 }, (_, index) => value(`--cover-${index}`, '#7a5a2e')),
+    groups: Array.from({ length: GRAPH_GROUP_TONES }, (_, index) => value(`--graph-group-${index}`, '#8fb1c9')),
   }
 }
 
@@ -74,7 +79,7 @@ function readPalette(element: HTMLElement): Palette {
  * выбирает, двойной клик открывает. Рисуется на canvas — тысячи узлов не нагружают
  * DOM; для клавиатуры и скринридера рядом есть обычный список узлов (`GraphPage`).
  */
-export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSelect, onOpen }: GraphCanvasProps) {
+export function GraphCanvas({ model, selectedId, query, tones = NO_TONES, focusNonce, label, onSelect, onOpen }: GraphCanvasProps) {
   const { t } = useTranslation()
   const hintId = useId()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -86,8 +91,8 @@ export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSel
   const hoverRef = useRef<string | null>(null)
   const frameRef = useRef(0)
   // Свежие значения для цикла отрисовки: он живёт дольше одного рендера.
-  const state = useRef({ model, selectedId, query, onSelect, onOpen })
-  useEffect(() => { state.current = { model, selectedId, query, onSelect, onOpen } })
+  const state = useRef({ model, selectedId, query, tones, onSelect, onOpen })
+  useEffect(() => { state.current = { model, selectedId, query, tones, onSelect, onOpen } })
 
   const requestDraw = useRef<() => void>(() => {})
   // Подлёт к узлу, которого ещё нет в раскладке (граф догружается) — выполнится после неё.
@@ -132,7 +137,7 @@ export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSel
     requestDraw.current()
   }, [focusNonce])
 
-  useEffect(() => { requestDraw.current() }, [selectedId, query])
+  useEffect(() => { requestDraw.current() }, [selectedId, query, tones])
 
   // Цикл: пока раскладка не успокоилась или камера летит — шаг и кадр; потом холст спит.
   useEffect(() => {
@@ -179,7 +184,7 @@ export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSel
       const { width, height } = sizeRef.current
       const ratio = window.devicePixelRatio || 1
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
-      const { model: current, selectedId: selected, query: search } = state.current
+      const { model: current, selectedId: selected, query: search, tones: groupTones } = state.current
       const camera = cameraRef.current
       const focus = hoverRef.current ?? selected
       const near = focus ? neighbours(current.links, focus) : null
@@ -294,7 +299,8 @@ export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSel
         } else if (node.kind === 'note') {
           ctx.beginPath()
           ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
-          ctx.fillStyle = isSelected || isFocus ? colors.accent : colors.note
+          const group = groupTones.get(node.id)
+          ctx.fillStyle = isSelected || isFocus ? colors.accent : group !== undefined ? colors.groups[group] : colors.note
           ctx.fill()
           if (isSelected || isMatch) strokeCircle(ctx, p.x, p.y, r + 4, colors.accent)
         } else if (node.kind === 'missing') {
@@ -314,8 +320,9 @@ export function GraphCanvas({ model, selectedId, query, focusNonce, label, onSel
           ctx.fillStyle = colors.surface
           roundRect(ctx, p.x - w / 2, p.y - h / 2, w, h, h / 2)
           ctx.fill()
-          ctx.lineWidth = 1
-          ctx.strokeStyle = ring ?? colors.border
+          const group = groupTones.get(node.id)
+          ctx.lineWidth = group !== undefined ? 2 : 1
+          ctx.strokeStyle = ring ?? (group !== undefined ? colors.groups[group] : colors.border)
           ctx.stroke()
           ctx.fillStyle = colors.muted
           ctx.font = `${Math.max(9, 11 * camera.scale)}px ${colors.font}`

@@ -37,6 +37,7 @@
 }
 
 .filters legend,
+.section h3,
 .books h3 {
   margin: 0 0 6px;
   padding: 0;
@@ -151,4 +152,98 @@
   margin: 0;
   color: var(--color-text-muted);
   font-size: 12px;
+}
+
+.section {
+  display: grid;
+  gap: 8px;
+}
+
+.section h3 {
+  margin: 0;
+}
+
+/* Переключатель раскраски — как «По книгам · Недавние» в панели заметок. */
+.views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.viewButton {
+  padding: 3px 10px;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.viewButton:hover {
+  color: var(--color-text);
+}
+
+.viewButton[aria-pressed='true'] {
+  color: var(--color-text);
+  background: var(--sidebar-active);
+  border-color: var(--sidebar-active);
+}
+
+.swatches,
+.legend {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.swatches li {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  background: var(--group-tone);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 14%);
+}
+
+.swatchLabel {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  color: var(--color-text-soft);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.legend svg {
+  width: 28px;
+  height: 10px;
+  flex: none;
+  fill: var(--color-text-muted);
+  stroke: var(--color-text-muted);
 }

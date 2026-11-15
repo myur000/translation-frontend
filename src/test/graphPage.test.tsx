@@ -170,6 +170,26 @@ describe('graph section', () => {
 })
 
 describe('graph panel next to the rail', () => {
+  it('switches the colouring through the address and explains the lines', async () => {
+    const user = userEvent.setup()
+    renderGraph('/graph', true)
+    const coloring = await screen.findByRole('group', { name: 'Раскраска' })
+    expect(within(coloring).getByRole('button', { name: 'Нет' }).getAttribute('aria-pressed')).toBe('true')
+    await user.click(within(coloring).getByRole('button', { name: 'По тегам' }))
+    expect(address()).toBe('/graph?color=tag')
+    expect(within(screen.getByRole('list', { name: 'Цвета тегов' })).getByText('#сюжет')).toBeTruthy()
+    await user.click(within(coloring).getByRole('button', { name: 'По книгам' }))
+    expect(address()).toBe('/graph?color=book')
+    expect(screen.getByText('Заметка — цвета обложки книги, из которой она цитирует.')).toBeTruthy()
+
+    const legend = screen.getByRole('region', { name: 'Связи' })
+    const lines = () => within(legend).getAllByRole('listitem').map((item) => item.textContent)
+    expect(lines()).toEqual(['Цитата из книги', 'Ссылка [[…]]', 'Конспект книги', 'Тег', 'Заметка, которой ещё нет'])
+    // Спрятанные теги не объясняем.
+    await user.click(screen.getByRole('checkbox', { name: 'Теги' }))
+    expect(lines()).not.toContain('Тег')
+  })
+
   it('drives the map through the address: filters, search and books', async () => {
     const user = userEvent.setup()
     renderGraph('/graph', true)
