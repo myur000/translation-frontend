@@ -1599,21 +1599,46 @@ describe('workspace notes', () => {
   const notesButton = () => within(screen.getByRole('group', { name: 'Вид документа' })).getByRole('button', { name: 'Заметки' })
   const notesColumn = () => screen.queryByRole('complementary', { name: 'Заметки' })
 
-  it('shows notes as one column under the header, toggled by the dock button and N', async () => {
+  const viewMenuButton = () => screen.getByRole('button', { name: /^Вид: / })
+  const chooseLayout = async (user: ReturnType<typeof userEvent.setup>, layout: string) => {
+    await user.click(viewMenuButton())
+    await user.click(screen.getByRole('menuitemradio', { name: new RegExp(`^${layout} `) }))
+  }
+  const resizeHandle = () => screen.queryByRole('separator', { name: 'Изменить ширину панели заметок' })
+  // Упавший перевод: цитат нет, поэтому в одной колонке заметки — колонкой, а не на полях.
+  const failedBook = {
+    '/api/documents/history?page=0&size=100': () => jsonResponse({
+      items: [{ ...historyItems[0], status: 'FAILED', progress: 0, error_code: 'ML_FAILED', error_message: 'Сервис перевода не ответил.' }],
+      page: 0, size: 100, total_elements: 1, total_pages: 1, first: true, last: true,
+    }),
+  }
+
+  it('keeps the notes button in comparison but explains that notes open from the text', async () => {
     const user = userEvent.setup()
     renderWithNotes()
     await findWorkspaceRegion('Оригинал')
+    // Кнопка остаётся на месте, чтобы нижняя панель не сдвигалась при смене вида.
+    expect(notesButton().getAttribute('aria-disabled')).toBe('true')
+    expect(notesButton().getAttribute('title')).toBe('В сравнении заметка открывается щелчком по цитате в тексте или по метке у абзаца')
+    await user.click(notesButton())
+    await user.keyboard('n')
     expect(notesColumn()).toBeNull()
+  })
+
+  it('toggles notes with the dock button and N in a single view and remembers them', async () => {
+    const user = userEvent.setup()
+    renderWithNotes(failedBook)
+    await findWorkspaceRegion('Оригинал')
+    await chooseLayout(user, 'Перевод')
+    expect(notesButton().getAttribute('aria-disabled')).toBeNull()
 
     await user.click(notesButton())
     const column = await screen.findByRole('complementary', { name: 'Заметки' })
     expect(notesButton().getAttribute('aria-pressed')).toBe('true')
     expect(await within(column).findByRole('button', { name: /Шторм/ })).toBeTruthy()
-    // Окна, пилюли и переноса на другую сторону больше нет.
-    expect(screen.queryByRole('dialog', { name: 'Заметки' })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Свернуть заметки|Закрепить колонкой|Перенести панель/ })).toBeNull()
     // Колонка лежит в рабочей области, поэтому шапка документа остаётся над ней на всю ширину.
     expect(column.closest('[style*="--chrome-top"]')).toBeTruthy()
+    expect(resizeHandle()).toBeTruthy()
 
     await user.keyboard('n')
     expect(notesColumn()).toBeNull()
@@ -1626,7 +1651,7 @@ describe('workspace notes', () => {
     // Открытые заметки запоминаются для аккаунта.
     await user.click(notesButton())
     cleanup()
-    renderWithNotes()
+    renderWithNotes(failedBook)
     expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
   })
 
@@ -1647,9 +1672,10 @@ describe('workspace notes', () => {
       [`/api/notes?job_id=${firstJob}&size=50`]: bookNotes,
       ...withBookQuotes,
     })
-    // В сравнении заметки — колонкой: она открывается сразу на заметке из ссылки.
-    const column = await screen.findByRole('complementary', { name: 'Заметки' })
-    expect(await within(column).findByRole('heading', { name: 'Шторм' })).toBeTruthy()
+    // В сравнении заметка открывается карточкой сразу на заметке из ссылки.
+    const card = await screen.findByRole('complementary', { name: 'Заметки' })
+    expect(await within(card).findByRole('heading', { name: 'Шторм' })).toBeTruthy()
+    expect(resizeHandle()).toBeNull()
     await waitFor(() => expect(router.state.location.search).toBe(''))
     expect(router.state.location.pathname).toBe(`/documents/${firstJob}`)
   })
@@ -1663,39 +1689,69 @@ describe('workspace notes', () => {
     expect(await within(await screen.findByRole('complementary', { name: 'Заметки' })).findByRole('heading', { name: 'Шторм' })).toBeTruthy()
   })
 
-  it('keeps the notes column in fullscreen comparison and returns to the book with Esc', async () => {
+  it('opens a note as a card at the marker in comparison and closes it with Esc or a click outside', async () => {
+    const user = userEvent.setup()
+    renderWithNotes(withBookQuotes)
+    await findWorkspaceRegion('Оригинал')
+    const marker = await screen.findByRole('button', { name: 'Метка на полях' })
+
+    await user.click(marker)
+    const card = await screen.findByRole('complementary', { name: 'Заметки' })
+    expect(await within(card).findByRole('heading', { name: 'Шторм' })).toBeTruthy()
+    // Карточка поверх книги: колонки и ручки ширины нет, страницы не сужаются.
+    expect(resizeHandle()).toBeNull()
+    expect(card.closest('[style*="--notes-column"]')).toBeNull()
+
+    // Esc возвращает к чтению и закрывает карточку.
+    within(card).getByRole('button', { name: 'Новая заметка' }).focus()
+    await user.keyboard('{Escape}')
+    expect(notesColumn()).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }))
+
+    // Щелчок мимо карточки тоже закрывает её.
+    await user.click(marker)
+    expect(await screen.findByRole('complementary', { name: 'Заметки' })).toBeTruthy()
+    await user.click(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }))
+    expect(notesColumn()).toBeNull()
+  })
+
+  it('keeps a started note in the card when clicking outside and closes it on cancel', async () => {
     const user = userEvent.setup()
     renderWithNotes()
     await findWorkspaceRegion('Оригинал')
-    await user.click(notesButton())
+    await user.click(within(await openTools(user)).getByRole('menuitem', { name: 'Новая заметка' }))
+    const card = await screen.findByRole('complementary', { name: 'Заметки' })
+    await user.type(await within(card).findByRole('textbox', { name: 'Текст заметки' }), 'Мысль')
+    await user.click(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }))
     expect(notesColumn()).toBeTruthy()
+    // «Отмена» в карточке закрывает её, а не уводит к списку заметок.
+    await user.click(within(notesColumn()!).getByRole('button', { name: 'Отмена' }))
+    expect(notesColumn()).toBeNull()
+  })
 
-    // Сравнение на весь экран: заметки остаются колонкой (на полях двух колонок места нет).
+  it('closes the card in fullscreen comparison with Esc before leaving the fullscreen view', async () => {
+    const user = userEvent.setup()
+    renderWithNotes(withBookQuotes)
+    await findWorkspaceRegion('Оригинал')
     await user.keyboard('f')
     expect(screen.queryByText('Мои книги')).toBeNull()
-    expect(notesColumn()).toBeTruthy()
-    await user.keyboard('n')
-    expect(notesColumn()).toBeNull()
-    await user.keyboard('n')
-    expect(notesColumn()).toBeTruthy()
 
-    // Esc в заметках возвращает фокус в книгу, не закрывая их и не выходя из режима.
-    within(notesColumn()!).getByRole('button', { name: 'Новая заметка' }).focus()
+    await user.click(await screen.findByRole('button', { name: 'Метка на полях' }))
+    const card = await screen.findByRole('complementary', { name: 'Заметки' })
+    within(card).getByRole('button', { name: 'Новая заметка' }).focus()
     await user.keyboard('{Escape}')
-    // В сравнении чтение возвращается в оригинал (как при входе в режим).
-    expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Прокрутка панели «Оригинал»' }))
-    expect(notesColumn()).toBeTruthy()
+    expect(notesColumn()).toBeNull()
     expect(screen.queryByText('Мои книги')).toBeNull()
     // Esc в книге, как и раньше, выходит из полноэкранного режима.
     await user.keyboard('{Escape}')
     expect(screen.getByText('Мои книги')).toBeTruthy()
-    expect(notesColumn()).toBeTruthy()
   })
 
   it('resizes the column from the keyboard and keeps its width', async () => {
     const user = userEvent.setup()
-    renderWithNotes()
+    renderWithNotes(failedBook)
     await findWorkspaceRegion('Оригинал')
+    await chooseLayout(user, 'Перевод')
     await user.click(notesButton())
 
     // Колонка всегда справа: «к книге» — стрелка влево, она расширяет колонку.
@@ -1706,7 +1762,7 @@ describe('workspace notes', () => {
     expect(handle.getAttribute('aria-valuenow')).toBe('372')
 
     cleanup()
-    renderWithNotes()
+    renderWithNotes(failedBook)
     expect((await screen.findByRole('separator', { name: 'Изменить ширину панели заметок' })).getAttribute('aria-valuenow')).toBe('372')
   })
 })

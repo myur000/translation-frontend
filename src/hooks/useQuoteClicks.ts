@@ -1,7 +1,7 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import type { NoteQuoteSide } from '../api/contracts/notes.ts'
 import type { BookQuote } from '../notes/bookQuotes.ts'
-import { notesAtPoint, quoteHits } from '../notes/quoteMarkerLayout.ts'
+import { notesAtPoint, quoteHits, type QuoteHit } from '../notes/quoteMarkerLayout.ts'
 
 interface QuoteClicksOptions {
   viewportRef: RefObject<HTMLElement | null>
@@ -9,8 +9,11 @@ interface QuoteClicksOptions {
   quotes: BookQuote[]
   /** Меняется, когда колонка могла смонтироваться заново (раскладка, полный экран). */
   layoutKey: string
-  /** Клик по цитате: открыть её заметки; `point` — где кликнули (там встаёт меню выбора). */
-  onOpen: (noteIds: string[], point: { x: number; y: number }) => void
+  /**
+   * Клик по цитате: открыть её заметки; `point` — где кликнули (там встаёт меню выбора),
+   * `anchor` — сама цитата под курсором, к ней привязывается карточка заметки.
+   */
+  onOpen: (noteIds: string[], point: { x: number; y: number }, anchor: Range | null) => void
   /** Курсор над цитатами этих заметок (пустой список — ни над одной). */
   onHover: (noteIds: string[]) => void
 }
@@ -35,11 +38,11 @@ export function useQuoteClicks({ viewportRef, column, quotes, layoutKey, onOpen,
     if (!viewport || !quotes.some((quote) => quote.side === column)) return
     let hovered: string[] = []
     let frame = 0
-    const hitsAt = (event: MouseEvent) => {
+    const hitsOf = (event: MouseEvent): QuoteHit[] => {
       const target = event.target
-      if (!(target instanceof Element) || target.closest(NOT_TEXT)) return []
-      return notesAtPoint(quoteHits(viewport, column, quotes), event.clientX, event.clientY)
+      return !(target instanceof Element) || target.closest(NOT_TEXT) ? [] : quoteHits(viewport, column, quotes)
     }
+    const hitsAt = (event: MouseEvent) => notesAtPoint(hitsOf(event), event.clientX, event.clientY)
     const setHovered = (noteIds: string[]) => {
       if (noteIds.join() === hovered.join()) return
       hovered = noteIds
@@ -50,8 +53,11 @@ export function useQuoteClicks({ viewportRef, column, quotes, layoutKey, onOpen,
     const handleClick = (event: MouseEvent) => {
       if (event.button !== 0 || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
       if (!window.getSelection()?.isCollapsed) return
-      const noteIds = hitsAt(event)
-      if (noteIds.length) handlers.current.onOpen(noteIds, { x: event.clientX, y: event.clientY })
+      const hits = hitsOf(event)
+      const noteIds = notesAtPoint(hits, event.clientX, event.clientY)
+      if (!noteIds.length) return
+      const anchor = hits.find((hit) => notesAtPoint([hit], event.clientX, event.clientY).length)?.range ?? null
+      handlers.current.onOpen(noteIds, { x: event.clientX, y: event.clientY }, anchor)
     }
     const handlePointerMove = (event: PointerEvent) => {
       if (event.pointerType === 'touch') return

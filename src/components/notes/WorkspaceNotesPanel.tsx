@@ -59,6 +59,8 @@ interface WorkspaceNotesPanelProps {
   onQuoteFinished: () => void
   onShowQuote: (quote: NoteQuoteResponse) => ShowQuoteResult
   onClose: () => void
+  /** «Отмена» в форме: без него панель возвращается к списку (карточка в сравнении закрывается). */
+  onCancel?: () => void
 }
 
 /** Первый абзац книги, который цитирует заметка; без цитат — `null` («О книге»). */
@@ -77,7 +79,7 @@ function firstParagraphs(quotes: BookQuote[]) {
  * поиск и теги — в разделе «Заметки» (ссылка в заголовке). Просмотр и правка
  * заметки, добавление цитаты из выделения — без ухода со страницы.
  */
-export function WorkspaceNotesPanel({ document, bookQuotes, pendingQuote, pendingQuoteKind = 'note', summaries = NO_SUMMARIES, request = null, onQuoteFinished, onShowQuote, onClose }: WorkspaceNotesPanelProps) {
+export function WorkspaceNotesPanel({ document, bookQuotes, pendingQuote, pendingQuoteKind = 'note', summaries = NO_SUMMARIES, request = null, onQuoteFinished, onShowQuote, onClose, onCancel }: WorkspaceNotesPanelProps) {
   const { t } = useTranslation()
   const { notesChanged } = useNotes()
   const { session } = useAuth()
@@ -133,7 +135,7 @@ export function WorkspaceNotesPanel({ document, bookQuotes, pendingQuote, pendin
             onQuoteFinished()
             openNote(id)
           }}
-          onCancel={onQuoteFinished}
+          onCancel={() => { onQuoteFinished(); onCancel?.() }}
         />
       </div>
     )
@@ -149,7 +151,7 @@ export function WorkspaceNotesPanel({ document, bookQuotes, pendingQuote, pendin
       />
     )
   } else if (view.kind === 'new') {
-    content = <PanelNewNote key={view.summary ? 'summary' : 'new'} summary={view.summary} onCreated={(id) => { changed(); openNote(id) }} onCancel={() => setView({ kind: 'list' })} />
+    content = <PanelNewNote key={view.summary ? 'summary' : 'new'} summary={view.summary} onCreated={(id) => { changed(); openNote(id) }} onCancel={onCancel ?? (() => setView({ kind: 'list' }))} />
   } else {
     const paragraphs = firstParagraphs(bookQuotes)
     // По ходу книги: сначала заметки о книге целиком, затем по первому процитированному абзацу.

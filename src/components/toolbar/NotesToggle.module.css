@@ -13,12 +13,17 @@
   border-radius: 9px;
 }
 
-.button:hover {
+.button:not([aria-disabled='true']):hover {
   color: var(--color-text);
   background: var(--color-surface-subtle);
 }
 
-.button:active {
+.button[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.button:not([aria-disabled='true']):active {
   transform: translateY(1px);
 }
 

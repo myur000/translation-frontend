@@ -13,7 +13,7 @@ interface WorkspaceViewBarProps {
   target: PaneLanguage
   isScrollSyncEnabled: boolean
   onToggleScrollSync: () => void
-  notes: { isOpen: boolean; panelId: string; onToggle: () => void }
+  notes: { isOpen: boolean; panelId: string; onToggle: () => void; disabledHint?: string }
   /** Конспект книги; без него (документ ещё не отправлен) кнопки нет. */
   summary?: { onToggle: () => void }
   onOpenFullscreen: () => void
@@ -36,7 +36,7 @@ export function WorkspaceViewBar(props: WorkspaceViewBarProps) {
         scrollSync={{ isEnabled: props.isScrollSyncEnabled, onToggle: props.onToggleScrollSync }}
       />
       {/* Заметки — тоже «что рядом с книгой», поэтому сразу за раскладкой. */}
-      <NotesToggle isOpen={props.notes.isOpen} panelId={props.notes.panelId} onToggle={props.notes.onToggle} />
+      <NotesToggle isOpen={props.notes.isOpen} panelId={props.notes.panelId} onToggle={props.notes.onToggle} disabledHint={props.notes.disabledHint} />
       {props.summary ? <SummaryToggle onToggle={props.summary.onToggle} /> : null}
       <span className={styles.separator} aria-hidden="true" />
       <WorkspaceViewButton layout={props.layout} onOpen={props.onOpenFullscreen} />

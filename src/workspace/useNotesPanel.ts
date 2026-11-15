@@ -81,12 +81,17 @@ export function useNotesPanel() {
 export type NotesPanelController = ReturnType<typeof useNotesPanel>
 
 /**
- * Как заметки показаны прямо сейчас: колонка справа под шапкой (и в полноэкранном
- * режиме — ради сценария «только перевод и заметки») или, на узком экране, шторка.
+ * Как заметки показаны прямо сейчас: колонка справа под шапкой, на узком экране —
+ * шторка. В сравнении двум страницам и так тесно: заметка открывается карточкой у
+ * слова или метки (`popover`), а не колонкой, и только по щелчку.
  */
-export type NotesPresentation = 'hidden' | 'column' | 'sheet'
+export type NotesPresentation = 'hidden' | 'column' | 'sheet' | 'popover'
 
-export function notesPresentation(settings: Pick<NotesPanelSettings, 'isOpen'>, { isNarrow }: { isNarrow: boolean }): NotesPresentation {
+export function notesPresentation(
+  settings: Pick<NotesPanelSettings, 'isOpen'>,
+  { isNarrow, isCompare = false, isPopoverOpen = false }: { isNarrow: boolean; isCompare?: boolean; isPopoverOpen?: boolean },
+): NotesPresentation {
+  if (isCompare && !isNarrow) return isPopoverOpen ? 'popover' : 'hidden'
   if (!settings.isOpen) return 'hidden'
   return isNarrow ? 'sheet' : 'column'
 }

@@ -24,8 +24,8 @@ function Column({ column, quotes, summaryQuotes, onOpen, onOpenSummary }: {
   column: 'SOURCE' | 'TRANSLATION'
   quotes: BookQuote[]
   summaryQuotes?: BookQuote[]
-  onOpen: (ids: string[]) => void
-  onOpenSummary?: (id: string) => void
+  onOpen: (ids: string[], marker: HTMLElement) => void
+  onOpenSummary?: (id: string, marker: HTMLElement) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   return (
@@ -63,7 +63,8 @@ describe('margin markers', () => {
     expect(screen.getAllByRole('button')).toHaveLength(1)
     expect(marker.textContent).toBe('2')
     await user.click(marker)
-    expect(onOpen).toHaveBeenCalledWith(['n-1', 'n-2'])
+    // Нажатая метка — якорь карточки заметки в сравнении.
+    expect(onOpen).toHaveBeenCalledWith(['n-1', 'n-2'], marker)
   })
 
   it('finds a quote from the other column by its paired paragraph', async () => {
@@ -88,7 +89,7 @@ describe('margin markers', () => {
     expect(summary.style.left).toBe(notes.style.left)
     // Каждая метка открывает своё: кружок — заметки, тетрадь — конспект.
     await user.click(summary)
-    expect(onOpenSummary).toHaveBeenCalledWith('s-1')
+    expect(onOpenSummary).toHaveBeenCalledWith('s-1', expect.any(HTMLElement))
     expect(onOpen).not.toHaveBeenCalled()
   })
 

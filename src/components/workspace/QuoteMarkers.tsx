@@ -20,9 +20,10 @@ interface QuoteMarkersProps {
   summaryTone?: number
   /** Меняется, когда колонка могла смонтироваться заново (раскладка, полный экран). */
   layoutKey: string
-  onOpen: (noteIds: string[]) => void
+  /** `marker` — нажатая метка: у неё встаёт карточка заметки, если заметки не колонкой. */
+  onOpen: (noteIds: string[], marker: HTMLElement) => void
   /** Метка-тетрадь: открыть конспект на этой выписке. */
-  onOpenSummary?: (noteId: string) => void
+  onOpenSummary?: (noteId: string, marker: HTMLElement) => void
 }
 
 const NO_QUOTES: BookQuote[] = []
@@ -118,7 +119,7 @@ export function QuoteMarkers({ viewportRef, column, quotes, summaryQuotes = NO_Q
             title={label}
             // Клик не должен снимать выделение в книге и уводить прокрутку.
             onMouseDown={(event) => event.preventDefault()}
-            onClick={() => onOpen(marker.noteIds)}
+            onClick={(event) => onOpen(marker.noteIds, event.currentTarget)}
           >
             {marker.noteIds.length}
           </button>
@@ -135,7 +136,7 @@ export function QuoteMarkers({ viewportRef, column, quotes, summaryQuotes = NO_Q
             aria-label={label}
             title={label}
             onMouseDown={(event) => event.preventDefault()}
-            onClick={() => onOpenSummary?.(marker.noteIds[0])}
+            onClick={(event) => onOpenSummary?.(marker.noteIds[0], event.currentTarget)}
           >
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3h7v10h-7zM4.5 3v10M6.5 6h3" /></svg>
           </button>

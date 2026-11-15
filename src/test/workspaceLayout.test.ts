@@ -127,4 +127,11 @@ describe('notes presentation', () => {
     expect(notesPresentation({ isOpen: true }, { isNarrow: true })).toBe('sheet')
     expect(notesPresentation({ isOpen: false }, { isNarrow: true })).toBe('hidden')
   })
+
+  it('shows a card at the quote in comparison and ignores the remembered column there', () => {
+    expect(notesPresentation({ isOpen: true }, { isNarrow: false, isCompare: true })).toBe('hidden')
+    expect(notesPresentation({ isOpen: false }, { isNarrow: false, isCompare: true, isPopoverOpen: true })).toBe('popover')
+    // На телефоне колонки друг под другом: там по-прежнему шторка.
+    expect(notesPresentation({ isOpen: true }, { isNarrow: true, isCompare: true })).toBe('sheet')
+  })
 })

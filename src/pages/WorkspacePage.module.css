@@ -95,6 +95,45 @@
   display: none;
 }
 
+/* Сравнение: заметка — карточка у цитаты или метки поверх книги, страницы не сужаются.
+   Без якоря (полноэкранный режим без нижней панели) — в правом верхнем углу. Ниже меню (40). */
+.notesPopover {
+  position: fixed;
+  z-index: 35;
+  top: var(--popover-top, 64px);
+  right: auto;
+  bottom: auto;
+  left: var(--popover-left, calc(100vw - 400px));
+  width: 380px;
+  max-width: calc(100vw - 20px);
+  max-height: var(--popover-max-height, min(560px, calc(100vh - 88px)));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  animation: notes-popover-appear 120ms ease-out;
+}
+
+.notesPopover > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Пока якорь и высота не измерены, карточка не мелькает в углу. */
+.notesPopover[data-placing] {
+  visibility: hidden;
+  animation: none;
+}
+
+@keyframes notes-popover-appear {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
 /* Ручка ширины на шве с книгой: узкая полоса, которая подсвечивается при наведении. */
 .notesResizeHandle {
   position: absolute;
@@ -355,5 +394,9 @@
 @media (prefers-reduced-motion: reduce) {
   .notesResizeHandle::after {
     transition: none;
+  }
+
+  .notesPopover {
+    animation: none;
   }
 }

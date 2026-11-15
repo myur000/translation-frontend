@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useId, useMemo, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useOutletContext } from 'react-router'
 import { ApiClientError } from '../api/client.ts'
 import type { NoteQuoteResponse } from '../api/contracts/notes.ts'
@@ -47,6 +47,7 @@ import { wantsFeedbackPrompt } from '../documents/documentRoutes.ts'
 import { OriginalPanel } from '../components/workspace/OriginalPanel.tsx'
 import { TranslationPanel } from '../components/workspace/TranslationPanel.tsx'
 import { useElementHeight } from '../hooks/useElementHeight.ts'
+import { useAnchoredPosition, type FloatingAnchor } from '../hooks/useAnchoredPosition.ts'
 import { useMediaQuery } from '../hooks/useMediaQuery.ts'
 import { useSynchronizedScroll } from '../hooks/useSynchronizedScroll.ts'
 import { useBookZoom } from '../hooks/useBookZoom.ts'
@@ -186,11 +187,22 @@ function DocumentWorkspace({
   const notesPanel = useNotesPanel()
   const notesPanelId = useId()
   const isNarrowScreen = useMediaQuery(NARROW_SCREEN)
-  const notesView = notesPresentation(notesPanel, { isNarrow: isNarrowScreen })
+  // В сравнении колонка заметок отнимала место у страниц: там заметка открывается
+  // карточкой у цитаты, метки или выделения и закрывается вместе с ней.
+  const isCompareMode = !isNarrowScreen && !isSinglePane(visibleLayout)
+  const [notesPopover, setNotesPopover] = useState<{ anchor: FloatingAnchor | null } | null>(null)
+  if (notesPopover && !isCompareMode) setNotesPopover(null)
+  const notesView = notesPresentation(notesPanel, { isNarrow: isNarrowScreen, isCompare: isCompareMode, isPopoverOpen: notesPopover !== null })
   const isNotesShown = notesView !== 'hidden'
+  const isNotesPopover = notesView === 'popover'
   const [isNotesMounted, setNotesMounted] = useState(notesPanel.isOpen)
-  if (notesPanel.isOpen && !isNotesMounted) setNotesMounted(true)
-  // Кнопка в нижней панели и N: один переключатель.
+  if ((notesPanel.isOpen || isNotesShown) && !isNotesMounted) setNotesMounted(true)
+  const notesDockRef = useRef<HTMLDivElement>(null)
+  const bottomChromeId = useId()
+  const notesPopoverPosition = useAnchoredPosition(isNotesPopover ? notesPopover?.anchor ?? null : null, notesDockRef, {
+    width: NOTES_POPOVER_WIDTH, maxHeight: NOTES_POPOVER_MAX_HEIGHT,
+  })
+  // Кнопка в нижней панели и N: один переключатель (в сравнении его нет).
   const toggleNotes = () => (isNotesShown ? notesPanel.close() : notesPanel.reveal())
   const synchronizedScroll = useSynchronizedScroll(
     isScrollSyncEnabled,
@@ -245,18 +257,22 @@ function DocumentWorkspace({
   const [savedTerm, setSavedTerm] = useState<{ term: string; translation: string } | null>(null)
   const [isRetranslateWithGlossary, setRetranslateWithGlossary] = useState(false)
   const [notesRequest, setNotesRequest] = useState<NotesPanelRequest | null>(null)
-  const revealNotes = () => notesPanel.reveal()
-  const openNotesFromMarker = (noteIds: string[]) => {
-    setNotesRequest((current) => ({ nonce: (current?.nonce ?? 0) + 1, noteIds }))
-    revealNotes()
+  /** Показать заметки; в сравнении — карточкой у `anchor`, без него — над нижней панелью. */
+  const revealNotes = (anchor?: FloatingAnchor | null) => {
+    if (isCompareMode) setNotesPopover({ anchor: anchor ?? window.document.getElementById(bottomChromeId) })
+    else notesPanel.reveal()
   }
-  /** Выписка в конспект: на полях — закладка на этом конспекте, иначе он в колонке. */
-  const openSummaryNote = (noteId: string) => {
+  const openNotesFromMarker = (noteIds: string[], anchor?: FloatingAnchor | null) => {
+    setNotesRequest((current) => ({ nonce: (current?.nonce ?? 0) + 1, noteIds }))
+    revealNotes(anchor)
+  }
+  /** Выписка в конспект: на полях — закладка на этом конспекте, иначе он в заметках. */
+  const openSummaryNote = (noteId: string, anchor?: FloatingAnchor | null) => {
     setNotesRequest((current) => ({ nonce: (current?.nonce ?? 0) + 1, noteIds: [noteId], about: true }))
-    revealNotes()
+    revealNotes(anchor)
   }
   // Слово есть и в заметке, и в конспекте: меню выбора у слова, а не молчаливая догадка.
-  const [quoteChoice, setQuoteChoice] = useState<{ x: number; y: number; choices: QuoteChoice[] } | null>(null)
+  const [quoteChoice, setQuoteChoice] = useState<{ x: number; y: number; choices: QuoteChoice[]; anchor: Range | null } | null>(null)
   // Ссылка постоянная: меню подписывается на клики мимо один раз, а не на каждую перерисовку.
   const closeQuoteChoice = useCallback(() => setQuoteChoice(null), [])
   // Ссылка постоянная: поля зовут её из эффекта, когда закладку с выпиской закрыли.
@@ -265,16 +281,17 @@ function DocumentWorkspace({
     setSummaryQuote(null)
     clearQuoteSelection()
   }, [clearQuoteSelection])
-  const openFromText = (noteIds: string[], point: { x: number; y: number }) => {
+  const openFromText = (noteIds: string[], point: { x: number; y: number }, anchor: Range | null) => {
     const target = textClickTarget(noteIds, summaryIds)
     if (target.kind === 'notes') {
-      openNotesFromMarker(target.noteIds)
+      openNotesFromMarker(target.noteIds, anchor)
     } else if (target.kind === 'summary') {
-      openSummaryNote(target.noteId)
+      openSummaryNote(target.noteId, anchor)
     } else {
       const titles = new Map(bookQuotes.map((quote) => [quote.noteId, quote.noteTitle]))
       setQuoteChoice({
         ...point,
+        anchor,
         choices: [
           ...target.noteIds.map((noteId) => ({ noteId, title: titles.get(noteId) ?? '', kind: 'note' as const })),
           ...target.summaryIds.map((noteId) => ({ noteId, title: titles.get(noteId) ?? '', kind: 'summary' as const })),
@@ -367,6 +384,7 @@ function DocumentWorkspace({
       ? findQuoteElement(own, quote.paragraphIndex, quote.quote, quote.paragraphText)
       : other && quote.pairedText ? findQuoteElement(other, quote.paragraphIndex, quote.pairedText, quote.pairedText) : null
     if (element) revealQuoteElement(element)
+    return element
   }
 
   // Переход «Открыть в книге» со страницы заметки: `?note=` (и `&quote=`). Когда заметки
@@ -381,10 +399,14 @@ function DocumentWorkspace({
     const quote = bookNotes.quotes.find((item) => item.id === linkedQuoteId)
       ?? bookNotes.quotes.find((item) => item.noteId === linkedNoteId)
     setNotesRequest((current) => ({ nonce: (current?.nonce ?? 0) + 1, noteIds: [linkedNoteId], about: isAbout && !quote }))
-    notesPanel.reveal()
+    revealNotes()
     void navigate({ pathname: location.pathname, search: '' }, { replace: true })
     // Книга ещё раскладывается после открытия заметок: прокрутка — в следующем кадре.
-    if (quote) window.requestAnimationFrame(() => revealBookQuote(quote))
+    // Карточка в сравнении переезжает к найденной цитате.
+    if (quote) window.requestAnimationFrame(() => {
+      const element = revealBookQuote(quote)
+      if (element) setNotesPopover((current) => (current ? { anchor: element } : current))
+    })
     // Срабатывает один раз на переход: параметры сразу убираются из адреса.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkedNoteId, linkedQuoteId, bookNotes.isLoaded])
@@ -453,6 +475,7 @@ function DocumentWorkspace({
 
   // Обработчик горячих клавиш видит текущее состояние заметок, не переподписываясь на каждый рендер.
   const handleNotesShortcut = useEffectEvent((event: KeyboardEvent) => {
+    if (isCompareMode) return
     event.preventDefault()
     toggleNotes()
   })
@@ -677,12 +700,30 @@ function DocumentWorkspace({
     // Esc уже обработан внутри (закрыт редактор без правок) — фокус не трогаем.
     if (event.defaultPrevented) return
     event.preventDefault()
+    // Карточку в сравнении Esc закрывает: она лежит поверх текста.
+    if (isNotesPopover) closeNotes()
     readingViewport(visibleLayout, synchronizedScroll.originalRef, synchronizedScroll.translationRef)?.focus({ preventScroll: true })
   }
-  const closeNotes = () => {
-    notesPanel.close()
+  function closeNotes() {
+    if (isNotesPopover) setNotesPopover(null)
+    else notesPanel.close()
     setPendingQuote(null)
   }
+  // Карточка закрывается щелчком мимо, но не посреди начатого текста: форму закрывают
+  // её кнопкой или Esc. Щелчок по другой цитате или метке открывает свою заметку.
+  useEffect(() => {
+    if (!isNotesPopover) return
+    const handlePointerDown = (event: PointerEvent) => {
+      const dock = notesDockRef.current
+      const target = event.target
+      if (!dock || !(target instanceof Element) || dock.contains(target) || target.closest(KEEPS_NOTES_POPOVER)) return
+      if (dock.querySelector('textarea')) return
+      setNotesPopover(null)
+      setPendingQuote(null)
+    }
+    window.addEventListener('pointerdown', handlePointerDown, true)
+    return () => window.removeEventListener('pointerdown', handlePointerDown, true)
+  }, [isNotesPopover])
 
   /** «Развернуть панель» — эта колонка на весь экран; повторное нажатие возвращает раскладку. */
   const handlePanelExpandToggle = (pane: ReadingPane) => {
@@ -821,7 +862,7 @@ function DocumentWorkspace({
         </div>
 
         {!isImmersiveMode ? (
-          <div ref={bottomChromeRef} className={styles.bottomChrome}>
+          <div ref={bottomChromeRef} id={bottomChromeId} className={styles.bottomChrome}>
             <WorkspaceDock
               document={document}
               sourceLanguage={sourceLanguage}
@@ -847,7 +888,10 @@ function DocumentWorkspace({
                   target={{ code: shortLanguageCode(targetLanguage), label: getLanguageLabel(targetLanguage) }}
                   isScrollSyncEnabled={isScrollSyncEnabled}
                   onToggleScrollSync={handleToggleScrollSync}
-                  notes={{ isOpen: isNotesShown, panelId: notesPanelId, onToggle: toggleNotes }}
+                  notes={{
+                    isOpen: isNotesShown, panelId: notesPanelId, onToggle: toggleNotes,
+                    disabledHint: isCompareMode ? t('toolbar.notesCompareHint') : undefined,
+                  }}
                   summary={document.jobId ? { onToggle: () => openSummary('toggle') } : undefined}
                   onOpenFullscreen={() => onFullscreenLayoutChange(layout)}
                 />
@@ -894,8 +938,8 @@ function DocumentWorkspace({
             summaryTone={bookTone}
             onPick={(choice) => {
               setQuoteChoice(null)
-              if (choice.kind === 'summary') openSummaryNote(choice.noteId)
-              else openNotesFromMarker([choice.noteId])
+              if (choice.kind === 'summary') openSummaryNote(choice.noteId, quoteChoice.anchor)
+              else openNotesFromMarker([choice.noteId], quoteChoice.anchor)
             }}
             onClose={closeQuoteChoice}
           />
@@ -905,7 +949,7 @@ function DocumentWorkspace({
           <QuoteSelectionButton
             selection={quoteSelection.selection}
             onQuote={() => {
-              const { rect, ...selection } = quoteSelection.selection!
+              const { rect, range, ...selection } = quoteSelection.selection!
               // На полях черновик встаёт у выделения, в колонке — открывается в ней.
               const viewport = marginViewportRef.current
               if (isMarginAvailable && viewport) {
@@ -914,10 +958,10 @@ function DocumentWorkspace({
                 setPendingQuoteKind('note')
                 setPendingQuote(selection)
               }
-              revealNotes()
+              revealNotes(range)
             }}
             onSummary={document.jobId ? () => {
-              const { rect: _rect, ...selection } = quoteSelection.selection!
+              const { rect: _rect, range, ...selection } = quoteSelection.selection!
               // На полях выписка пишется в закладке конспекта, в колонке — в ней.
               if (isMarginAvailable) {
                 setSummaryQuote((current) => ({ nonce: nextNonce(current), selection }))
@@ -925,7 +969,7 @@ function DocumentWorkspace({
                 setPendingQuoteKind('summary')
                 setPendingQuote(selection)
               }
-              revealNotes()
+              revealNotes(range)
             } : undefined}
             // Предложение или абзац — уже не термин: круга глоссария над ним нет.
             onGlossary={document.jobId && canBeTerm(quoteSelection.selection.text) ? () => setTermDraft(quoteSelection.selection) : undefined}
@@ -966,10 +1010,17 @@ function DocumentWorkspace({
           // Колонка лежит в рабочей области под шапкой: шапка остаётся на всю ширину,
           // а книга и нижняя панель сужаются на ширину колонки.
           <div
+            ref={notesDockRef}
             id={notesPanelId}
-            className={styles.notesDock}
+            className={`${styles.notesDock} ${isNotesPopover ? styles.notesPopover : ''}`}
             hidden={!isNotesShown || isMarginMode}
             onKeyDown={handleNotesKeyDown}
+            style={isNotesPopover && notesPopoverPosition ? {
+              '--popover-top': `${notesPopoverPosition.top}px`,
+              '--popover-left': `${notesPopoverPosition.left}px`,
+              '--popover-max-height': `${notesPopoverPosition.maxHeight}px`,
+            } as CSSProperties : undefined}
+            data-placing={isNotesPopover && notesPopover?.anchor && !notesPopoverPosition?.isReady ? '' : undefined}
           >
             {notesView === 'column' ? (
               <div
@@ -1002,6 +1053,7 @@ function DocumentWorkspace({
                 onQuoteFinished={() => { setPendingQuote(null); quoteSelection.clear() }}
                 onShowQuote={showQuote}
                 onClose={closeNotes}
+                onCancel={isNotesPopover ? closeNotes : undefined}
               />
             </Suspense>
           </div>
@@ -1010,6 +1062,12 @@ function DocumentWorkspace({
     </div>
   )
 }
+
+const NOTES_POPOVER_WIDTH = 380
+const NOTES_POPOVER_MAX_HEIGHT = 560
+// Щелчки, после которых карточка заметок остаётся: по ней самой открываются меню и
+// диалоги, по цитате (курсор над ней) и метке — другая заметка.
+const KEEPS_NOTES_POPOVER = '[data-quote-markers], [data-over-quote], [role="menu"], [role="dialog"], [role="alertdialog"], dialog'
 
 /** Цитаты есть только у готового перевода; один и тот же пустой список не сбрасывает мемоизацию. */
 const NO_BOOK_QUOTES: BookQuote[] = []
