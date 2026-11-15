@@ -45,7 +45,11 @@ export const API_ENDPOINTS = {
     document: (noteId: string, jobId: string) =>
       `/notes/${encodeURIComponent(noteId)}/documents/${encodeURIComponent(jobId)}`,
   },
-  terms: '/terms',
+  terms: {
+    list: '/terms',
+    term: (termId: string) => `/terms/${encodeURIComponent(termId)}`,
+    documents: (termId: string) => `/terms/${encodeURIComponent(termId)}/documents`,
+  },
   profile: {
     details: '/profile',
     avatar: '/profile/avatar',

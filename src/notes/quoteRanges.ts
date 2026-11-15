@@ -22,7 +22,7 @@ const SPACES = /[\s\u00a0\u2007\u202f]/
  * символа — текстовый узел и смещение в нём. По этой карте найденная в чистом
  * тексте цитата превращается в Range прямо по DOM книги.
  */
-function indexText(element: HTMLElement) {
+export function indexText(element: HTMLElement) {
   let text = ''
   const points: { node: Text; offset: number }[] = []
   const walker = element.ownerDocument.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
@@ -109,7 +109,8 @@ export function supportsQuoteHighlight() {
 /** Диапазоны каждой колонки по слоям: обе колонки пишут в одну подсветку и не стирают чужие. */
 const rangesByLayer = new Map<string, Map<object, Range[]>>()
 
-function setLayerRanges(name: string, owner: object, ranges: Range[]) {
+/** Диапазоны слоя `::highlight(name)` от одного владельца (колонки); пустой список убирает их. */
+export function setLayerRanges(name: string, owner: object, ranges: Range[]) {
   if (!supportsQuoteHighlight()) return
   const byOwner = rangesByLayer.get(name) ?? new Map<object, Range[]>()
   rangesByLayer.set(name, byOwner)

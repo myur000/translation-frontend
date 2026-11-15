@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import { usePreferences } from '../../preferences/usePreferences.ts'
 import { LAYOUT_PRESET_ORDER, type LayoutPreset } from '../../workspace/workspaceLayout.ts'
+import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 import styles from './LayoutSwitcher.module.css'
 
 /** Язык колонки: код — в имени для диктора («Перевод RU»), полное название — в подписи меню. */
@@ -36,7 +37,7 @@ export function LayoutSwitcher({ value, onChange, source, target, scrollSync }: 
   const [menuStyle, setMenuStyle] = useState<CSSProperties | null>(null)
   const isOpen = menuStyle !== null
   // Подсветка цитат — настройка чтения, а не раскладки документа: хранится в настройках интерфейса.
-  const { isQuoteHighlightEnabled, setQuoteHighlightEnabled } = usePreferences()
+  const { isQuoteHighlightEnabled, setQuoteHighlightEnabled, isTermHighlightEnabled, setTermHighlightEnabled } = usePreferences()
 
   const options: Record<LayoutPreset, { name: string; label: string; hint: string; languages: string; icon: ReactElement }> = {
     translation: {
@@ -222,6 +223,28 @@ export function LayoutSwitcher({ value, onChange, source, target, scrollSync }: 
               <span className={styles.itemHint}>{t('layout.quoteHighlightHint')}</span>
             </span>
             <svg className={styles.check} viewBox="0 0 16 16" aria-hidden="true" data-checked={isQuoteHighlightEnabled || undefined}>
+              <path d="m3.5 8.5 3 3 6-7" />
+            </svg>
+          </button>
+          <button
+            ref={(element) => { itemRefs.current[LAYOUT_PRESET_ORDER.length + 2] = element }}
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={isTermHighlightEnabled}
+            aria-label={t('layout.termHighlight')}
+            aria-description={t('layout.termHighlightHint')}
+            className={styles.item}
+            onClick={() => {
+              close()
+              setTermHighlightEnabled(!isTermHighlightEnabled)
+            }}
+          >
+            <span className={styles.itemIcon} aria-hidden="true"><GlyphIcon name="glossary" className={styles.icon} /></span>
+            <span className={styles.itemText} aria-hidden="true">
+              <span className={styles.itemName}>{t('layout.termHighlight')}</span>
+              <span className={styles.itemHint}>{t('layout.termHighlightHint')}</span>
+            </span>
+            <svg className={styles.check} viewBox="0 0 16 16" aria-hidden="true" data-checked={isTermHighlightEnabled || undefined}>
               <path d="m3.5 8.5 3 3 6-7" />
             </svg>
           </button>

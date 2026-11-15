@@ -66,7 +66,10 @@ Frontend обновляет JWT за минуту до истечения и п�
 | POST | `/api/documents/{jobId}/cancel` | JWT | — | `200 DocumentStatusResponse` (`CANCELED`, `quota_refund`) |
 | GET | `/api/documents/events` | JWT | — | `text/event-stream` |
 | GET / PUT | `/api/documents/{jobId}/feedback` | JWT | `DocumentFeedbackRequest` | `200 DocumentFeedbackResponse` |
-| GET | `/api/terms?source_lang=&target_lang=&size=1` | JWT | — | `200 TermListResponse` (frontend читает `total_elements`) |
+| GET | `/api/terms?source_lang=&target_lang=&page=&size=` | JWT | `size` до 100 | `200 TermListResponse` (счётчик для галочки «Глоссарий» — `size=1` и `total_elements`; термины пары в книге — постранично по 100) |
+| POST | `/api/terms` | JWT | `TermCreateRequest` (`term`, `translation`, `job_id` — пара из книги) | `201 TermResponse`; `409 NOTE_CONFLICT` — такой термин в паре есть или предел 5000 |
+| PUT | `/api/terms/{termId}` | JWT | `TermUpdateRequest` (`term`, `translation`) | `200 TermResponse`; `409` — написание занято другим термином |
+| POST | `/api/terms/{termId}/documents` | JWT | `{ job_id }` | `200 TermResponse`; повторная привязка ничего не меняет |
 | GET | `/api/documents/{jobId}/status` | JWT | — | `200 DocumentStatusResponse` |
 | GET | `/api/documents/{jobId}/download` | JWT | — | file stream |
 | GET | `/api/documents/{jobId}/text?page=0&size=500` | JWT | query, `size` до 500 | `200 DocumentTextResponse` |

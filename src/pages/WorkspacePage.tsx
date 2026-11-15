@@ -10,6 +10,11 @@ import { NOTE_PARAM, QUOTE_PARAM, SUMMARY_PARAM } from '../notes/noteBooks.ts'
 import { bookTitle, coverTone } from '../documents/bookTitle.ts'
 import { nextSummaryTitle, textClickTarget } from '../notes/bookSummaries.ts'
 import { QuoteMarkers } from '../components/workspace/QuoteMarkers.tsx'
+import { GlossaryNotice } from '../components/workspace/GlossaryNotice.tsx'
+import { TermComposer } from '../components/workspace/TermComposer.tsx'
+import { TermHighlights } from '../components/workspace/TermHighlights.tsx'
+import { useGlossaryTerms } from '../glossary/useGlossaryTerms.ts'
+import type { ActiveQuoteSelection } from '../hooks/useQuoteSelection.ts'
 import { useBookNotes } from '../notes/useBookQuotes.ts'
 import type { BookQuote } from '../notes/bookQuotes.ts'
 import { useNotes } from '../notes/useNotes.ts'
@@ -228,6 +233,14 @@ function DocumentWorkspace({
   const noteQuotes = useMemo(() => bookQuotes.filter((quote) => !summaryIds.has(quote.noteId)), [bookQuotes, summaryIds])
   const summaryQuotes = useMemo(() => bookQuotes.filter((quote) => summaryIds.has(quote.noteId)), [bookQuotes, summaryIds])
   const bookTone = coverTone(document.name)
+  // Глоссарий пары языков книги: термины подчёркнуты в тексте, новые — из выделения.
+  const glossary = useGlossaryTerms(
+    document.jobId ? toCatalogLanguageCode(document.sourceLanguage) : null,
+    document.jobId ? toCatalogLanguageCode(document.targetLanguage) : null,
+  )
+  const [termDraft, setTermDraft] = useState<ActiveQuoteSelection | null>(null)
+  const [savedTerm, setSavedTerm] = useState<{ term: string; translation: string } | null>(null)
+  const [isRetranslateWithGlossary, setRetranslateWithGlossary] = useState(false)
   const [notesRequest, setNotesRequest] = useState<NotesPanelRequest | null>(null)
   const revealNotes = () => notesPanel.reveal()
   const openNotesFromMarker = (noteIds: string[]) => {
@@ -745,6 +758,12 @@ function DocumentWorkspace({
               summaryQuotes={summaryQuotes} summaryTone={bookTone}
               layoutKey={markersLayoutKey} onOpen={openNotesFromMarker} onOpenSummary={openSummaryNote} />
           ) : null}
+          {canQuote && showsPane(visibleLayout, 'original') ? (
+            <TermHighlights viewportRef={synchronizedScroll.originalRef} column="SOURCE" terms={glossary.terms} layoutKey={markersLayoutKey} />
+          ) : null}
+          {canQuote && showsPane(visibleLayout, 'translation') ? (
+            <TermHighlights viewportRef={synchronizedScroll.translationRef} column="TRANSLATION" terms={glossary.terms} layoutKey={markersLayoutKey} />
+          ) : null}
           {isMarginMode && document.jobId ? (
             <Suspense fallback={null}>
               <MarginNotes
@@ -808,7 +827,11 @@ function DocumentWorkspace({
           <RetranslateDialog
             document={document}
             onSubmit={(request) => onRetranslate(document.id, request)}
-            onClose={() => setDialog(null)}
+            onClose={() => {
+              setDialog(null)
+              setRetranslateWithGlossary(false)
+            }}
+            withGlossary={isRetranslateWithGlossary}
           />
         ) : null}
         {dialog === 'delete' ? (
@@ -845,7 +868,7 @@ function DocumentWorkspace({
           />
         ) : null}
         {/* Пока цитата оформляется в панели, кнопка над старым выделением только мешает. */}
-        {quoteSelection.selection && !pendingQuote && !marginDraft && !summaryQuote ? (
+        {quoteSelection.selection && !pendingQuote && !marginDraft && !summaryQuote && !termDraft ? (
           <QuoteSelectionButton
             selection={quoteSelection.selection}
             onQuote={() => {
@@ -871,6 +894,36 @@ function DocumentWorkspace({
               }
               revealNotes()
             } : undefined}
+            onGlossary={document.jobId ? () => setTermDraft(quoteSelection.selection) : undefined}
+          />
+        ) : null}
+        {termDraft && document.jobId ? (
+          <TermComposer
+            jobId={document.jobId}
+            selection={termDraft}
+            liveSelection={quoteSelection.selection}
+            canPickPaired={showsPane(visibleLayout, 'original') && showsPane(visibleLayout, 'translation')}
+            terms={glossary.terms}
+            pair={`${shortLanguageCode(toCatalogLanguageCode(document.sourceLanguage))} → ${shortLanguageCode(toCatalogLanguageCode(document.targetLanguage))}`}
+            onSaved={(term) => {
+              glossary.upsert(term)
+              setTermDraft(null)
+              quoteSelection.clear()
+              setSavedTerm({ term: term.term, translation: term.translation })
+            }}
+            onClose={() => setTermDraft(null)}
+          />
+        ) : null}
+        {savedTerm && !feedbackPrompt && !isImmersiveMode ? (
+          <GlossaryNotice
+            term={savedTerm.term}
+            translation={savedTerm.translation}
+            onRetranslate={() => {
+              setSavedTerm(null)
+              setRetranslateWithGlossary(true)
+              setDialog('retranslate')
+            }}
+            onClose={() => setSavedTerm(null)}
           />
         ) : null}
         {isNotesMounted ? (

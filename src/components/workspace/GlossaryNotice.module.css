@@ -1,0 +1,84 @@
+/* Там же, где просьба оценить перевод: над нижней панелью справа. */
+.card {
+  position: absolute;
+  z-index: 20;
+  right: 20px;
+  bottom: calc(var(--chrome-bottom, 0px) + 16px);
+  width: min(340px, calc(100% - 40px));
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 12px;
+  padding: 14px 16px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  animation: notice-in 200ms ease-out;
+}
+
+.icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--color-glossary);
+  background: color-mix(in srgb, var(--glossary-term-line) 14%, transparent);
+  border-radius: 50%;
+  font-size: 16px;
+}
+
+.text {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+.text span {
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.actions {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.primary {
+  padding: 5px 12px;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.quiet {
+  padding: 5px 8px;
+  color: var(--color-text-muted);
+  background: none;
+  border: 0;
+  font-size: 13px;
+}
+
+.quiet:hover {
+  color: var(--color-text);
+}
+
+@keyframes notice-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+}

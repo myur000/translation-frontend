@@ -1,0 +1,29 @@
+/* Подсказка у термина: тёмная плашка, как всплывающие подсказки браузера, только своя. */
+.tip {
+  position: fixed;
+  z-index: 45;
+  max-width: 312px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+  padding: 6px 10px;
+  color: var(--color-bg);
+  background: var(--color-text);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-popover);
+  font-size: 12.5px;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+.term {
+  font-family: var(--font-serif);
+  font-weight: 600;
+}
+
+.label {
+  margin-left: 2px;
+  opacity: 0.7;
+  font-size: 11.5px;
+}

@@ -141,6 +141,12 @@
   --cover-4: #7a3f3f;
   --cover-5: #3d4f7a;
 
+  /* Термины глоссария в тексте книги. Страница книги белая в обеих темах, поэтому
+     цвет один; в интерфейсе вокруг (кнопки, карточка) — --color-glossary. */
+  --glossary-term-line: #2f7d8c;
+  --glossary-term-soft: rgb(47 125 140 / 14%);
+  --color-glossary: #1d5f6b;
+
   /* Холст графа: фон, точки сетки, связи и заметки. */
   --graph-bg: #f7f9fc;
   --graph-dot: rgb(74 111 140 / 16%);
@@ -218,6 +224,8 @@
   --sidebar-hover: #0f1d2f;
   --sidebar-active: #1a3048;
   --sidebar-border: rgb(143 177 201 / 12%);
+
+  --color-glossary: #9fd9e2;
 
   --graph-bg: #0c1727;
   --graph-dot: rgb(143 177 201 / 12%);

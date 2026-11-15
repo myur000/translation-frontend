@@ -10,10 +10,13 @@ export interface PreferencesContextValue {
   isScrollSyncEnabled: boolean
   /** Тихая подсветка цитат из заметок в тексте книги; по умолчанию включена. */
   isQuoteHighlightEnabled: boolean
+  /** Термины глоссария подчёркнуты в тексте книги; по умолчанию включено. */
+  isTermHighlightEnabled: boolean
   setTheme: (theme: ThemePreference) => void
   setLanguage: (language: InterfaceLanguage) => void
   setScrollSyncEnabled: (isEnabled: boolean) => void
   setQuoteHighlightEnabled: (isEnabled: boolean) => void
+  setTermHighlightEnabled: (isEnabled: boolean) => void
 }
 
 export const PreferencesContext =

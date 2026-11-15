@@ -1,5 +1,5 @@
 import { apiClient, type AuthenticatedApiCallOptions } from './client.ts'
-import type { TermListQuery, TermListResponse } from './contracts/terms.ts'
+import type { TermCreateRequest, TermListQuery, TermListResponse, TermResponse, TermUpdateRequest } from './contracts/terms.ts'
 import { API_ENDPOINTS } from './endpoints.ts'
 
 export function getTerms(query: TermListQuery, options: AuthenticatedApiCallOptions) {
@@ -10,7 +10,40 @@ export function getTerms(query: TermListQuery, options: AuthenticatedApiCallOpti
   const search = params.toString()
 
   return apiClient.request<TermListResponse>(
-    search ? `${API_ENDPOINTS.terms}?${search}` : API_ENDPOINTS.terms,
+    search ? `${API_ENDPOINTS.terms.list}?${search}` : API_ENDPOINTS.terms.list,
     { method: 'GET', accessToken: options.accessToken, signal: options.signal },
   )
+}
+
+/** `409` — такой термин в паре уже есть или достигнут предел терминов. */
+export function createTerm(request: TermCreateRequest, options: AuthenticatedApiCallOptions) {
+  return apiClient.request<TermResponse>(API_ENDPOINTS.terms.list, {
+    method: 'POST',
+    accessToken: options.accessToken,
+    json: request,
+    signal: options.signal,
+    notifyAccessErrors: false,
+  })
+}
+
+/** `409` — новое написание совпало с другим термином пары. */
+export function updateTerm(termId: string, request: TermUpdateRequest, options: AuthenticatedApiCallOptions) {
+  return apiClient.request<TermResponse>(API_ENDPOINTS.terms.term(termId), {
+    method: 'PUT',
+    accessToken: options.accessToken,
+    json: request,
+    signal: options.signal,
+    notifyAccessErrors: false,
+  })
+}
+
+/** Привязать термин к книге той же пары языков; повторная привязка ничего не меняет. */
+export function linkTermDocument(termId: string, jobId: string, options: AuthenticatedApiCallOptions) {
+  return apiClient.request<TermResponse>(API_ENDPOINTS.terms.documents(termId), {
+    method: 'POST',
+    accessToken: options.accessToken,
+    json: { job_id: jobId },
+    signal: options.signal,
+    notifyAccessErrors: false,
+  })
 }

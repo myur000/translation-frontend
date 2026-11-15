@@ -1,0 +1,193 @@
+/* Карточка «В глоссарий» у выделения: поля и кнопки — как у быстрой записи заметки. */
+.card {
+  position: fixed;
+  top: var(--composer-top);
+  left: var(--composer-left);
+  z-index: 41;
+  width: 340px;
+  max-width: calc(100vw - 20px);
+  box-sizing: border-box;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  animation: appear 120ms ease-out;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-glossary);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  margin: -6px -6px -6px 0;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+}
+
+.close svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.close:hover {
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  color: var(--color-text-soft);
+  font-size: 12px;
+}
+
+.field input {
+  width: 100%;
+  min-height: 34px;
+  box-sizing: border-box;
+  padding: 5px 9px;
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 14px;
+}
+
+.field .termInput {
+  font-family: var(--font-serif);
+  font-size: 15px;
+}
+
+.field input:focus-visible {
+  outline: none;
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+.hint,
+.exists,
+.error,
+.footnote {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.hint {
+  color: var(--color-text-muted);
+}
+
+.exists {
+  padding: 6px 9px;
+  color: var(--color-warning-text);
+  background: var(--color-warning-surface);
+  border-radius: var(--radius-sm);
+}
+
+.error {
+  color: var(--color-danger-text);
+}
+
+.footnote {
+  color: var(--color-text-soft);
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save {
+  min-height: 30px;
+  padding: 4px 14px;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.save:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.save:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.kbd {
+  padding: 0 5px;
+  color: var(--color-text-soft);
+  border: 1px solid var(--color-border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.cancel {
+  margin-left: auto;
+  padding: 4px 6px;
+  color: var(--color-text-muted);
+  background: none;
+  border: 0;
+  font-size: 13px;
+}
+
+.cancel:hover {
+  color: var(--color-text);
+}
+
+@keyframes appear {
+  from { opacity: 0; transform: translateY(4px); }
+}
+
+@media (max-width: 640px) {
+  .card {
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+}

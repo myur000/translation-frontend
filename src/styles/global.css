@@ -63,6 +63,21 @@ a {
 /* Выписки в конспект — подчёркивание цветом обложки книги, без фона: фон — знак
    заметки, и слово, которое есть и в заметке, и в конспекте, несёт оба знака.
    Цвет ставит слой меток (--summary-quote-color на корне документа). */
+/* Термины глоссария — пунктир бирюзового цвета: не фон (знак заметки) и не сплошная
+   линия цвета обложки (знак конспекта). Под курсором — сплошная линия и лёгкий фон. */
+::highlight(glossary-term) {
+  text-decoration: underline dotted 2px var(--glossary-term-line);
+  text-underline-offset: 4px;
+  text-decoration-skip-ink: none;
+}
+
+::highlight(glossary-term-active) {
+  background-color: var(--glossary-term-soft);
+  text-decoration: underline 2px var(--glossary-term-line);
+  text-underline-offset: 4px;
+  text-decoration-skip-ink: none;
+}
+
 ::highlight(summary-quote) {
   text-decoration: underline 2px var(--summary-quote-color, #7a5a2e);
   text-underline-offset: 4px;

@@ -25,8 +25,22 @@ describe('buttons over a selection in the book', () => {
     expect(onQuote).toHaveBeenCalledOnce()
   })
 
+  it('puts «To glossary» into a separate round button next to the pill', async () => {
+    const user = userEvent.setup()
+    const onGlossary = vi.fn()
+    render(<PreferencesProvider><QuoteSelectionButton selection={selection} onQuote={vi.fn()} onSummary={vi.fn()} onGlossary={onGlossary} /></PreferencesProvider>)
+    const glossary = screen.getByRole('button', { name: 'В глоссарий' })
+    // Без подписи: знак «文A», название — для скринридера и во всплывающей подсказке.
+    expect(glossary.textContent).toBe('')
+    expect(glossary.getAttribute('title')).toBe('В глоссарий')
+    expect(glossary.parentElement).toBe(screen.getByRole('group', { name: 'Что сделать с выделением' }))
+    await user.click(glossary)
+    expect(onGlossary).toHaveBeenCalledOnce()
+  })
+
   it('shows only «To note» for a book that cannot have a summary yet', () => {
     render(<PreferencesProvider><QuoteSelectionButton selection={selection} onQuote={vi.fn()} /></PreferencesProvider>)
     expect(screen.queryByRole('button', { name: 'В конспект' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'В глоссарий' })).toBeNull()
   })
 })

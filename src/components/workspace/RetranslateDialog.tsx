@@ -22,6 +22,8 @@ interface RetranslateDialogProps {
   document: DocumentItem
   onSubmit: (request: RetranslateSubmit) => Promise<unknown>
   onClose: () => void
+  /** Открыт после нового термина: тот же язык перевода, глоссарий отмечен. */
+  withGlossary?: boolean
 }
 
 type T = ReturnType<typeof useTranslation>['t']
@@ -43,15 +45,16 @@ function suggestTarget(source: string, current: string) {
   return POPULAR_LANGUAGES.find((code) => code !== source && code !== current) ?? current
 }
 
-export function RetranslateDialog({ document, onSubmit, onClose }: RetranslateDialogProps) {
+export function RetranslateDialog({ document, onSubmit, onClose, withGlossary = false }: RetranslateDialogProps) {
   const { t } = useTranslation()
   const { getLabel } = useLanguageCatalog()
   const id = useId()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const sourceLanguage = toCatalogLanguageCode(document.sourceLanguage)
-  const [targetLanguage, setTargetLanguage] = useState(() =>
-    suggestTarget(sourceLanguage, toCatalogLanguageCode(document.targetLanguage)))
-  const [useGlossary, setUseGlossary] = useState(false)
+  const [targetLanguage, setTargetLanguage] = useState(() => (withGlossary
+    ? toCatalogLanguageCode(document.targetLanguage)
+    : suggestTarget(sourceLanguage, toCatalogLanguageCode(document.targetLanguage))))
+  const [useGlossary, setUseGlossary] = useState(withGlossary)
   const [isBusy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Один ключ на каждый отличающийся запрос: повтор того же запроса после потерянного

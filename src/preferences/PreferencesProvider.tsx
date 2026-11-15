@@ -17,6 +17,7 @@ interface StoredPreferences {
   language: InterfaceLanguage
   isScrollSyncEnabled: boolean
   isQuoteHighlightEnabled: boolean
+  isTermHighlightEnabled: boolean
 }
 
 const DEFAULT_PREFERENCES: StoredPreferences = {
@@ -26,6 +27,7 @@ const DEFAULT_PREFERENCES: StoredPreferences = {
   isScrollSyncEnabled: true,
   // Цитаты видны в тексте сразу; кто читает «начисто», выключает в меню «Вид».
   isQuoteHighlightEnabled: true,
+  isTermHighlightEnabled: true,
 }
 
 function readPreferences(): StoredPreferences {
@@ -43,6 +45,7 @@ function readPreferences(): StoredPreferences {
       // Сохранённые до появления настройки значения её не содержат — тогда включена.
       isScrollSyncEnabled: preferences.isScrollSyncEnabled !== false,
       isQuoteHighlightEnabled: preferences.isQuoteHighlightEnabled !== false,
+      isTermHighlightEnabled: preferences.isTermHighlightEnabled !== false,
     }
   } catch {
     return DEFAULT_PREFERENCES
@@ -69,6 +72,8 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         setPreferences((current) => ({ ...current, isScrollSyncEnabled })),
       setQuoteHighlightEnabled: (isQuoteHighlightEnabled: boolean) =>
         setPreferences((current) => ({ ...current, isQuoteHighlightEnabled })),
+      setTermHighlightEnabled: (isTermHighlightEnabled: boolean) =>
+        setPreferences((current) => ({ ...current, isTermHighlightEnabled })),
     }),
     [preferences],
   )

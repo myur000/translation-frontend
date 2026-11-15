@@ -1505,6 +1505,20 @@ describe('workspace layout', () => {
     expect(highlightItem().getAttribute('aria-checked')).toBe('false')
   })
 
+  it('turns glossary term highlighting off from the view menu and remembers it', async () => {
+    const user = userEvent.setup()
+    renderDocumentRoute(`/documents/${firstJob}`)
+    await findWorkspaceRegion('Оригинал')
+    const termItem = () => screen.getByRole('menuitemcheckbox', { name: 'Подсвечивать термины' })
+
+    await user.click(viewMenuButton())
+    expect(termItem().getAttribute('aria-checked')).toBe('true')
+    await user.click(termItem())
+    expect(JSON.parse(localStorage.getItem('doctranslate.preferences.v1')!)).toMatchObject({ isTermHighlightEnabled: false })
+    await user.click(viewMenuButton())
+    expect(termItem().getAttribute('aria-checked')).toBe('false')
+  })
+
   it('keeps the dock of a finished document short', async () => {
     renderDocumentRoute(`/documents/${firstJob}`)
     await findWorkspaceRegion('Оригинал')
