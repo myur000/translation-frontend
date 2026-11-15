@@ -9,6 +9,7 @@ import { RetranslateDialog } from '../components/workspace/RetranslateDialog.tsx
 import { TermComposer } from '../components/workspace/TermComposer.tsx'
 import { cleanTermText, findTerms, termMatcher, translationPattern } from '../glossary/termMatch.ts'
 import { termAtPoint, termHits } from '../glossary/termRanges.ts'
+import { autoRange, canBeTerm, clickWord, MAX_SELECTION_WORDS } from '../glossary/termWords.ts'
 import { useGlossaryTerms } from '../glossary/useGlossaryTerms.ts'
 import type { ActiveQuoteSelection } from '../hooks/useQuoteSelection.ts'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
@@ -74,6 +75,33 @@ describe('finding glossary terms in the text', () => {
   })
 })
 
+describe('words of a selection', () => {
+  it('cuts off edge punctuation and the article of the selection’s language', () => {
+    expect(autoRange(['—', 'the', 'glass', 'float,'], 'eng_Latn')).toEqual({ range: { from: 2, to: 3 }, article: 'the' })
+    expect(autoRange(['der', 'Leuchtturm'], 'deu_Latn')).toEqual({ range: { from: 1, to: 1 }, article: 'der' })
+    // В русском артиклей нет; единственное слово не отрезается никогда.
+    expect(autoRange(['и', 'риф'], 'rus_Cyrl')).toEqual({ range: { from: 0, to: 1 }, article: null })
+    expect(autoRange(['the'], 'eng_Latn')).toEqual({ range: { from: 0, to: 0 }, article: null })
+  })
+
+  it('removes edge words, cuts before a middle word and brings words back', () => {
+    const range = { from: 1, to: 4 }
+    expect(clickWord(range, 1)).toEqual({ from: 2, to: 4 })
+    expect(clickWord(range, 4)).toEqual({ from: 1, to: 3 })
+    expect(clickWord(range, 2)).toEqual({ from: 1, to: 1 })
+    expect(clickWord(range, 0)).toEqual({ from: 0, to: 4 })
+    expect(clickWord(range, 6)).toEqual({ from: 1, to: 6 })
+    expect(clickWord({ from: 3, to: 3 }, 3)).toEqual({ from: 3, to: 3 })
+  })
+
+  it('offers the glossary only for a word or a short phrase', () => {
+    expect(canBeTerm(' reef, ')).toBe(true)
+    expect(canBeTerm(Array.from({ length: MAX_SELECTION_WORDS }, () => 'word').join(' '))).toBe(true)
+    expect(canBeTerm(Array.from({ length: MAX_SELECTION_WORDS + 1 }, () => 'word').join(' '))).toBe(false)
+    expect(canBeTerm(' , ')).toBe(false)
+  })
+})
+
 describe('glossary of the book’s language pair', () => {
   const item = (id: string, value: string): TermListItem => ({
     id, term: value, translation: value, source_lang: 'eng_Latn', target_lang: 'rus_Cyrl', document_count: 1, updated_at: '',
@@ -115,7 +143,7 @@ describe('«To glossary» card over a selection', () => {
     const onClose = vi.fn()
     const all = {
       jobId: 'j1', selection: selection('SOURCE', ' reef, '), liveSelection: null, canPickPaired: true,
-      terms: [], pair: 'EN → RU', onSaved, onClose, ...props,
+      languages: { source: 'eng_Latn', target: 'rus_Cyrl' }, terms: [], pair: 'EN → RU', onSaved, onClose, ...props,
     }
     const view = render(<TermComposer {...all} />, { wrapper })
     return { ...view, onSaved, onClose, rerenderWith: (next: Partial<typeof all>) => view.rerender(<TermComposer {...all} {...next} />) }
@@ -127,7 +155,8 @@ describe('«To glossary» card over a selection', () => {
     const { onSaved, rerenderWith } = renderCard()
     const card = screen.getByRole('form', { name: 'В глоссарий' })
     expect(within(card).getByText('В глоссарий · EN → RU')).toBeTruthy()
-    expect((within(card).getByLabelText('Термин') as HTMLInputElement).value).toBe('reef')
+    expect(within(card).getByRole('group', { name: 'Слова термина' }).textContent).toBe('reef,')
+    expect(card.textContent).toContain('термин: reef')
     expect(document.activeElement).toBe(within(card).getByLabelText('Перевод'))
     expect(card.textContent).toContain('Выделите перевод в соседней колонке — он подставится сюда.')
 
@@ -146,7 +175,7 @@ describe('«To glossary» card over a selection', () => {
   it('starts from the translation side with the term field', () => {
     renderCard({ selection: selection('TRANSLATION', 'рифом') })
     const card = screen.getByRole('form', { name: 'В глоссарий' })
-    expect((within(card).getByLabelText('Перевод') as HTMLInputElement).value).toBe('рифом')
+    expect(card.textContent).toContain('перевод: рифом')
     expect(document.activeElement).toBe(within(card).getByLabelText('Термин'))
     expect(card.textContent).toContain('Выделите слово в оригинале — оно станет термином.')
   })
@@ -179,6 +208,52 @@ describe('«To glossary» card over a selection', () => {
     expect(onSaved).not.toHaveBeenCalled()
     await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('turns the selection into word chips: edges come off, a middle word cuts the term', async () => {
+    const user = userEvent.setup()
+    renderCard({ selection: selection('SOURCE', "the lighthouse keeper's ledger,"), canPickPaired: false })
+    const card = screen.getByRole('form', { name: 'В глоссарий' })
+    const words = within(card).getByRole('group', { name: 'Слова термина' })
+    const chip = (name: RegExp) => within(words).getByRole('button', { name })
+    // Артикль и запятая отрезаны сразу.
+    expect(chip(/the/).getAttribute('aria-pressed')).toBe('false')
+    expect(card.textContent).toContain("термин: lighthouse keeper's ledger")
+    expect(card.textContent).toContain('Артикль «the» и знаки по краям отрезаны')
+
+    await user.click(chip(/^Обрезать перед «keeper's»/))
+    expect(card.textContent).toContain('термин: lighthouse')
+    expect(card.textContent).not.toContain('отрезаны')
+    await user.click(chip(/^Вернуть «ledger,»/))
+    expect(card.textContent).toContain("термин: lighthouse keeper's ledger")
+    await user.click(chip(/^Убрать «lighthouse»/))
+    expect(card.textContent).toContain("термин: keeper's ledger")
+  })
+
+  it('replaces the words when the same column is selected again', async () => {
+    const { rerenderWith } = renderCard()
+    rerenderWith({ liveSelection: selection('SOURCE', 'glass float') })
+    fireEvent.pointerUp(document)
+    const card = screen.getByRole('form', { name: 'В глоссарий' })
+    await waitFor(() => expect(card.textContent).toContain('термин: glass float'))
+    expect(document.activeElement).toBe(within(card).getByLabelText('Перевод'))
+  })
+
+  it('gives a plain field for a long selection and does not save a phrase as a term', async () => {
+    const user = userEvent.setup()
+    renderCard({ selection: selection('SOURCE', 'he saw a light where no light should have been') })
+    const card = screen.getByRole('form', { name: 'В глоссарий' })
+    expect(within(card).queryByRole('group', { name: 'Слова термина' })).toBeNull()
+    const termField = within(card).getByLabelText('Термин') as HTMLInputElement
+    expect(termField.value).toBe('he saw a light where no light should have been')
+    await user.type(within(card).getByLabelText('Перевод'), 'свет')
+    expect(card.textContent).toContain('Термин — слово или фраза до 8 слов.')
+    expect((within(card).getByRole('button', { name: 'Сохранить' }) as HTMLButtonElement).disabled).toBe(true)
+
+    await user.clear(termField)
+    await user.type(termField, 'light')
+    expect(card.textContent).not.toContain('до 8 слов')
+    expect((within(card).getByRole('button', { name: 'Сохранить' }) as HTMLButtonElement).disabled).toBe(false)
   })
 
   it('does not suggest picking from the other column when only one is visible', () => {

@@ -1,15 +1,15 @@
-/* Карточка «В глоссарий» у выделения: поля и кнопки — как у быстрой записи заметки. */
+/* Карточка «В глоссарий» у выделения: слова-чипы, под ними поле второй стороны пары. */
 .card {
   position: fixed;
   top: var(--composer-top);
   left: var(--composer-left);
   z-index: 41;
-  width: 340px;
+  width: 360px;
   max-width: calc(100vw - 20px);
   box-sizing: border-box;
   display: grid;
-  gap: 10px;
-  padding: 14px;
+  gap: 12px;
+  padding: 16px 18px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -25,14 +25,11 @@
 }
 
 .title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   min-width: 0;
   color: var(--color-glossary);
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.08em;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -42,9 +39,9 @@
   height: 28px;
   display: grid;
   place-items: center;
-  margin: -6px -6px -6px 0;
+  margin: -6px -8px -6px 0;
   padding: 0;
-  color: var(--color-text-muted);
+  color: var(--color-glossary);
   background: transparent;
   border: 0;
   border-radius: 50%;
@@ -60,52 +57,81 @@
 }
 
 .close:hover {
-  color: var(--color-text);
   background: var(--color-surface-subtle);
 }
 
-.field {
-  display: grid;
-  gap: 4px;
-  color: var(--color-text-soft);
-  font-size: 12px;
+/* Слова выделения: в термине — заливка цвета глоссария, убранные — пунктир и зачёркивание. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.field input {
-  width: 100%;
-  min-height: 34px;
-  box-sizing: border-box;
-  padding: 5px 9px;
+.chip {
+  max-width: 100%;
+  padding: 2px 11px 3px;
+  overflow-wrap: anywhere;
   color: var(--color-text);
-  background: var(--color-surface-subtle);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font: inherit;
-  font-size: 14px;
-}
-
-.field .termInput {
+  background: color-mix(in srgb, var(--glossary-term-line) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--glossary-term-line) 55%, transparent);
+  border-radius: 999px;
   font-family: var(--font-serif);
   font-size: 15px;
+  line-height: 1.4;
 }
 
-.field input:focus-visible {
+.chip:hover {
+  border-color: var(--glossary-term-line);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.chipOut {
+  color: var(--color-text-soft);
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--color-border-strong);
+  text-decoration: line-through;
+}
+
+.caption {
+  margin: -4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+/* Поле второй стороны — строка с линией снизу, как в тексте книги. */
+.line {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 0 6px;
+  color: var(--color-text);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--color-border-strong);
+  border-radius: 0;
+  font-family: var(--font-serif);
+  font-size: 17px;
+}
+
+.line::placeholder {
+  color: var(--color-text-soft);
+}
+
+.line:focus {
   outline: none;
-  border-color: var(--color-focus);
-  box-shadow: 0 0 0 3px var(--color-focus-ring);
+  border-bottom-color: var(--color-accent);
 }
 
-.hint,
 .exists,
-.error,
-.footnote {
+.error {
   margin: 0;
   font-size: 12.5px;
   line-height: 1.45;
-}
-
-.hint {
-  color: var(--color-text-muted);
 }
 
 .exists {
@@ -119,25 +145,28 @@
   color: var(--color-danger-text);
 }
 
-.footnote {
-  color: var(--color-text-soft);
-  font-size: 12px;
-}
-
-.actions {
+.footer {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hint {
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+  line-height: 1.4;
 }
 
 .save {
-  min-height: 30px;
-  padding: 4px 14px;
+  flex: none;
+  padding: 7px 16px;
   color: var(--color-on-accent);
   background: var(--color-accent);
   border: 1px solid var(--color-accent);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -148,29 +177,6 @@
 .save:disabled {
   cursor: not-allowed;
   opacity: 0.5;
-}
-
-.kbd {
-  padding: 0 5px;
-  color: var(--color-text-soft);
-  border: 1px solid var(--color-border);
-  border-bottom-width: 2px;
-  border-radius: 5px;
-  font-family: inherit;
-  font-size: 11px;
-}
-
-.cancel {
-  margin-left: auto;
-  padding: 4px 6px;
-  color: var(--color-text-muted);
-  background: none;
-  border: 0;
-  font-size: 13px;
-}
-
-.cancel:hover {
-  color: var(--color-text);
 }
 
 @keyframes appear {

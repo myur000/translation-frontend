@@ -3,28 +3,40 @@ import type { TermListItem, TermResponse } from '../../api/contracts/terms.ts'
 import { createTerm, linkTermDocument, updateTerm } from '../../api/terms.ts'
 import { useAuth } from '../../auth/useAuth.ts'
 import { cleanTermText } from '../../glossary/termMatch.ts'
+import {
+  autoRange,
+  clickWord,
+  countWords,
+  hasTrimmedPunctuation,
+  MAX_TERM_WORDS,
+  rangeText,
+  splitWords,
+  wordAction,
+  type WordRange,
+} from '../../glossary/termWords.ts'
 import type { ActiveQuoteSelection } from '../../hooks/useQuoteSelection.ts'
 import { useTranslation } from '../../i18n/useTranslation.ts'
 import { noteErrorMessage, type NoteErrorMessage } from '../../notes/noteErrors.ts'
 import { NoteErrorText } from '../notes/NoteErrorText.tsx'
-import { GlyphIcon } from '../ui/GlyphIcon.tsx'
 import styles from './TermComposer.module.css'
 
 const TERM_MAX = 200
 const TRANSLATION_MAX = 500
-const WIDTH = 340
+const WIDTH = 360
 const GAP = 10
 /** Выделение во второй колонке читается после того, как его закончили: хук выделения обновляется в кадре анимации. */
 const PICK_DELAY_MS = 80
 
 interface TermComposerProps {
   jobId: string
-  /** Выделение, с которого начали: оригинал — термин, перевод — перевод термина. */
+  /** Выделение, с которого начали: его слова — чипы, вторая сторона — поле. */
   selection: ActiveQuoteSelection
-  /** Текущее выделение в книге: пока карточка открыта, им заполняют второе поле. */
+  /** Текущее выделение в книге: пока карточка открыта, им заменяют слова или заполняют поле. */
   liveSelection: ActiveQuoteSelection | null
-  /** Видна вторая колонка — значит, второе поле можно взять выделением. */
+  /** Видна вторая колонка — значит, поле можно заполнить выделением. */
   canPickPaired: boolean
+  /** Языки книги (коды NLLB): по языку выделения отрезается артикль. */
+  languages: { source: string; target: string }
   /** Термины пары: совпадение с существующим показывается и обновляет его. */
   terms: readonly TermListItem[]
   /** «EN → RU». */
@@ -33,25 +45,45 @@ interface TermComposerProps {
   onClose: () => void
 }
 
+/** Слова выделения: до `MAX_TERM_WORDS` — чипы, длиннее — обычное поле с текстом. */
+interface Picked {
+  words: string[]
+  range: WordRange
+  /** Диапазон после автообрезки: пока его не меняли, внизу сказано, что отрезано. */
+  auto: WordRange
+  article: string | null
+  free: string | null
+}
+
 const selectionKey = (selection: ActiveQuoteSelection) => `${selection.side}\n${selection.text}`
 
+function pick(text: string, language: string): Picked {
+  const words = splitWords(text.replace(/\s+/g, ' ').trim())
+  if (words.length > MAX_TERM_WORDS) {
+    const range = { from: 0, to: words.length - 1 }
+    return { words, range, auto: range, article: null, free: cleanTermText(text) }
+  }
+  const { range, article } = autoRange(words, language)
+  return { words, range, auto: range, article, free: null }
+}
+
 /**
- * Быстрая карточка «В глоссарий» у выделения. Сохраняет пару «термин → перевод»
- * с привязкой к книге: язык пары берётся из книги на сервере. Если такой термин
- * в паре уже есть — меняется его перевод, а книга добавляется к его книгам.
+ * Быстрая карточка «В глоссарий» у выделения. Слова выделения — чипы: щелчок по
+ * крайнему убирает его, по слову в середине — обрезает термин перед ним. Вторую
+ * сторону пары вписывают или выделяют в соседней колонке. Сохраняется с привязкой
+ * к книге; существующий термин пары обновляется.
  */
-export function TermComposer({ jobId, selection, liveSelection, canPickPaired, terms, pair, onSaved, onClose }: TermComposerProps) {
+export function TermComposer({ jobId, selection, liveSelection, canPickPaired, languages, terms, pair, onSaved, onClose }: TermComposerProps) {
   const { t } = useTranslation()
   const { session } = useAuth()
-  const fromSource = selection.side === 'SOURCE'
-  const initial = cleanTermText(selection.text)
-  const [term, setTerm] = useState(() => (fromSource ? initial.slice(0, TERM_MAX) : ''))
-  const [translation, setTranslation] = useState(() => (fromSource ? '' : initial.slice(0, TRANSLATION_MAX)))
+  const side = selection.side
+  const language = side === 'SOURCE' ? languages.source : languages.target
+  const [picked, setPicked] = useState(() => pick(selection.text, language))
+  const [other, setOther] = useState('')
   const [isSaving, setSaving] = useState(false)
   const [error, setError] = useState<NoteErrorMessage | null>(null)
   const cardRef = useRef<HTMLFormElement>(null)
-  const termRef = useRef<HTMLInputElement>(null)
-  const translationRef = useRef<HTMLInputElement>(null)
+  const otherRef = useRef<HTMLInputElement>(null)
   const saveRef = useRef<HTMLButtonElement>(null)
   const [top, setTop] = useState(selection.rect.top + selection.rect.height + GAP)
 
@@ -63,24 +95,23 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, t
     setTop(below + height <= window.innerHeight - GAP ? below : Math.max(GAP, rect.top - height - GAP))
   }, [selection])
 
-  useEffect(() => {
-    ;(fromSource ? translationRef : termRef).current?.focus({ preventScroll: true })
-  }, [fromSource])
+  useEffect(() => { otherRef.current?.focus({ preventScroll: true }) }, [])
 
-  // Выделение во второй колонке подставляется во второе поле, когда его закончили:
-  // пока тянут мышью или Shift+стрелками, фокус не забираем.
-  const latest = useRef(liveSelection)
-  useEffect(() => { latest.current = liveSelection })
-  const consumed = useRef(selectionKey(selection))
-  // Куда перевести фокус после подстановки: кнопка «Сохранить» активна только после перерисовки.
+  // Фокус после подстановки: кнопка «Сохранить» активна только после перерисовки.
   const focusNext = useRef<RefObject<HTMLElement | null> | null>(null)
   useEffect(() => {
     focusNext.current?.current?.focus({ preventScroll: true })
     focusNext.current = null
   })
+
+  // Новое выделение, когда его закончили (отпустили кнопку мыши или Shift): на той же
+  // стороне оно заменяет слова, на другой — заполняет поле.
+  const latest = useRef(liveSelection)
+  useEffect(() => { latest.current = liveSelection })
+  const consumed = useRef(selectionKey(selection))
   useEffect(() => {
     let timer = 0
-    const pick = (event: Event) => {
+    const take = (event: Event) => {
       if (event.target instanceof Node && cardRef.current?.contains(event.target)) return
       window.clearTimeout(timer)
       timer = window.setTimeout(() => {
@@ -89,28 +120,32 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, t
         consumed.current = selectionKey(next)
         const text = cleanTermText(next.text)
         if (!text) return
-        if (next.side === 'SOURCE') setTerm(text.slice(0, TERM_MAX))
-        else setTranslation(text.slice(0, TRANSLATION_MAX))
         setError(null)
-        // Второе поле ещё пустое — курсор туда, оба заполнены — на «Сохранить».
-        const otherEmpty = next.side === 'SOURCE' ? !translationRef.current?.value.trim() : !termRef.current?.value.trim()
-        focusNext.current = otherEmpty ? (next.side === 'SOURCE' ? translationRef : termRef) : saveRef
+        if (next.side === side) {
+          setPicked(pick(next.text, language))
+          focusNext.current = otherRef.current?.value.trim() ? saveRef : otherRef
+        } else {
+          setOther(text.slice(0, side === 'SOURCE' ? TRANSLATION_MAX : TERM_MAX))
+          focusNext.current = saveRef
+        }
       }, PICK_DELAY_MS)
     }
-    const pickOnKey = (event: globalThis.KeyboardEvent) => { if (event.key === 'Shift') pick(event) }
-    document.addEventListener('pointerup', pick)
-    document.addEventListener('keyup', pickOnKey)
+    const takeOnKey = (event: globalThis.KeyboardEvent) => { if (event.key === 'Shift') take(event) }
+    document.addEventListener('pointerup', take)
+    document.addEventListener('keyup', takeOnKey)
     return () => {
       window.clearTimeout(timer)
-      document.removeEventListener('pointerup', pick)
-      document.removeEventListener('keyup', pickOnKey)
+      document.removeEventListener('pointerup', take)
+      document.removeEventListener('keyup', takeOnKey)
     }
-  }, [])
+  }, [language, side])
 
-  const cleanTerm = term.trim()
-  const cleanTranslation = translation.trim()
-  const existing = cleanTerm ? terms.find((item) => item.term.toLocaleLowerCase() === cleanTerm.toLocaleLowerCase()) : undefined
-  const canSave = Boolean(cleanTerm && cleanTranslation) && !isSaving
+  const pickedText = picked.free ?? rangeText(picked.words, picked.range)
+  const term = (side === 'SOURCE' ? pickedText : other).trim()
+  const translation = (side === 'SOURCE' ? other : pickedText).trim()
+  const isTooLong = countWords(term) > MAX_TERM_WORDS
+  const existing = term ? terms.find((item) => item.term.toLocaleLowerCase() === term.toLocaleLowerCase()) : undefined
+  const canSave = Boolean(term && translation) && !isTooLong && !isSaving
 
   const save = async (event: FormEvent) => {
     event.preventDefault()
@@ -121,10 +156,10 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, t
     try {
       let saved: TermResponse
       if (existing) {
-        await updateTerm(existing.id, { term: cleanTerm, translation: cleanTranslation }, { accessToken: token })
+        await updateTerm(existing.id, { term, translation }, { accessToken: token })
         saved = await linkTermDocument(existing.id, jobId, { accessToken: token })
       } else {
-        saved = await createTerm({ term: cleanTerm, translation: cleanTranslation, job_id: jobId }, { accessToken: token })
+        saved = await createTerm({ term, translation, job_id: jobId }, { accessToken: token })
       }
       onSaved(saved)
     } catch (caught) {
@@ -140,10 +175,18 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, t
     }
   }
 
-  const hint = !canPickPaired ? null
-    : !cleanTranslation && fromSource ? t('glossary.hintTranslation')
-      : !cleanTerm && !fromSource ? t('glossary.hintTerm')
-        : null
+  const isAutoRange = !picked.free && picked.range.from === picked.auto.from && picked.range.to === picked.auto.to
+  const trimmedPunctuation = isAutoRange && hasTrimmedPunctuation(picked.words, picked.range)
+  const trimmed = !isAutoRange ? null
+    : picked.article && trimmedPunctuation ? t('glossary.trimmed.both', { word: picked.article })
+      : picked.article ? t('glossary.trimmed.article', { word: picked.article })
+        : trimmedPunctuation ? t('glossary.trimmed.punctuation')
+          : null
+  const footerHint = !other.trim() && canPickPaired
+    ? t(side === 'SOURCE' ? 'glossary.hintTranslation' : 'glossary.hintTerm')
+    : trimmed
+  const pickedLabel = t(side === 'SOURCE' ? 'glossary.term' : 'glossary.translation')
+  const otherLabel = t(side === 'SOURCE' ? 'glossary.translation' : 'glossary.term')
   const left = Math.max(GAP, Math.min(selection.rect.left + selection.rect.width / 2 - WIDTH / 2, window.innerWidth - WIDTH - GAP))
 
   return (
@@ -157,37 +200,73 @@ export function TermComposer({ jobId, selection, liveSelection, canPickPaired, t
       autoComplete="off"
     >
       <div className={styles.header}>
-        <span className={styles.title}>
-          <GlyphIcon name="glossary" />
-          {t('glossary.composerTitle', { pair })}
-        </span>
+        <span className={styles.title}>{t('glossary.composerTitle', { pair })}</span>
         <button type="button" className={styles.close} aria-label={t('common.close')} title={t('common.close')} onClick={onClose}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" /></svg>
         </button>
       </div>
-      <label className={styles.field}>
-        <span>{t('glossary.term')}</span>
-        <input ref={termRef} className={styles.termInput} value={term} maxLength={TERM_MAX}
-          onChange={(event) => { setTerm(event.currentTarget.value); setError(null) }} />
-      </label>
-      <label className={styles.field}>
-        <span>{t('glossary.translation')}</span>
-        <input ref={translationRef} value={translation} maxLength={TRANSLATION_MAX}
-          onChange={(event) => { setTranslation(event.currentTarget.value); setError(null) }} />
-      </label>
-      {hint ? <p className={styles.hint}>{hint}</p> : null}
+
+      {picked.free === null ? (
+        <>
+          <div className={styles.chips} role="group" aria-label={t(side === 'SOURCE' ? 'glossary.termWords' : 'glossary.translationWords')}>
+            {picked.words.map((word, index) => {
+              const action = wordAction(picked.range, index)
+              const isIncluded = action !== 'restore'
+              return (
+                <button
+                  // Слова могут повторяться — ключ по месту в выделении.
+                  key={index}
+                  type="button"
+                  className={`${styles.chip} ${isIncluded ? '' : styles.chipOut}`}
+                  aria-pressed={isIncluded}
+                  aria-label={t(`glossary.word.${action}`, { word })}
+                  title={t(`glossary.word.${action}`, { word })}
+                  onClick={() => setPicked((current) => ({ ...current, range: clickWord(current.range, index) }))}
+                >
+                  {word}
+                </button>
+              )
+            })}
+          </div>
+          <p className={styles.caption}>{t(side === 'SOURCE' ? 'glossary.termIs' : 'glossary.translationIs', { text: pickedText })}</p>
+        </>
+      ) : (
+        <input
+          className={styles.line}
+          aria-label={pickedLabel}
+          placeholder={pickedLabel}
+          value={picked.free}
+          maxLength={side === 'SOURCE' ? TERM_MAX : TRANSLATION_MAX}
+          onChange={(event) => {
+            const free = event.currentTarget.value
+            setPicked((current) => ({ ...current, free }))
+            setError(null)
+          }}
+        />
+      )}
+
+      <input
+        ref={otherRef}
+        className={styles.line}
+        aria-label={otherLabel}
+        placeholder={otherLabel}
+        value={other}
+        maxLength={side === 'SOURCE' ? TRANSLATION_MAX : TERM_MAX}
+        onChange={(event) => { setOther(event.currentTarget.value); setError(null) }}
+      />
+
+      {isTooLong ? <p className={styles.error}>{t('glossary.tooLong', { max: MAX_TERM_WORDS })}</p> : null}
       {existing ? (
         <p className={styles.exists}>{t('glossary.exists', { term: existing.term, translation: existing.translation })}</p>
       ) : null}
       {error ? <p className={styles.error} role="alert"><NoteErrorText message={error} /></p> : null}
-      <div className={styles.actions}>
+
+      <div className={styles.footer}>
+        <span className={styles.hint}>{footerHint}</span>
         <button ref={saveRef} type="submit" className={styles.save} disabled={!canSave}>
           {isSaving ? t('glossary.saving') : t('glossary.save')}
         </button>
-        <kbd className={styles.kbd}>Enter</kbd>
-        <button type="button" className={styles.cancel} onClick={onClose} disabled={isSaving}>{t('common.cancel')}</button>
       </div>
-      <p className={styles.footnote}>{t('glossary.footnote')}</p>
     </form>
   )
 }

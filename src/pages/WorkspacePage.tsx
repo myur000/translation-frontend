@@ -13,6 +13,7 @@ import { QuoteMarkers } from '../components/workspace/QuoteMarkers.tsx'
 import { GlossaryNotice } from '../components/workspace/GlossaryNotice.tsx'
 import { TermComposer } from '../components/workspace/TermComposer.tsx'
 import { TermHighlights } from '../components/workspace/TermHighlights.tsx'
+import { canBeTerm } from '../glossary/termWords.ts'
 import { useGlossaryTerms } from '../glossary/useGlossaryTerms.ts'
 import type { ActiveQuoteSelection } from '../hooks/useQuoteSelection.ts'
 import { useBookNotes } from '../notes/useBookQuotes.ts'
@@ -894,7 +895,8 @@ function DocumentWorkspace({
               }
               revealNotes()
             } : undefined}
-            onGlossary={document.jobId ? () => setTermDraft(quoteSelection.selection) : undefined}
+            // Предложение или абзац — уже не термин: круга глоссария над ним нет.
+            onGlossary={document.jobId && canBeTerm(quoteSelection.selection.text) ? () => setTermDraft(quoteSelection.selection) : undefined}
           />
         ) : null}
         {termDraft && document.jobId ? (
@@ -903,6 +905,7 @@ function DocumentWorkspace({
             selection={termDraft}
             liveSelection={quoteSelection.selection}
             canPickPaired={showsPane(visibleLayout, 'original') && showsPane(visibleLayout, 'translation')}
+            languages={{ source: toCatalogLanguageCode(document.sourceLanguage), target: toCatalogLanguageCode(document.targetLanguage) }}
             terms={glossary.terms}
             pair={`${shortLanguageCode(toCatalogLanguageCode(document.sourceLanguage))} → ${shortLanguageCode(toCatalogLanguageCode(document.targetLanguage))}`}
             onSaved={(term) => {
