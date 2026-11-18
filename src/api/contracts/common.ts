@@ -12,6 +12,20 @@ export type KnownApiErrorCode =
   | 'DOCUMENT_NOT_FOUND'
   | 'DOCUMENT_STILL_PROCESSING'
   | 'DOCUMENT_ALREADY_FINISHED'
+  | 'SESSION_CHANGED'
+  | 'SESSION_NOT_FOUND'
+  | 'INVALID_CURRENT_PASSWORD'
+  | 'PASSWORD_UNCHANGED'
+  | 'WEAK_PASSWORD'
+  | 'EMAIL_UNCHANGED'
+  | 'EMAIL_ALREADY_USED'
+  | 'INVALID_ACTION_LINK'
+  | 'LOGIN_CHALLENGE_EXPIRED'
+  | 'INVALID_SECOND_FACTOR_CODE'
+  | 'SECOND_FACTOR_UNAVAILABLE'
+  | 'SECOND_FACTOR_ALREADY_ENABLED'
+  | 'SECOND_FACTOR_NOT_ENABLED'
+  | 'SECOND_FACTOR_NOT_SET_UP'
 
 // `string & {}` сохраняет подсказки известных кодов и при этом принимает любые другие.
 export type ApiErrorCode = KnownApiErrorCode | (string & {})

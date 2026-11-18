@@ -72,6 +72,7 @@ function sharedCoordinator() {
 function requests(overrides: Partial<SessionRequests> = {}): SessionRequests {
   return {
     login: vi.fn().mockImplementation(async () => response()),
+    loginSecondFactor: vi.fn().mockImplementation(async () => response()),
     refresh: vi.fn().mockImplementation(async () => response(2)),
     logout: vi.fn().mockResolvedValue(undefined),
     logoutAll: vi.fn().mockResolvedValue(undefined),
@@ -102,6 +103,52 @@ describe('refresh cookie API contract', () => {
 })
 
 describe('session controller', () => {
+  it('stops at the second factor without a session and signs in with the code', async () => {
+    const api = requests({
+      login: vi.fn().mockResolvedValue({ secondFactorRequired: true, challenge: 'challenge-1', expiresIn: 300 }),
+    })
+    const shared = sharedCoordinator()
+    const controller = new SessionController(null, shared.create(), api)
+    const neighbour = new SessionController(null, shared.create(), requests())
+    neighbour.connect()
+    controller.connect()
+
+    const result = await controller.login(credentials)
+    expect(result).toMatchObject({ status: 'second-factor', challenge: 'challenge-1', email: 'reader@example.com' })
+    expect(controller.getSnapshot().session).toBeNull()
+
+    await controller.completeSecondFactor({ challenge: 'challenge-1', code: '123456' }, 'reader@example.com')
+    expect(api.loginSecondFactor).toHaveBeenCalledWith({ challenge: 'challenge-1', code: '123456' })
+    expect(controller.getSnapshot().session?.email).toBe('reader@example.com')
+    // Соседняя вкладка получает ту же сессию и не продлевает её сама.
+    expect(neighbour.getSnapshot().session?.accessToken).toBe(controller.getSnapshot().session?.accessToken)
+  })
+
+  it('takes the new session from a password change and shares it with other tabs', async () => {
+    const shared = sharedCoordinator()
+    const controller = new SessionController(session(1), shared.create(), requests())
+    const neighbour = new SessionController(session(1), shared.create(), requests())
+    neighbour.connect()
+    controller.connect()
+    const oldToken = controller.getSnapshot().session!.accessToken
+    const perform = vi.fn().mockResolvedValue(response(5))
+
+    await controller.replaceSession(perform)
+    expect(perform).toHaveBeenCalledWith(oldToken)
+    const next = controller.getSnapshot().session!
+    expect(next.accessToken).not.toBe(oldToken)
+    expect(next.email).toBe('reader@example.com')
+    expect(neighbour.getSnapshot().session?.accessToken).toBe(next.accessToken)
+  })
+
+  it('keeps the session when the password change is rejected', async () => {
+    const controller = new SessionController(session(1), sharedCoordinator().create(), requests())
+    const before = controller.getSnapshot().session
+    await expect(controller.replaceSession(async () => { throw denied(400) })).rejects.toBeInstanceOf(ApiClientError)
+    expect(controller.getSnapshot().session).toBe(before)
+    expect(controller.getSnapshot().issue).toBeNull()
+  })
+
   it('restores one in-memory session and coalesces duplicate bootstrap calls', async () => {
     const api = requests()
     const controller = new SessionController(null, sharedCoordinator().create(), api)

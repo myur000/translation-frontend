@@ -11,6 +11,7 @@ import type {
   PasswordResetConfirmRequest,
   RegisterRequest,
 } from './contracts/auth.ts'
+import type { SecondFactorChallenge, SecondFactorLoginRequest } from './contracts/accountSecurity.ts'
 import { API_ENDPOINTS } from './endpoints.ts'
 import { abortable } from './abortable.ts'
 
@@ -28,8 +29,25 @@ export function register(
   })
 }
 
+/** 200 — сессия; 202 — у аккаунта двухэтапная проверка, код уходит в `loginSecondFactor`. */
 export function login(request: LoginRequest, options: ApiCallOptions = {}) {
-  return apiClient.request<LoginResponse>(API_ENDPOINTS.auth.login, {
+  return apiClient.request<LoginResponse | SecondFactorChallenge>(API_ENDPOINTS.auth.login, {
+    method: 'POST',
+    json: request,
+    signal: options.signal,
+    credentials: 'include',
+    notifyAccessErrors: false,
+  })
+}
+
+export function isSecondFactorChallenge(value: unknown): value is SecondFactorChallenge {
+  return typeof value === 'object' && value !== null &&
+    (value as Partial<SecondFactorChallenge>).secondFactorRequired === true &&
+    typeof (value as Partial<SecondFactorChallenge>).challenge === 'string'
+}
+
+export function loginSecondFactor(request: SecondFactorLoginRequest, options: ApiCallOptions = {}) {
+  return apiClient.request<LoginResponse>(API_ENDPOINTS.auth.loginSecondFactor, {
     method: 'POST',
     json: request,
     signal: options.signal,

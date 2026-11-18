@@ -55,7 +55,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const dismissNotice = useCallback(() => setAccessNotice(''), [])
   const value = useMemo<AuthContextValue>(() => ({
     session, isAuthenticated: session !== null, isRestoring, sessionIssue: issue,
-    login: controller.login, logout: controller.logout,
+    login: controller.login, completeSecondFactor: controller.completeSecondFactor,
+    replaceSession: controller.replaceSession, logout: controller.logout,
     logoutEverywhere: controller.logoutEverywhere,
     invalidateSession: controller.invalidate,
   }), [controller, session, isRestoring, issue])

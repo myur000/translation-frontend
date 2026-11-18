@@ -4,7 +4,7 @@ import styles from './AuthField.module.css'
 
 interface AuthFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
   label: string
-  type: 'email' | 'password'
+  type: 'email' | 'password' | 'text'
   error?: string
 }
 

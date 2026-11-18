@@ -1,6 +1,7 @@
-import { login, logoutAll, logoutSession, refreshSession } from '../api/auth.ts'
+import { isSecondFactorChallenge, login, loginSecondFactor, logoutAll, logoutSession, refreshSession } from '../api/auth.ts'
 import { ApiClientError, type SessionRecovery } from '../api/client.ts'
 import type { LoginRequest, LoginResponse } from '../api/contracts/auth.ts'
+import type { SecondFactorChallenge, SecondFactorLoginRequest } from '../api/contracts/accountSecurity.ts'
 import { clearAuthSession, createAuthSession, readAccessTokenSubject, type AuthSession } from './authStorage.ts'
 import {
   BrowserSessionCoordinator, SessionCoordinationError,
@@ -14,8 +15,14 @@ export interface SessionSnapshot {
   issue: SessionIssue
 }
 
+/** Итог первого шага входа: сессия готова или нужен код второго фактора. */
+export type LoginResult =
+  | { status: 'signed-in' }
+  | { status: 'second-factor'; challenge: string; email: string; expiresAt: number }
+
 export interface SessionRequests {
-  login: (credentials: LoginRequest) => Promise<LoginResponse>
+  login: (credentials: LoginRequest) => Promise<LoginResponse | SecondFactorChallenge>
+  loginSecondFactor: (request: SecondFactorLoginRequest) => Promise<LoginResponse>
   refresh: () => Promise<LoginResponse>
   logout: () => Promise<void>
   logoutAll: (token: string) => Promise<void>
@@ -29,7 +36,7 @@ export class SessionChangedError extends Error {
 }
 
 const defaultRequests: SessionRequests = {
-  login, refresh: refreshSession, logout: logoutSession,
+  login, loginSecondFactor, refresh: refreshSession, logout: logoutSession,
   logoutAll: (accessToken) => logoutAll({ accessToken }),
 }
 
@@ -115,16 +122,54 @@ export class SessionController implements SessionRecovery {
     return this.bootstrapPromise
   }
 
-  login = async (credentials: LoginRequest): Promise<void> => {
+  login = async (credentials: LoginRequest): Promise<LoginResult> => {
     const generation = ++this.generation
-    await this.coordinator.exclusive(async () => {
+    return this.coordinator.exclusive(async (): Promise<LoginResult> => {
       const response = await this.requests.login(credentials)
       if (generation !== this.generation) throw new SessionChangedError()
-      const session = createAuthSession(response, credentials.email)
-      const marker = this.coordinator.mark('active')
-      this.accept(session, marker.revision)
-      this.coordinator.publish({ type: 'session', revision: marker.revision, session })
+      if (isSecondFactorChallenge(response)) {
+        return {
+          status: 'second-factor', challenge: response.challenge, email: credentials.email,
+          expiresAt: Date.now() + response.expiresIn * 1000,
+        }
+      }
+      this.start(response, credentials.email)
+      return { status: 'signed-in' }
     })
+  }
+
+  /** Второй шаг входа: код из приложения или резервный код к `challenge` из `login`. */
+  completeSecondFactor = async (request: SecondFactorLoginRequest, email: string): Promise<void> => {
+    const generation = ++this.generation
+    await this.coordinator.exclusive(async () => {
+      const response = await this.requests.loginSecondFactor(request)
+      if (generation !== this.generation) throw new SessionChangedError()
+      this.start(response, email)
+    })
+  }
+
+  /**
+   * Действие, после которого бэк завершает все сеансы и выдаёт этому новый
+   * (смена пароля). Идёт под блокировкой cookie, как продление: иначе соседняя
+   * вкладка продлит сеанс старой cookie, получит 401 и разлогинит всех.
+   */
+  replaceSession = async (perform: (accessToken: string) => Promise<LoginResponse>): Promise<void> => {
+    const session = this.snapshot.session
+    if (!session) throw new SessionChangedError()
+    const token = await this.prepareAccessToken(session.accessToken)
+    const generation = this.generation
+    await this.coordinator.exclusive(async () => {
+      const response = await perform(token)
+      if (generation !== this.generation) throw new SessionChangedError()
+      this.start(response, session.email)
+    })
+  }
+
+  private start(response: LoginResponse, email: string) {
+    const session = createAuthSession(response, email)
+    const marker = this.coordinator.mark('active')
+    this.accept(session, marker.revision)
+    this.coordinator.publish({ type: 'session', revision: marker.revision, session })
   }
 
   refresh = (rejectedToken?: string): Promise<AuthSession> => {

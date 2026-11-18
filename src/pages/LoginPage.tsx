@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { ApiClientError } from '../api/client.ts'
 import { useAuth } from '../auth/useAuth.ts'
 import { AuthField } from '../components/auth/AuthField.tsx'
+import { SecondFactorStep } from '../components/auth/SecondFactorStep.tsx'
 import { useTranslation } from '../i18n/useTranslation.ts'
 import type { TranslationKey } from '../i18n/translations.ts'
 import styles from './AuthPage.module.css'
@@ -45,6 +46,7 @@ export function LoginPage() {
   const [errors, setErrors] = useState<LoginErrors>({})
   const [formError, setFormError] = useState('')
   const [isSubmitting, setSubmitting] = useState(false)
+  const [challenge, setChallenge] = useState<{ challenge: string; email: string } | null>(null)
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -58,7 +60,11 @@ export function LoginPage() {
 
     setSubmitting(true)
     try {
-      await login({ email: email.trim(), password })
+      const result = await login({ email: email.trim(), password })
+      if (result.status === 'second-factor') {
+        setChallenge({ challenge: result.challenge, email: result.email })
+        return
+      }
       void navigate(getReturnPath(location.state), { replace: true })
     } catch (error) {
       if (error instanceof ApiClientError && error.details?.fieldErrors) setErrors(error.details.fieldErrors)
@@ -67,6 +73,18 @@ export function LoginPage() {
   }
 
   if (isAuthenticated) return <Navigate to={getReturnPath(location.state)} replace />
+  if (challenge) return (
+    <SecondFactorStep
+      challenge={challenge.challenge}
+      email={challenge.email}
+      onSignedIn={() => void navigate(getReturnPath(location.state), { replace: true })}
+      onRestart={(reason) => {
+        setChallenge(null)
+        setPassword('')
+        setFormError(reason === 'expired' ? t('login.challengeExpired') : '')
+      }}
+    />
+  )
 
   return (
     <section aria-labelledby="login-title">

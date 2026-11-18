@@ -50,7 +50,8 @@ Frontend обновляет JWT за минуту до истечения и п�
 | Method | Path | Access | Request | Success response |
 | --- | --- | --- | --- | --- |
 | POST | `/api/auth/register` | public | `RegisterRequest` | `202` без тела (и для нового, и для занятого email) |
-| POST | `/api/auth/login` | public | `LoginRequest` | `200 LoginResponse` |
+| POST | `/api/auth/login` | public | `LoginRequest` | `200 LoginResponse` или `202 SecondFactorChallenge` |
+| POST | `/api/auth/login/second-factor` | public | `{challenge, code \| recoveryCode}` | `200 LoginResponse` + cookie |
 | POST | `/api/auth/refresh` | refresh cookie + custom header | — | `200 LoginResponse` + rotated cookie |
 | POST | `/api/auth/logout` | refresh cookie + custom header | — | `204` + deleted cookie |
 | POST | `/api/auth/logout-all` | JWT | — | `204` |
@@ -58,6 +59,17 @@ Frontend обновляет JWT за минуту до истечения и п�
 | POST | `/api/auth/email-verification/confirm` | public | `AccountTokenRequest` | `204` |
 | POST | `/api/auth/password-reset/request` | public | `AccountEmailRequest` | `202` |
 | POST | `/api/auth/password-reset/confirm` | public | `PasswordResetConfirmRequest` | `204` |
+| POST | `/api/account/password` | JWT | `{currentPassword, newPassword}` | `200 LoginResponse` + cookie; остальные сеансы завершены |
+| POST | `/api/account/email-change` | JWT | `{newEmail, currentPassword}` | `202` (и для занятого адреса) |
+| POST | `/api/account/email-change/confirm` | public | `AccountTokenRequest` | `204`; все сеансы завершены |
+| POST | `/api/account/email-change/cancel` | public | `AccountTokenRequest` | `204`; все сеансы завершены |
+| GET | `/api/account/sessions` | JWT | — | `200 AccountSession[]` |
+| DELETE | `/api/account/sessions/{id}` | JWT | — | `204` |
+| GET | `/api/account/second-factor` | JWT | — | `200 {enabled, recoveryCodesLeft}` |
+| POST | `/api/account/second-factor/setup` | JWT | `{currentPassword}` | `200 {secret, otpauthUri}` |
+| POST | `/api/account/second-factor/enable` | JWT | `{code}` | `200 {recoveryCodes}`; остальные сеансы завершены |
+| POST | `/api/account/second-factor/disable` | JWT | `{currentPassword, code \| recoveryCode}` | `204` |
+| POST | `/api/account/second-factor/recovery-codes` | JWT | `{currentPassword, code}` | `200 {recoveryCodes}` |
 | GET | `/api/languages` | public | — | `200 LanguageResponse[]` (NLLB-200, `max-age=3600`) |
 | POST | `/api/documents/upload` | verified JWT | multipart | `202 DocumentUploadResponse` |
 | POST | `/api/documents/estimate` | verified JWT | multipart `file` | `200 DocumentEstimateResponse` |
@@ -399,6 +411,8 @@ download и разбирается в браузере с оформлением
 
 Реализованный поток и ограничения форматов: [просмотр документов](real-document-viewer.md).
 
-Backend формирует email-ссылки на `/verify-email?token=...` и
-`/reset-password?token=...`. Эти frontend-маршруты и API-запросы реализованы.
+Backend формирует email-ссылки на `/verify-email`, `/reset-password`,
+`/confirm-email-change` и `/cancel-email-change` с токеном во фрагменте
+(`#token=...`, с 2026-10-31; раньше — `?token=...`). Frontend принимает оба
+варианта (`auth/linkToken.ts`). Подробности: [вход и безопасность](account-security.md).
 Доставка писем зависит от SMTP-настроек backend.

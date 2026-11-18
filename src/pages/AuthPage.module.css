@@ -146,3 +146,23 @@
   margin: 0 0 18px;
   color: var(--color-success-text);
 }
+
+.linkButton {
+  justify-self: start;
+  padding: 0;
+  color: var(--color-primary);
+  background: none;
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+.form input.codeInput {
+  font-family: var(--font-mono);
+  letter-spacing: 0.2em;
+}

@@ -7,6 +7,7 @@ import type { ProfileResponse } from '../api/contracts/profile.ts'
 import { ProfileProvider } from '../profile/ProfileProvider.tsx'
 import { useProfile } from '../profile/useProfile.ts'
 import { mapProfileFieldErrors, profileToValues, toProfileRequest, toProfileNameRequest, validateProfileName, validateProfileValues } from '../profile/profileForm.ts'
+import { TestQueryProvider } from './queryWrapper.tsx'
 import { ProfilePage } from '../pages/ProfilePage.tsx'
 import { UserMenu } from '../components/user/UserMenu.tsx'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
@@ -15,6 +16,10 @@ const auth = vi.hoisted(() => ({
   session: { email: 'reader@example.com', accessToken: 'token-1' }, logout: vi.fn(),
 }))
 vi.mock('../auth/useAuth.ts', () => ({ useAuth: () => auth }))
+// Разделы безопасности и сеансов проверяются в accountSecurity.test; здесь их запросы не мешают счёту fetch.
+vi.mock('../api/accountSecurity.ts', () => ({
+  listSessions: async () => [], getSecondFactorStatus: async () => ({ enabled: false, recoveryCodesLeft: 0 }),
+}))
 vi.mock('../account/useAccount.ts', () => ({ useAccount: () => ({
   usage: { loading: false, failed: false, data: { plan_code: 'FREE', plan_display_name: 'Free' } },
 }) }))
@@ -61,7 +66,7 @@ function TestApp({ probe = false }: { probe?: boolean }) {
       <UserMenu isCollapsed={false} />
       {probe ? <Probe /> : null}
       <Routes>
-        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/profile" element={<TestQueryProvider><ProfilePage /></TestQueryProvider>} />
         <Route path="/" element={<h1>Workspace</h1>} />
       </Routes>
     </ProfileProvider>

@@ -117,7 +117,7 @@ describe('domain API modules', () => {
       password: 'password123',
     })
 
-    expect(response.accessToken).toBe('jwt-token')
+    expect(response).toMatchObject({ accessToken: 'jwt-token' })
     expect(fetchMock.mock.calls[0][0]).toBe('/api/auth/login')
   })
 
