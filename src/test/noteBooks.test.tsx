@@ -6,6 +6,7 @@ import { ApiClientError } from '../api/client.ts'
 import type { NoteResponse } from '../api/contracts/notes.ts'
 import { NoteAside } from '../components/notes/NoteAside.tsx'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
+import { TestQueryProvider } from './queryWrapper.tsx'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
 import type { DocumentItem } from '../types/document.ts'
 
@@ -31,13 +32,13 @@ function Page({ onChanged }: { onChanged: (note: NoteResponse) => void }) {
   return (
     <PreferencesProvider>
       <MemoryRouter>
-        <NotesProvider>
+        <TestQueryProvider><NotesProvider>
           <Routes>
             <Route element={<Outlet context={{ documents }} />}>
               <Route index element={<NoteAside note={note} backlinks={[]} search="" onChanged={onChanged} />} />
             </Route>
           </Routes>
-        </NotesProvider>
+        </NotesProvider></TestQueryProvider>
       </MemoryRouter>
     </PreferencesProvider>
   )

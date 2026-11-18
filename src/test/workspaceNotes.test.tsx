@@ -10,6 +10,7 @@ import { NoteEditSession } from '../components/notes/NoteEditSession.tsx'
 import type { BookQuote } from '../notes/bookQuotes.ts'
 import { DeleteDocumentDialog } from '../components/workspace/DeleteDocumentDialog.tsx'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
+import { TestQueryProvider } from './queryWrapper.tsx'
 import type { QuoteSelection } from '../notes/quoteLocator.ts'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
 import type { DocumentItem } from '../types/document.ts'
@@ -58,9 +59,9 @@ function renderPanel(props: Partial<Parameters<typeof WorkspaceNotesPanel>[0]> =
   render(
     <PreferencesProvider>
       <MemoryRouter>
-        <NotesProvider>
+        <TestQueryProvider><NotesProvider>
           <WorkspaceNotesPanel document={book} bookQuotes={[bookQuote('n-1', 1)]} pendingQuote={null} {...handlers} {...props} />
-        </NotesProvider>
+        </NotesProvider></TestQueryProvider>
       </MemoryRouter>
     </PreferencesProvider>,
   )
@@ -250,7 +251,9 @@ describe('deleting a quoted book', () => {
     api.listNotes.mockResolvedValue({ ...page([summary(storm)]), total_elements: 3 })
     render(
       <PreferencesProvider>
-        <DeleteDocumentDialog document={book} onDelete={vi.fn()} onClose={vi.fn()} />
+        <TestQueryProvider>
+          <DeleteDocumentDialog document={book} onDelete={vi.fn()} onClose={vi.fn()} />
+        </TestQueryProvider>
       </PreferencesProvider>,
     )
     await waitFor(() => expect(screen.getByRole('alertdialog').textContent).toContain('останутся в заметках (3)'))
@@ -262,9 +265,9 @@ describe('closing the note editor before autosave', () => {
   const renderSession = (onSaved = vi.fn()) => render(
     <PreferencesProvider>
       <MemoryRouter>
-        <NotesProvider>
+        <TestQueryProvider><NotesProvider>
           <NoteEditSession note={storm} knownLinks={[]} compact onSaved={onSaved} onLatest={vi.fn()} onClose={vi.fn()} />
-        </NotesProvider>
+        </NotesProvider></TestQueryProvider>
       </MemoryRouter>
     </PreferencesProvider>,
   )

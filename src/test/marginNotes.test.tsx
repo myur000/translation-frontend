@@ -9,7 +9,8 @@ import type { NotesPanelRequest } from '../components/notes/WorkspaceNotesPanel.
 import type { BookQuote } from '../notes/bookQuotes.ts'
 import type { QuoteSelection } from '../notes/quoteLocator.ts'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
-import { useNotes } from '../notes/useNotes.ts'
+import { TestQueryProvider } from './queryWrapper.tsx'
+import { useNotesList } from '../notes/useNotesList.ts'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
 
 const api = vi.hoisted(() => ({
@@ -35,9 +36,10 @@ const quote = (target: NoteResponse, paragraphIndex: number): BookQuote => ({
   quote: paragraphIndex === 1 ? 'Ветер дул' : 'увидел свет', pairedText: null, paragraphText: null, note: target,
 })
 
-/** Сколько раз заметки менялись: по этому числу рабочая область перечитывает цитаты и конспекты. */
-function Revision() {
-  return <output aria-label="Ревизия заметок">{useNotes().revision}</output>
+/** Заметки книги в колонке: по их запросам видно, что после правки они перечитываются. */
+function BookNotesProbe() {
+  useNotesList({ job_id: 'job-1', size: 50 })
+  return null
 }
 
 /** Колонка книги в текстовом виде: абзацы с номерами, как у текста с сервера. */
@@ -53,7 +55,7 @@ function Book(props: {
   return (
     <PreferencesProvider>
       <MemoryRouter>
-        <NotesProvider>
+        <TestQueryProvider><NotesProvider>
           <div ref={ref} role="region" aria-label="Колонка" tabIndex={-1}>
             <article>
               <p data-paragraph-index="0">Глава первая</p>
@@ -64,8 +66,8 @@ function Book(props: {
           <MarginNotes viewportRef={ref} column="TRANSLATION" jobId="job-1" bookName="lighthouse-keepers-ledger.docx" quotes={props.quotes} aboutBook={props.aboutBook} layoutKey="translation"
             request={props.request ?? null} draft={props.draft ?? null} onDraftDone={vi.fn()}
             summaryQuote={props.summaryQuote ?? null} onSummaryQuoteDone={props.onSummaryQuoteDone} />
-          <Revision />
-        </NotesProvider>
+          <BookNotesProbe />
+        </NotesProvider></TestQueryProvider>
       </MemoryRouter>
     </PreferencesProvider>
   )
@@ -309,8 +311,8 @@ describe('margin notes', () => {
       { title: 'Конспект 2 — Lighthouse keepers ledger', body: 'Вторая мысль о книге.', job_ids: ['job-1'] },
       expect.objectContaining({ accessToken: 'jwt' }),
     )
-    // Заметки перечитываются, новый конспект — текущий.
-    expect(screen.getByRole('status', { name: 'Ревизия заметок' }).textContent).toBe('1')
+    // Заметки книги перечитываются, новый конспект — текущий.
+    await waitFor(() => expect(api.listNotes.mock.calls.filter(([query]) => query.job_id === 'job-1').length).toBeGreaterThanOrEqual(2))
     expect(JSON.parse(localStorage.getItem('parallel.current-summary.v1.reader@example.com')!)).toEqual({ 'job-1': 'n-10' })
   })
 

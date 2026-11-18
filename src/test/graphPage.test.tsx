@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NoteGraphResponse, NoteResponse } from '../api/contracts/notes.ts'
 import { GraphSidebarPanel } from '../components/sidebar/GraphSidebarPanel.tsx'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
+import { TestQueryProvider } from './queryWrapper.tsx'
 import { GraphPage } from '../pages/GraphPage.tsx'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
 
@@ -47,14 +48,14 @@ function renderGraph(path = '/graph', withPanel = false) {
   return render(
     <PreferencesProvider>
       <MemoryRouter initialEntries={[path]}>
-        <NotesProvider>
+        <TestQueryProvider><NotesProvider>
           {withPanel ? <GraphSidebarPanel isActive /> : null}
           <Routes>
             <Route path="/graph" element={<GraphPage />} />
             <Route path="*" element={null} />
           </Routes>
           <Location />
-        </NotesProvider>
+        </NotesProvider></TestQueryProvider>
       </MemoryRouter>
     </PreferencesProvider>,
   )

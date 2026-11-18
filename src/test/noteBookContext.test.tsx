@@ -6,6 +6,7 @@ import type { NoteQuoteResponse, NoteResponse } from '../api/contracts/notes.ts'
 import { NoteBookBar, NoteQuoteCards } from '../components/notes/NoteBookContext.tsx'
 import { bookNoteHref, noteBooks } from '../notes/noteBooks.ts'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
+import { TestQueryProvider } from './queryWrapper.tsx'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
 
 const api = vi.hoisted(() => ({
@@ -26,7 +27,7 @@ const note = (overrides: Partial<NoteResponse>): NoteResponse => ({
 })
 
 function renderWithProviders(element: React.ReactNode) {
-  return render(<PreferencesProvider><MemoryRouter><NotesProvider>{element}</NotesProvider></MemoryRouter></PreferencesProvider>)
+  return render(<PreferencesProvider><MemoryRouter><TestQueryProvider><NotesProvider>{element}</NotesProvider></TestQueryProvider></MemoryRouter></PreferencesProvider>)
 }
 
 beforeEach(() => {

@@ -20,7 +20,6 @@ import { PARAGRAPH_PARAM, TERM_PARAM } from '../glossary/glossaryLinks.ts'
 import type { ActiveQuoteSelection } from '../hooks/useQuoteSelection.ts'
 import { useBookNotes } from '../notes/useBookQuotes.ts'
 import type { BookQuote } from '../notes/bookQuotes.ts'
-import { useNotes } from '../notes/useNotes.ts'
 import { QuoteChoiceMenu, type QuoteChoice } from '../components/notes/QuoteChoiceMenu.tsx'
 import { QuoteSelectionButton } from '../components/notes/QuoteSelectionButton.tsx'
 import { useQuoteSelection } from '../hooks/useQuoteSelection.ts'
@@ -238,9 +237,8 @@ function DocumentWorkspace({
   // «В конспект» на полях: закладка раскрывается с формой выписки.
   const [summaryQuote, setSummaryQuote] = useState<{ nonce: number; selection: QuoteSelection } | null>(null)
   // Метки на полях: цитаты этой книги, перечитываются после каждой правки заметок.
-  const { revision: notesRevision } = useNotes()
   // Конспект можно начать, пока книга переводится: заметки о книге грузятся у любой отправленной.
-  const bookNotes = useBookNotes(document.jobId ?? null, notesRevision)
+  const bookNotes = useBookNotes(document.jobId ?? null)
   const bookQuotes = canQuote ? bookNotes.quotes : NO_BOOK_QUOTES
   // Выписки в конспект — отдельно от цитат заметок: у них своя метка-тетрадь и
   // подчёркивание цветом обложки, а открываются они в закладке конспекта.

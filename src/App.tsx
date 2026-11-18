@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router'
 import { AuthProvider } from './auth/AuthProvider.tsx'
+import { QueryProvider } from './query/QueryProvider.tsx'
 import { ProtectedRoute } from './auth/ProtectedRoute.tsx'
 import { AppLayout } from './layouts/AppLayout.tsx'
 import { AuthLayout } from './layouts/AuthLayout.tsx'
@@ -29,34 +30,36 @@ function App() {
   return (
     <PreferencesProvider>
       <AuthProvider>
-        <Routes>
-          <Route element={<AuthLayout />}>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/verify-email" element={<EmailVerificationPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-          </Route>
-
-          <Route element={<ProtectedRoute />}>
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/documents/:jobId" element={<WorkspacePage />} />
-              <Route path="/drafts/:draftId" element={<WorkspacePage />} />
-              <Route path="/history" element={<HistoryPage />} />
-              <Route path="/notes" element={<Suspense><NotesPage /></Suspense>} />
-              <Route path="/notes/new" element={<Suspense><NotesPage isNew /></Suspense>} />
-              <Route path="/notes/:noteId" element={<Suspense><NotesPage /></Suspense>} />
-              <Route path="/graph" element={<Suspense><GraphPage /></Suspense>} />
-              <Route path="/glossary" element={<Suspense><GlossaryPage /></Suspense>} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/plans" element={<PlansPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
+        <QueryProvider>
+          <Routes>
+            <Route element={<AuthLayout />}>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/verify-email" element={<EmailVerificationPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
             </Route>
-          </Route>
 
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
+            <Route element={<ProtectedRoute />}>
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/documents/:jobId" element={<WorkspacePage />} />
+                <Route path="/drafts/:draftId" element={<WorkspacePage />} />
+                <Route path="/history" element={<HistoryPage />} />
+                <Route path="/notes" element={<Suspense><NotesPage /></Suspense>} />
+                <Route path="/notes/new" element={<Suspense><NotesPage isNew /></Suspense>} />
+                <Route path="/notes/:noteId" element={<Suspense><NotesPage /></Suspense>} />
+                <Route path="/graph" element={<Suspense><GraphPage /></Suspense>} />
+                <Route path="/glossary" element={<Suspense><GlossaryPage /></Suspense>} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/plans" element={<PlansPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+              </Route>
+            </Route>
+
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </QueryProvider>
       </AuthProvider>
     </PreferencesProvider>
   )

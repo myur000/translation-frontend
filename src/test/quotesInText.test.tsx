@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NoteQuoteResponse, NoteResponse } from '../api/contracts/notes.ts'
 import { plainExcerpt } from '../notes/noteSyntax.ts'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
+import { TestQueryProvider } from './queryWrapper.tsx'
 import { embeddedQuoteIds, quoteEmbed, splitQuoteEmbeds } from '../notes/quoteEmbeds.ts'
 import { NotesPage } from '../pages/NotesPage.tsx'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
@@ -67,11 +68,11 @@ function renderNote() {
   return render(
     <PreferencesProvider>
       <MemoryRouter initialEntries={['/notes/n-1']}>
-        <NotesProvider>
+        <TestQueryProvider><NotesProvider>
           <Routes>
             <Route path="/notes/:noteId" element={<NotesPage />} />
           </Routes>
-        </NotesProvider>
+        </NotesProvider></TestQueryProvider>
       </MemoryRouter>
     </PreferencesProvider>,
   )

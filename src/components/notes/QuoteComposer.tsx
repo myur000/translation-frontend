@@ -111,7 +111,7 @@ export function QuoteComposer({ jobId, selection, bookNotes, bookQuotes, summary
     .filter((note): note is NoteSummary => Boolean(note))
     .slice(0, PARAGRAPH_NOTES_SHOWN)
   // Поиск грузится, только когда его раскрыли.
-  const found = useNotesList(isPickerOpen ? (query ? { q: query, size: 8 } : { size: 8 }) : null, 0)
+  const found = useNotesList(isPickerOpen ? (query ? { q: query, size: 8 } : { size: 8 }) : null)
   // Без поиска сначала заметки этой книги, затем недавние остальные.
   const candidates = query ? found.items
     : [...bookNotes, ...found.items.filter((item) => !bookNotes.some((known) => known.id === item.id))].slice(0, 8)

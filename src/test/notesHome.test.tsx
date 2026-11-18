@@ -7,6 +7,7 @@ import { translateCount } from '../i18n/translations.ts'
 import { bookOfNote, noteDay } from '../notes/notesOverview.ts'
 import { buildNotesTree } from '../notes/notesTree.ts'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
+import { TestQueryProvider } from './queryWrapper.tsx'
 import { NotesPage } from '../pages/NotesPage.tsx'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
 
@@ -48,12 +49,12 @@ function renderHome(path = '/notes') {
   return render(
     <PreferencesProvider>
       <MemoryRouter initialEntries={[path]}>
-        <NotesProvider>
+        <TestQueryProvider><NotesProvider>
           <Routes>
             <Route path="/notes" element={<NotesPage />} />
             <Route path="/notes/:noteId" element={<NotesPage />} />
           </Routes>
-        </NotesProvider>
+        </NotesProvider></TestQueryProvider>
       </MemoryRouter>
     </PreferencesProvider>,
   )

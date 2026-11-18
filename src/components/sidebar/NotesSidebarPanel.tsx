@@ -28,7 +28,7 @@ interface NotesSidebarPanelProps {
  */
 export function NotesSidebarPanel({ isActive }: NotesSidebarPanelProps) {
   const { t } = useTranslation()
-  const { revision, drafts, notesChanged } = useNotes()
+  const { drafts, notesChanged } = useNotes()
   const { session } = useAuth()
   const navigate = useNavigate()
   // Удаление прямо из панели: та же проверка, что на странице заметки.
@@ -40,7 +40,7 @@ export function NotesSidebarPanel({ isActive }: NotesSidebarPanelProps) {
   const [tag, setTag] = useState('')
   const [view, setView] = useState<View>('books')
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const { data, results, retry } = useNotesSidebar(wasShown, revision, query, tag)
+  const { data, results, retry } = useNotesSidebar(wasShown, query, tag)
   const noteMatch = useMatch('/notes/:noteId')
   const activeNoteId = noteMatch?.params.noteId !== 'new' ? noteMatch?.params.noteId ?? null : null
   const isFiltering = Boolean(query.trim() || tag)

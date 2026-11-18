@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiClientError } from '../api/client.ts'
 import type { NoteResponse, NoteSummary } from '../api/contracts/notes.ts'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
+import { TestQueryProvider } from './queryWrapper.tsx'
 import { NotesPage } from '../pages/NotesPage.tsx'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
 import { installDialogPolyfill } from './dialogPolyfill.ts'
@@ -48,14 +49,14 @@ function renderNotes(path: string) {
   return render(
     <PreferencesProvider>
       <MemoryRouter initialEntries={[path]}>
-        <NotesProvider>
+        <TestQueryProvider><NotesProvider>
           <Routes>
             <Route path="/notes" element={<NotesPage />} />
             <Route path="/notes/new" element={<NotesPage isNew />} />
             <Route path="/notes/:noteId" element={<NotesPage />} />
           </Routes>
           <LocationProbe />
-        </NotesProvider>
+        </NotesProvider></TestQueryProvider>
       </MemoryRouter>
     </PreferencesProvider>,
   )
@@ -70,6 +71,9 @@ beforeEach(() => {
   api.listNotes.mockResolvedValue(page([summary(stored)]))
   api.getNote.mockResolvedValue(stored)
   api.getNoteBacklinks.mockResolvedValue([])
+  // Сервер возвращает сохранённую версию; тесты со сбоем сохранения задают свой ответ.
+  api.updateNote.mockImplementation(async (_id: string, request: { title: string; body: string; version: number }) =>
+    note({ title: request.title, body: request.body, version: request.version + 1 }))
   api.getNoteGraph.mockResolvedValue({ nodes: [{ id: 'tag:договор', type: 'tag', label: '#договор', ref: null, deleted: false }],
     edges: [{ source: 'note:n-1', target: 'tag:договор', type: 'tagged', weight: 1 }], truncated: false })
 })
@@ -100,7 +104,7 @@ describe('notes section', () => {
     renderNotes(`/notes?q=${encodeURIComponent('срок')}`)
     expect(await screen.findByRole('heading', { name: /Поиск: «срок»/ })).toBeTruthy()
     expect(api.listNotes).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'срок' }), expect.anything())
-    expect(within(screen.getByRole('list', { name: /Поиск: «срок»/ })).getByRole('link', { name: /Сроки/ })).toBeTruthy()
+    expect(within(await screen.findByRole('list', { name: /Поиск: «срок»/ })).getByRole('link', { name: /Сроки/ })).toBeTruthy()
   })
 
   it('creates a note and opens it', async () => {
@@ -226,6 +230,8 @@ describe('notes section', () => {
     const other = note({ id: 'n-2', title: 'Штрафы', body: 'Пени', tags: [] })
     api.listNotes.mockResolvedValue(page([summary(note()), summary(other)]))
     api.getNote.mockImplementation(async (id: string) => (id === 'n-2' ? other : note()))
+    // Сохранение при уходе со страницы не дошло (нет сети): правка остаётся черновиком.
+    api.updateNote.mockRejectedValue(new TypeError('Failed to fetch'))
     renderNotes('/notes/n-1')
     await user.click(await screen.findByRole('button', { name: 'Редактировать' }))
     await user.type(screen.getByLabelText('Текст заметки'), ' Дополнение')

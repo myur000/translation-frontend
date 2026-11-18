@@ -17,7 +17,7 @@ export function DeleteDocumentDialog({ document, onDelete, onClose }: DeleteDocu
   const [isDeleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Цитаты переживают удаление книги — предупреждаем, в скольких заметках они останутся.
-  const quotingNotes = useNotesList(document.jobId ? { job_id: document.jobId, size: 1 } : null, 0)
+  const quotingNotes = useNotesList(document.jobId ? { job_id: document.jobId, size: 1 } : null)
   const notesKept = quotingNotes.status === 'ready' && quotingNotes.total > 0
     ? ` ${t('delete.notesKept', { count: quotingNotes.total })}` : ''
 

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { NoteReference, NoteResponse } from '../api/contracts/notes.ts'
+import { useQuery } from '@tanstack/react-query'
+import { useCallback } from 'react'
+import type { NoteResponse } from '../api/contracts/notes.ts'
 import { getNote, getNoteBacklinks } from '../api/notes.ts'
-import { useAuth } from '../auth/useAuth.ts'
 import { noteErrorMessage, type NoteErrorMessage } from './noteErrors.ts'
+import { noteKeys, useNotesAccess, useRememberNote } from './noteQueries.ts'
 
 export type NoteState =
   | { status: 'loading' }
@@ -10,55 +11,38 @@ export type NoteState =
   | { status: 'error'; message: NoteErrorMessage }
 
 /**
- * Одна заметка и её обратные ссылки. Обратные ссылки зависят от названия
+ * Одна заметка и её обратные ссылки. Заметка из кэша показывается сразу и при
+ * каждом открытии перечитывается в фоне. Обратные ссылки зависят от названия
  * (связь хранится по названию), поэтому перечитываются и после переименования.
  */
 export function useNote(noteId: string | null) {
-  const { session } = useAuth()
-  const tokenRef = useRef(session?.accessToken)
-  const [revision, setRevision] = useState(0)
-  const [loaded, setLoaded] = useState<{ key: string; state: NoteState } | null>(null)
-  const [backlinks, setBacklinks] = useState<{ key: string; items: NoteReference[] } | null>(null)
-  useEffect(() => { tokenRef.current = session?.accessToken }, [session?.accessToken])
+  const { owner, token } = useNotesAccess()
+  const remember = useRememberNote()
+  const note = useQuery({
+    queryKey: noteKeys.note(owner, noteId ?? ''),
+    queryFn: ({ signal }) => getNote(noteId!, { accessToken: token!, signal }),
+    enabled: Boolean(noteId && token),
+    staleTime: 0,
+  })
+  const title = note.data?.title ?? null
+  const backlinks = useQuery({
+    queryKey: noteKeys.backlinks(owner, noteId ?? '', title ?? ''),
+    // Обратные ссылки — дополнение: заметка остаётся доступной и без них.
+    queryFn: ({ signal }) => getNoteBacklinks(noteId!, { accessToken: token!, signal }).catch(() => []),
+    enabled: Boolean(noteId && token && title !== null),
+    staleTime: 0,
+  })
 
-  const key = `${session?.email ?? ''}\n${noteId ?? ''}\n${revision}`
-  useEffect(() => {
-    const token = tokenRef.current
-    if (!noteId || !token) return
-    const controller = new AbortController()
-    getNote(noteId, { accessToken: token, signal: controller.signal }).then((note) => {
-      if (!controller.signal.aborted) setLoaded({ key, state: { status: 'ready', note } })
-    }, (error: unknown) => {
-      if (!controller.signal.aborted) setLoaded({ key, state: { status: 'error', message: noteErrorMessage(error) } })
-    })
-    return () => controller.abort()
-  }, [key, noteId])
-
-  const state: NoteState = loaded?.key === key ? loaded.state : { status: 'loading' }
-  const title = state.status === 'ready' ? state.note.title : null
-  const backlinksKey = `${key}\n${title ?? ''}`
-  useEffect(() => {
-    const token = tokenRef.current
-    if (!noteId || !token || title === null) return
-    const controller = new AbortController()
-    getNoteBacklinks(noteId, { accessToken: token, signal: controller.signal }).then((items) => {
-      if (!controller.signal.aborted) setBacklinks({ key: backlinksKey, items })
-    }, () => {
-      // Обратные ссылки — дополнение: заметка остаётся доступной и без них.
-      if (!controller.signal.aborted) setBacklinks({ key: backlinksKey, items: [] })
-    })
-    return () => controller.abort()
-  }, [backlinksKey, noteId, title])
-
-  /** Принимает ответ сохранения как текущую версию, не перечитывая заметку. */
-  const applySaved = useCallback((note: NoteResponse) => {
-    setLoaded({ key, state: { status: 'ready', note } })
-  }, [key])
+  const state: NoteState = note.data ? { status: 'ready', note: note.data }
+    : note.isError && !note.isFetching ? { status: 'error', message: noteErrorMessage(note.error) }
+      : { status: 'loading' }
+  const { refetch } = note
 
   return {
     state,
-    backlinks: backlinks?.key === backlinksKey ? backlinks.items : null,
-    reload: useCallback(() => setRevision((value) => value + 1), []),
-    applySaved,
+    backlinks: backlinks.data ?? null,
+    reload: useCallback(() => void refetch(), [refetch]),
+    /** Принимает ответ сохранения как текущую версию, не перечитывая заметку. */
+    applySaved: remember,
   }
 }

@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NotesSidebarPanel } from '../components/sidebar/NotesSidebarPanel.tsx'
 import { NotesProvider } from '../notes/NotesProvider.tsx'
+import { TestQueryProvider } from './queryWrapper.tsx'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
 import { installDialogPolyfill } from './dialogPolyfill.ts'
 
@@ -23,9 +24,9 @@ function renderPanel(path: string) {
     path: '*',
     element: (
       <PreferencesProvider>
-        <NotesProvider>
+        <TestQueryProvider><NotesProvider>
           <NotesSidebarPanel isActive />
-        </NotesProvider>
+        </NotesProvider></TestQueryProvider>
       </PreferencesProvider>
     ),
   }], { initialEntries: [path] })

@@ -98,13 +98,8 @@ export function WorkspaceNotesPanel({ document, bookQuotes, pendingQuote, pendin
     setFocusIds(request.noteIds.length > 1 ? request.noteIds : null)
     setFocusOnSummaries(Boolean(request.about))
   }
-  const [revision, setRevision] = useState(0)
-
-  const bookNotes = useNotesList(jobId ? { job_id: jobId, size: 50 } : null, revision)
-  const changed = () => {
-    setRevision((value) => value + 1)
-    notesChanged()
-  }
+  const bookNotes = useNotesList(jobId ? { job_id: jobId, size: 50 } : null)
+  const changed = notesChanged
   const openNote = (id: string) => setView({ kind: 'note', id })
 
   let content
@@ -171,7 +166,7 @@ export function WorkspaceNotesPanel({ document, bookQuotes, pendingQuote, pendin
           items={items}
           emptyText={t(jobId && document.status === 'ready' ? 'notesPanel.bookEmpty' : 'notesPanel.noBook')}
           onOpen={openNote}
-          onRetry={() => setRevision((value) => value + 1)}
+          onRetry={bookNotes.retry}
         />
       </div>
     )

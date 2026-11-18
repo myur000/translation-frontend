@@ -1,40 +1,33 @@
-import { useEffect, useRef, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { NoteListQuery, NoteSummary } from '../api/contracts/notes.ts'
 import { listNotes } from '../api/notes.ts'
-import { useAuth } from '../auth/useAuth.ts'
+import { noteKeys, useNotesAccess } from './noteQueries.ts'
 
 export interface NotesListState {
   status: 'idle' | 'loading' | 'ready' | 'error'
   items: NoteSummary[]
   total: number
+  retry: () => void
 }
+
+const NO_ITEMS: NoteSummary[] = []
 
 /**
  * Список заметок по запросу (`null` — не загружать). Пока идёт новый запрос,
- * на экране остаётся прежний результат: поиск не мигает пустым списком.
+ * на экране остаётся прежний результат: поиск не мигает пустым списком. После
+ * правки заметок список перечитывается сам (`useNotesChanged`).
  */
-export function useNotesList(query: NoteListQuery | null, revision: number): NotesListState {
-  const { session } = useAuth()
-  const tokenRef = useRef(session?.accessToken)
-  const [loaded, setLoaded] = useState<{ key: string; state: NotesListState } | null>(null)
-  useEffect(() => { tokenRef.current = session?.accessToken }, [session?.accessToken])
-  const key = query ? `${session?.email ?? ''}\n${JSON.stringify(query)}\n${revision}` : null
-
-  useEffect(() => {
-    const token = tokenRef.current
-    if (!key || !query || !token) return
-    const controller = new AbortController()
-    listNotes(query, { accessToken: token, signal: controller.signal }).then((page) => {
-      if (!controller.signal.aborted) setLoaded({ key, state: { status: 'ready', items: page.items, total: page.total_elements } })
-    }, () => {
-      if (!controller.signal.aborted) setLoaded({ key, state: { status: 'error', items: [], total: 0 } })
-    })
-    return () => controller.abort()
-    // query описан ключом: объект запроса создаётся заново на каждом рендере.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key])
-
-  if (!key) return { status: 'idle', items: [], total: 0 }
-  if (loaded?.key === key) return loaded.state
-  return loaded?.state.status === 'ready' ? loaded.state : { status: 'loading', items: [], total: 0 }
+export function useNotesList(query: NoteListQuery | null): NotesListState {
+  const { owner, token } = useNotesAccess()
+  const result = useQuery({
+    queryKey: noteKeys.list(owner, query ?? {}),
+    queryFn: ({ signal }) => listNotes(query!, { accessToken: token!, signal }),
+    enabled: Boolean(query && token),
+    placeholderData: keepPreviousData,
+  })
+  const retry = () => void result.refetch()
+  if (!query) return { status: 'idle', items: NO_ITEMS, total: 0, retry }
+  if (result.data) return { status: 'ready', items: result.data.items, total: result.data.total_elements, retry }
+  // Повтор после ошибки показывает загрузку, а не прежнюю ошибку.
+  return { status: result.isError && !result.isFetching ? 'error' : 'loading', items: NO_ITEMS, total: 0, retry }
 }
