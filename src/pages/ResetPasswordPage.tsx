@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useLocation } from 'react-router'
 import { confirmPasswordReset } from '../api/auth.ts'
 import { ApiClientError } from '../api/client.ts'
+import { readLinkToken } from '../auth/linkToken.ts'
 import { useAuth } from '../auth/useAuth.ts'
 import { AuthField } from '../components/auth/AuthField.tsx'
 import { AuthStatusCard } from '../components/auth/AuthStatusCard.tsx'
@@ -23,7 +24,7 @@ export function ResetPasswordPage() {
   const location = useLocation()
   const { invalidateSession } = useAuth()
   const { t } = useTranslation()
-  const token = new URLSearchParams(location.search).get('token')?.trim() ?? ''
+  const token = readLinkToken(location)
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [errors, setErrors] = useState<ResetErrors>({})

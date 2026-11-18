@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { confirmEmailVerification } from '../api/auth.ts'
 import { ApiClientError } from '../api/client.ts'
+import { readLinkToken } from '../auth/linkToken.ts'
 import { useAuth } from '../auth/useAuth.ts'
 import { AuthStatusCard } from '../components/auth/AuthStatusCard.tsx'
 import { useTranslation } from '../i18n/useTranslation.ts'
@@ -23,7 +24,7 @@ export function EmailVerificationPage() {
   const location = useLocation()
   const { invalidateSession } = useAuth()
   const { t } = useTranslation()
-  const token = new URLSearchParams(location.search).get('token')?.trim() ?? ''
+  const token = readLinkToken(location)
   const processedToken = useRef<string | null>(null)
   const [result, setResult] = useState<VerificationResult>(() =>
     token ? { state: 'loading', message: t('verify.checking') } : { state: 'error', message: t('verify.missingToken') },
