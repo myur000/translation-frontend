@@ -8,11 +8,28 @@ const MARKER_GAP = 6
 /** Меньше этого зазора поле страницы считается слишком узким для метки. */
 const MIN_INNER_GAP = MARKER_SIZE + 4
 
+/**
+ * Место метки на самой странице, в её единицах до масштаба: страница масштабируется
+ * через CSS `zoom`, и метка внутри неё едет вместе с текстом в том же кадре.
+ * `x`, `y` — точка на странице (центр первой строки абзаца по вертикали), `dx` —
+ * сдвиг кружка от неё в экранных пикселях: размер метки от масштаба не зависит.
+ */
+export interface PageAnchor {
+  page: HTMLElement
+  x: number
+  y: number
+  dx: number
+  /** Сдвиг вниз в экранных пикселях: тетрадь конспекта под кружком заметок того же абзаца. */
+  dy?: number
+}
+
 /** Метка у абзаца: все заметки, цитирующие этот абзац, — одной меткой. */
 export interface QuoteMarker {
   key: string
   top: number
   left: number
+  /** Где метка на странице; `null` — страницы нет, метка в слое колонки. */
+  anchor: PageAnchor | null
   noteIds: string[]
   titles: string[]
   /** Номер абзаца (как в `/text`), у которого стоит метка; `null` — у строки PDF без номера. */
@@ -48,8 +65,17 @@ export function placeMarkers(host: HTMLElement, column: NoteQuoteSide, quotes: B
     const paperLeft = paper.left - hostRect.left + host.scrollLeft
     // Метка — по центру первой строки абзаца.
     const top = line.top - hostRect.top + host.scrollTop + (line.height - MARKER_SIZE) / 2
+    const left = markerLeft(paperElement, paperLeft, rect.left - paper.left)
+    const zoom = paperElement ? cssZoom(paperElement) : 1
+    const anchor = paperElement ? {
+      page: paperElement,
+      // Середина левого поля, если метка в нём; иначе от левого края страницы.
+      x: left > paperLeft + 2 ? (left - paperLeft + MARKER_SIZE / 2) / zoom : 0,
+      y: (line.top + line.height / 2 - paper.top) / zoom,
+      dx: left > paperLeft + 2 ? -MARKER_SIZE / 2 : left - paperLeft,
+    } : null
     // Ключ — заметки и абзац (у строки PDF — её положение по вертикали): одна заметка может цитировать несколько абзацев.
-    markers.push({ key: `${group.noteIds.join(',')}@${blockOrder.get(element) ?? Math.round(top)}`, top: Math.round(top), left: Math.round(markerLeft(paperElement, paperLeft, rect.left - paper.left)), ...group })
+    markers.push({ key: `${group.noteIds.join(',')}@${blockOrder.get(element) ?? Math.round(top)}`, top: Math.round(top), left: Math.round(left), anchor, ...group })
   }
   return markers.sort((first, second) => first.top - second.top)
 }
@@ -63,6 +89,13 @@ function markerLeft(paperElement: HTMLElement | null, paperLeft: number, innerGa
   if (paperElement?.tagName === 'ARTICLE' && innerGap >= MIN_INNER_GAP) return paperLeft + (innerGap - MARKER_SIZE) / 2
   const outside = paperLeft - MARKER_SIZE - MARKER_GAP
   return outside >= 2 ? outside : paperLeft + 2
+}
+
+/** Масштаб страницы (CSS `zoom`); без поддержки в браузере или в jsdom — 1. */
+function cssZoom(element: HTMLElement) {
+  const zoom = (element as HTMLElement & { currentCSSZoom?: number }).currentCSSZoom
+    ?? parseFloat(getComputedStyle(element).zoom)
+  return Number.isFinite(zoom) && zoom > 0 ? zoom : 1
 }
 
 /** Прямоугольник первой строки абзаца; null, если браузер (или jsdom) его не даёт. */
@@ -122,5 +155,11 @@ export function notesAtPoint(hits: readonly QuoteHit[], x: number, y: number): s
 
 export function sameMarkers(current: QuoteMarker[], next: QuoteMarker[]) {
   return current.length === next.length && current.every((marker, index) =>
-    marker.key === next[index].key && marker.top === next[index].top && marker.left === next[index].left)
+    marker.key === next[index].key && marker.top === next[index].top && marker.left === next[index].left
+    && sameAnchor(marker.anchor, next[index].anchor))
+}
+
+function sameAnchor(current: PageAnchor | null, next: PageAnchor | null) {
+  if (!current || !next) return current === next
+  return current.page === next.page && Math.abs(current.x - next.x) < 0.5 && Math.abs(current.y - next.y) < 0.5 && current.dx === next.dx && (current.dy ?? 0) === (next.dy ?? 0)
 }

@@ -12,7 +12,7 @@ export const LAYOUT_SETTLE_MS = 180
  * Свой правый отступ под заметки (`--margin-notes-space`) ширину колонки не
  * меняет и сюда не попадает — иначе слой прятался бы от собственного пересчёта.
  */
-export function useLayoutSettling(host: HTMLElement | null) {
+export function useLayoutSettling(host: HTMLElement | null, { zoom: watchZoom = true }: { zoom?: boolean } = {}) {
   const [isSettling, setSettling] = useState(false)
   useEffect(() => {
     if (!host) return
@@ -24,12 +24,13 @@ export function useLayoutSettling(host: HTMLElement | null) {
       window.clearTimeout(timer)
       timer = window.setTimeout(() => setSettling(false), LAYOUT_SETTLE_MS)
     }
+    // Слою, который масштабируется вместе со страницей, прятаться от масштаба не нужно.
     const zoomChanges = new MutationObserver(() => {
       if (host.dataset.zoom === zoom) return
       zoom = host.dataset.zoom
       settle()
     })
-    zoomChanges.observe(host, { attributes: true, attributeFilter: ['data-zoom'] })
+    if (watchZoom) zoomChanges.observe(host, { attributes: true, attributeFilter: ['data-zoom'] })
     const resizes = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
       if (host.clientWidth === width) return
       width = host.clientWidth
@@ -42,6 +43,6 @@ export function useLayoutSettling(host: HTMLElement | null) {
       resizes?.disconnect()
       setSettling(false)
     }
-  }, [host])
+  }, [host, watchZoom])
   return isSettling
 }

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NoteResponse } from '../api/contracts/notes.ts'
 import { QuoteMarkers } from '../components/workspace/QuoteMarkers.tsx'
 import { loadBookNotes, loadBookQuotes, type BookQuote } from '../notes/bookQuotes.ts'
+import { placeMarkers } from '../notes/quoteMarkerLayout.ts'
 import { PreferencesProvider } from '../preferences/PreferencesProvider.tsx'
 
 const api = vi.hoisted(() => ({ listNotes: vi.fn(), getNote: vi.fn() }))
@@ -45,9 +46,34 @@ function Column({ column, quotes, summaryQuotes, onOpen, onOpenSummary }: {
   )
 }
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 describe('margin markers', () => {
+  it('anchors a marker to its paragraph in page units, so the page zoom carries it', () => {
+    const host = document.createElement('div')
+    host.innerHTML = '<article><p>Глава первая</p><p>Ветер дул с северо-востока.</p></article>'
+    document.body.append(host)
+    const page = host.querySelector('article')!
+    const paragraph = host.querySelectorAll('p')[1]
+    // Страница в масштабе 200%: левое поле на экране 80px, первая строка абзаца — 40px высотой.
+    Object.defineProperty(page, 'currentCSSZoom', { value: 2 })
+    const box = (left: number, top: number, width: number, height: number) =>
+      ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this === page) return box(100, 50, 1120, 900)
+      if (this === paragraph) return box(180, 250, 960, 40)
+      return box(0, 0, 0, 0)
+    })
+
+    const [marker] = placeMarkers(host, 'TRANSLATION', [quote({})])
+    // Середина поля и центр строки — в единицах страницы, кружок сдвинут на свою половину.
+    expect(marker.anchor).toMatchObject({ page, x: 20, y: 110, dx: -11 })
+    host.remove()
+  })
+
   it('marks a quoted paragraph once per paragraph and opens its notes', async () => {
     const user = userEvent.setup()
     const onOpen = vi.fn()
@@ -84,9 +110,13 @@ describe('margin markers', () => {
 
     const notes = await screen.findByRole('button', { name: 'Заметки к этому абзацу (1): Шторм' })
     const summary = screen.getByRole('button', { name: 'Выписка в конспект «Конспект»' })
+    // Метки лежат на самой странице: при масштабе они едут вместе с текстом.
+    expect(notes.closest('article')).toBeTruthy()
     // Тетрадь не закрывает кружок заметок: она под ним, на той же вертикали.
-    expect(Number.parseFloat(summary.style.top)).toBeGreaterThan(Number.parseFloat(notes.style.top))
-    expect(summary.style.left).toBe(notes.style.left)
+    const anchorOf = (button: HTMLElement) => button.parentElement!.style
+    expect(anchorOf(summary).top).toBe(anchorOf(notes).top)
+    expect(anchorOf(summary).left).toBe(anchorOf(notes).left)
+    expect(Number.parseFloat(summary.style.marginTop)).toBeGreaterThan(Number.parseFloat(notes.style.marginTop))
     // Каждая метка открывает своё: кружок — заметки, тетрадь — конспект.
     await user.click(summary)
     expect(onOpenSummary).toHaveBeenCalledWith('s-1', expect.any(HTMLElement))

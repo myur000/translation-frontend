@@ -10,7 +10,25 @@
   transition: opacity 120ms ease;
 }
 
-/* Масштаб или ширина меняются: метки скрыты, пока страница не встанет на место. */
+/* Слой внутри страницы: метки в её единицах, CSS `zoom` страницы двигает их вместе
+   с текстом в том же кадре. */
+.pageLayer {
+  pointer-events: none;
+}
+
+.anchor {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* Размер кружка от масштаба страницы не зависит: обратный `zoom` гасит её. */
+.anchor > * {
+  zoom: calc(1 / var(--book-zoom, 1));
+  pointer-events: auto;
+}
+
+/* Ширина колонки меняется: метки скрыты, пока страница не встанет на место. */
 .settling {
   opacity: 0;
   transition: none;
