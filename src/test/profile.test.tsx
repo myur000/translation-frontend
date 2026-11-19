@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, within, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -188,13 +188,13 @@ describe('profile editing UI', () => {
     expect(screen.queryByText('Профиль сохранён.')).toBeNull()
   })
 
-  it('loads existing values, keeps email readonly and prevents unchanged saves', async () => {
+  it('loads existing values, shows the email in sign-in settings and prevents unchanged saves', async () => {
     const { mock } = installApi()
     renderPage()
     await ready()
-    expect((screen.getByLabelText('Email') as HTMLInputElement).readOnly).toBe(true)
-    expect((screen.getByLabelText('Email') as HTMLInputElement).value).toBe(original.email)
-    expect(screen.getAllByRole('textbox')).toHaveLength(2)
+    // Почта не поле формы имени: она показана и меняется в «Вход и безопасность».
+    expect(within(screen.getByRole('region', { name: 'Вход и безопасность' })).getByText(original.email)).toBeTruthy()
+    expect(screen.getAllByRole('textbox')).toHaveLength(1)
     for (const label of ['Имя пользователя', 'Никнейм', 'Профессия', 'О себе']) {
       expect(screen.queryByLabelText(label)).toBeNull()
     }
@@ -372,7 +372,7 @@ describe('profile editing UI', () => {
     installApi()
     renderPage()
     await screen.findByLabelText('Name')
-    expect(screen.getAllByRole('textbox')).toHaveLength(2)
+    expect(screen.getAllByRole('textbox')).toHaveLength(1)
     expect(screen.queryByLabelText('Username')).toBeNull()
     expect(document.documentElement.lang).toBe('en')
     expect(document.documentElement.dataset.theme).toBe('dark')
@@ -408,7 +408,7 @@ describe('profile editing UI', () => {
     view.rerender(<TestApp />)
     expect((await ready() as HTMLInputElement).value).toBe('Another reader')
     await act(async () => finish(json(original)))
-    expect((screen.getByLabelText('Email') as HTMLInputElement).value).toBe('another@example.com')
+    expect(within(screen.getByRole('region', { name: 'Вход и безопасность' })).getByText('another@example.com')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Открыть меню пользователя' }).textContent).not.toContain('Reader')
   })
 

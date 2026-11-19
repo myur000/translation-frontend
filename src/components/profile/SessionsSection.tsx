@@ -16,19 +16,23 @@ export function SessionsSection() {
   const [now] = useState(() => new Date())
   return (
     <section id="sessions" className={styles.section} aria-labelledby="sessions-title" aria-busy={sessions.isFetching}>
-      <h2 id="sessions-title">{t('sessions.title')}</h2>
-      <p className={styles.sectionLead}>{t('sessions.lead')}</p>
-      {sessions.isPending ? <p className={styles.rowText} role="status">{t('sessions.loading')}</p> : null}
-      {sessions.isError && !sessions.data ? <p className={styles.error} role="alert">
-        {t('sessions.loadError')} <button type="button" className={styles.inlineButton}
-          onClick={() => void sessions.refetch()}>{t('profile.retry')}</button>
-      </p> : null}
-      {sessions.data ? (
-        <ul className={styles.rows} aria-label={t('sessions.title')}>
-          {sessions.data.map((session) => <SessionRow key={session.id} session={session} now={now} />)}
-        </ul>
-      ) : null}
-      <LogoutAllSection />
+      <div className={styles.sectionCopy}>
+        <h2 id="sessions-title">{t('sessions.title')}</h2>
+        <p>{t('sessions.lead')}</p>
+      </div>
+      <div className={styles.sectionBody}>
+        {sessions.isPending ? <p className={styles.rowText} role="status">{t('sessions.loading')}</p> : null}
+        {sessions.isError && !sessions.data ? <p className={styles.error} role="alert">
+          {t('sessions.loadError')} <button type="button" className={styles.inlineButton}
+            onClick={() => void sessions.refetch()}>{t('profile.retry')}</button>
+        </p> : null}
+        {sessions.data ? (
+          <ul className={styles.rows} aria-label={t('sessions.title')}>
+            {sessions.data.map((session) => <SessionRow key={session.id} session={session} now={now} />)}
+          </ul>
+        ) : null}
+        <LogoutAllSection />
+      </div>
     </section>
   )
 }

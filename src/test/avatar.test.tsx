@@ -316,7 +316,7 @@ describe('profile avatar UI', () => {
     auth.session = { email: 'another@example.com', accessToken: 'other-token' }
     options.profile = { ...initial, user_id: 'another', email: auth.session.email }
     view.rerender(<TestApp />)
-    await waitFor(() => expect((screen.getByLabelText('Email') as HTMLInputElement).value).toBe(auth.session.email))
+    await waitFor(() => expect(within(screen.getByRole('region', { name: 'Вход и безопасность' })).getByText(auth.session.email)).toBeTruthy())
     await act(async () => finish(binary()))
     expect(createUrl).not.toHaveBeenCalled()
   })

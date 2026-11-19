@@ -24,34 +24,29 @@ export function ProfilePage() {
           <h1>{t('user.profile')}</h1>
           <p>{t('profile.pageDescription')}</p>
         </header>
-        <div className={styles.layout}>
-          <nav className={styles.nav} aria-label={t('profile.sections')}>
-            <a href="#about">{t('profile.sectionAbout')}</a>
-            <a href="#security">{t('security.title')}</a>
-            <a href="#sessions">{t('sessions.title')}</a>
-          </nav>
-          <div className={styles.sections}>
-            <section id="about" className={styles.section} aria-labelledby="about-title">
-              <h2 id="about-title">{t('profile.sectionAbout')}</h2>
-              <p className={styles.sectionLead}>{t('profile.description')}</p>
-              {state === 'loading' ? <p role="status" className={styles.rowText}>{t('profile.loading')}</p> : null}
-              {state === 'error' || (state === 'ready' && !valid) ? (
-                <div role="alert" style={{ marginTop: 16 }}>
-                  <p className={styles.error}>{t('profile.loadError')}</p>
-                  <button type="button" className={styles.secondary} style={{ marginTop: 12 }} onClick={() => void reload()}>
-                    {t('profile.retry')}
-                  </button>
-                </div>
-              ) : null}
-              {valid ? <div style={{ marginTop: 20 }}>
-                <ProfileAvatarEditor key={profile.user_id + '-avatar'} />
-                <ProfileForm key={profile.user_id} profile={profile} />
-              </div> : null}
-            </section>
-            <SecuritySection email={email} />
-            <SessionsSection />
+        <section id="about" className={styles.section} aria-labelledby="about-title">
+          <div className={styles.sectionCopy}>
+            <h2 id="about-title">{t('profile.sectionAbout')}</h2>
+            <p>{t('profile.description')}</p>
           </div>
-        </div>
+          <div className={styles.sectionBody}>
+            {state === 'loading' ? <p role="status" className={styles.rowText}>{t('profile.loading')}</p> : null}
+            {state === 'error' || (state === 'ready' && !valid) ? (
+              <div role="alert">
+                <p className={styles.error}>{t('profile.loadError')}</p>
+                <button type="button" className={styles.secondary} style={{ marginTop: 12 }} onClick={() => void reload()}>
+                  {t('profile.retry')}
+                </button>
+              </div>
+            ) : null}
+            {valid ? <>
+              <ProfileAvatarEditor key={profile.user_id + '-avatar'} />
+              <ProfileForm key={profile.user_id} profile={profile} />
+            </> : null}
+          </div>
+        </section>
+        <SecuritySection email={email} />
+        <SessionsSection />
       </div>
     </div>
   )

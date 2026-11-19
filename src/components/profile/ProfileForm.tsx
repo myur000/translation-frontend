@@ -100,12 +100,7 @@ export function ProfileForm({ profile }: { profile: ProfileResponse }) {
   return (
     <form className={styles.card} noValidate onSubmit={(event) => void submit(event)}
       aria-label={t('user.profile')} aria-busy={isSaving}>
-      <div className={styles.email}>
-        <label htmlFor={prefix + '-email'}>{t('common.email')}</label>
-        <input id={prefix + '-email'} type="email" value={profile.email} readOnly
-          aria-describedby={prefix + '-email-hint'} />
-        <small id={prefix + '-email-hint'}>{t('profile.emailReadonly')}</small>
-      </div>
+      {/* Почта показана и меняется в разделе «Вход и безопасность». */}
       <div className={styles.fields}>
         <ProfileField id={prefix + '-display_name'} value={name} disabled={disabled} onChange={change}
           error={errors.display_name ? t(errors.display_name, { limit: PROFILE_FIELD_LIMITS.display_name })
