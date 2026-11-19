@@ -1,3 +1,4 @@
+import { NotificationsSection } from '../components/settings/NotificationsSection.tsx'
 import { usePreferences } from '../preferences/usePreferences.ts'
 import { useTranslation } from '../i18n/useTranslation.ts'
 import type {
@@ -71,6 +72,8 @@ export function SettingsPage() {
           />
         </fieldset>
       </section>
+
+      <NotificationsSection />
 
       <p className={styles.savedNote}>{t('settings.saved')}</p>
     </div>

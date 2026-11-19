@@ -70,6 +70,8 @@ Frontend обновляет JWT за минуту до истечения и п�
 | POST | `/api/account/second-factor/enable` | JWT | `{code}` | `200 {recoveryCodes}`; остальные сеансы завершены |
 | POST | `/api/account/second-factor/disable` | JWT | `{currentPassword, code \| recoveryCode}` | `204` |
 | POST | `/api/account/second-factor/recovery-codes` | JWT | `{currentPassword, code}` | `200 {recoveryCodes}` |
+| GET | `/api/account/notifications` | JWT | — | `200 {document_ready}` |
+| PUT | `/api/account/notifications` | JWT | `{document_ready}` | `200 {document_ready}` |
 | GET | `/api/languages` | public | — | `200 LanguageResponse[]` (NLLB-200, `max-age=3600`) |
 | POST | `/api/documents/upload` | verified JWT | multipart | `202 DocumentUploadResponse` |
 | POST | `/api/documents/estimate` | verified JWT | multipart `file` | `200 DocumentEstimateResponse` |

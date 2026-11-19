@@ -72,6 +72,7 @@ export const API_ENDPOINTS = {
     usage: '/account/usage',
     subscription: '/account/subscription',
     cancelSubscription: '/account/subscription/cancellation',
+    notifications: '/account/notifications',
   },
   subscriptionOffers: '/subscription-offers',
   subscriptionPurchases: '/subscription-purchases',

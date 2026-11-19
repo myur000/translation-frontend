@@ -9,6 +9,7 @@ export const accountKeys = {
   all: (owner: string) => ['account', owner] as const,
   sessions: (owner: string) => ['account', owner, 'sessions'] as const,
   secondFactor: (owner: string) => ['account', owner, 'second-factor'] as const,
+  notifications: (owner: string) => ['account', owner, 'notifications'] as const,
 }
 
 export function useAccountAccess() {
